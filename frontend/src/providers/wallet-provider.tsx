@@ -13,16 +13,6 @@ type WalletState = {
   disconnect: () => void;
 };
 
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: unknown[] }) => Promise<any>;
-      on?: (event: string, cb: (...args: any[]) => void) => void;
-      removeListener?: (event: string, cb: (...args: any[]) => void) => void;
-    };
-  }
-}
-
 const WalletContext = createContext<WalletState | null>(null);
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {

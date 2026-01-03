@@ -98,9 +98,12 @@ function Navbar() {
 
           {isConnected && (
             <Link to="/upload">
-              <Button variant="secondary" className="gap-2">
+              <Button
+                variant="secondary"
+                className="hover:cursor-pointer gap-2"
+              >
                 <Upload className="h-4 w-4" />
-                Upload Data
+                Sell Data
               </Button>
             </Link>
           )}
@@ -114,13 +117,17 @@ function Navbar() {
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
-                onClick={copyAddress}
+                onClick={() => copyAddress()}
                 title={address ?? ""}
-                className="font-mono"
+                className="font-mono hover:cursor-pointer"
               >
                 {shortAddress(address!)}
               </Button>
-              <Button variant="ghost" onClick={disconnect}>
+              <Button
+                variant="ghost"
+                onClick={disconnect}
+                className="hover:cursor-pointer"
+              >
                 Disconnect
               </Button>
             </div>
