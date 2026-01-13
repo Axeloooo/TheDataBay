@@ -67,7 +67,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({ address, isConnected, connect, disconnect }),
-    [address, isConnected]
+    [address, isConnected, connect, disconnect]
   );
 
   return (

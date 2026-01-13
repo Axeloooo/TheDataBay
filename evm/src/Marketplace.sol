@@ -15,7 +15,6 @@ contract Marketplace is Ownable, ReentrancyGuard {
     error Marketplace__AlreadyHasAccess(address user, uint256 itemId);
     error Marketplace__NothingToWithdraw();
     error Marketplace__WithdrawFailed();
-    error Marketplace__IncorrectPaymentAmount();
 
     // ============ Structs ============
 
@@ -207,7 +206,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         DataItem storage item = items[itemId];
 
         if (msg.value != item.price) {
-            revert Marketplace__IncorrectPaymentAmount();
+            revert Marketplace__InsufficientPayment(item.price, msg.value);
         }
 
         if (item.accessList[msg.sender]) {
