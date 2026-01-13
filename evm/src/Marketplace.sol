@@ -277,7 +277,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
     function withdraw() external onlyOwner nonReentrant {
         uint256 amount = address(this).balance;
 
-        if (amount <= 0) {
+        if (amount == 0) {
             revert Marketplace__NothingToWithdraw();
         }
 
