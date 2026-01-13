@@ -1,0 +1,55 @@
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import "./App.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
+import Layout from "@/pages/Layout";
+import Home from "@/pages/Home";
+import HowItWorks from "@/pages/HowItWorks";
+import Upload from "@/pages/Upload";
+import DatasetDetail from "@/pages/DatasetDetail";
+
+function App() {
+  return (
+    <ThemeProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <Layout>
+                <Home />
+              </Layout>
+            }
+          />
+          <Route
+            path="/how-it-works"
+            element={
+              <Layout>
+                <HowItWorks />
+              </Layout>
+            }
+          />
+          <Route
+            path="/upload"
+            element={
+              <Layout>
+                <Upload />
+              </Layout>
+            }
+          />
+          <Route
+            path="/dataset/:id"
+            element={
+              <Layout>
+                <DatasetDetail />
+              </Layout>
+            }
+          />
+        </Routes>
+      </BrowserRouter>
+      <Toaster position="top-center" />
+    </ThemeProvider>
+  );
+}
+
+export default App;
