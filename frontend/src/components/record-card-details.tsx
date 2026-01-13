@@ -49,10 +49,6 @@ function RecordCardDetails({
     });
   };
 
-  const shortAddress = (addr: string) => {
-    return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
