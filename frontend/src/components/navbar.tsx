@@ -16,6 +16,12 @@ import { Search, ArrowLeftRight, Wallet, Upload } from "lucide-react";
 import { Button } from "./ui/button";
 import { useWallet } from "@/providers/wallet-provider";
 import { toast } from "sonner";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -29,7 +35,7 @@ function Navbar() {
     try {
       await navigator.clipboard.writeText(address);
       toast("Address copied to clipboard", {
-        description: address,
+        description: shortAddress(address),
       });
     } catch {}
   };
@@ -66,7 +72,7 @@ function Navbar() {
         <div className="flex items-center gap-2">
           <NavigationMenu>
             <NavigationMenuList className="flex items-center gap-1">
-              <NavigationMenuItem>
+              {/* <NavigationMenuItem>
                 <NavLink to="/">
                   {({ isActive }) => (
                     <NavigationMenuLink
@@ -78,7 +84,7 @@ function Navbar() {
                     </NavigationMenuLink>
                   )}
                 </NavLink>
-              </NavigationMenuItem>
+              </NavigationMenuItem> */}
 
               <NavigationMenuItem>
                 <NavLink to="/how-it-works">
@@ -109,10 +115,19 @@ function Navbar() {
           )}
 
           {!isConnected ? (
-            <Button onClick={connect} className="gap-2">
-              <Wallet className="h-4 w-4" />
-              Connect Wallet
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger>
+                <Button className="hover:cursor-pointer gap-2">
+                  <Wallet className="h-4 w-4" />
+                  Connect Wallet
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={connect}>EVM</DropdownMenuItem>
+                <DropdownMenuItem disabled>Solana</DropdownMenuItem>
+                <DropdownMenuItem disabled>Bitcoin</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
             <div className="flex items-center gap-2">
               <Button
