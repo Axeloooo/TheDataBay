@@ -2,6 +2,7 @@
 pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
+import {HelperConfig} from "./HelperConfig.s.sol";
 import {Marketplace} from "../src/Marketplace.sol";
 
 contract DeployMarketplace is Script {
