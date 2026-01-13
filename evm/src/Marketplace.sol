@@ -99,7 +99,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         string calldata signatureUrl,
         bytes32 signatureHash
     ) external onlyOwner returns (uint256 itemId) {
-        if (price <= 0) {
+        if (price == 0) {
             revert Marketplace__PriceMustBeGreaterThanZero();
         }
 
