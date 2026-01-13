@@ -161,7 +161,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @param newPrice The new price in wei.
      */
     function updatePrice(uint256 itemId, uint256 newPrice) external onlyOwner onlyExistingItem(itemId) {
-        if (newPrice <= 0) {
+        if (newPrice == 0) {
             revert Marketplace__PriceMustBeGreaterThanZero();
         }
 

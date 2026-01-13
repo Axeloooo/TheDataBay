@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  useCallback,
 } from "react";
 
 type WalletState = {
@@ -20,7 +21,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const isConnected = !!address;
 
-  const connect = async () => {
+  const connect = useCallback(async () => {
     if (!window.ethereum) {
       // You can replace this with a toast/modal
       alert(
@@ -32,13 +33,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       method: "eth_requestAccounts",
     });
     setAddress(accounts?.[0] ?? null);
-  };
+  }, []);
 
-  const disconnect = () => {
+  const disconnect = useCallback(() => {
     // NOTE: Most injected wallets don't support programmatic "disconnect".
     // We just clear app state.
     setAddress(null);
-  };
+  }, []);
 
   // Keep state in sync if user switches accounts in wallet UI
   useEffect(() => {
