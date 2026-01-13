@@ -37,7 +37,12 @@ function Navbar() {
       toast("Address copied to clipboard", {
         description: shortAddress(address),
       });
-    } catch {}
+    } catch (error) {
+      console.error("Failed to copy address to clipboard:", error);
+      toast("Failed to copy address", {
+        description: "Please check your browser permissions and try again.",
+      });
+    }
   };
 
   return (
