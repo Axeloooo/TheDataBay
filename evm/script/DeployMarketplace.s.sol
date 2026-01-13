@@ -5,16 +5,18 @@ import {Script} from "forge-std/Script.sol";
 import {Marketplace} from "../src/Marketplace.sol";
 
 contract DeployMarketplace is Script {
-    uint256 public constant DEFAULT_ANVIL_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
-
     Marketplace public marketplace;
 
     function setUp() public {}
 
     function run() public {
-        vm.startBroadcast();
+        HelperConfig config = new HelperConfig();
 
-        marketplace = new Marketplace(vm.addr(DEFAULT_ANVIL_KEY));
+        (uint256 deployKey) = config.activeNetworkConfig;
+
+        vm.startBroadcast(deployKey);
+
+        marketplace = new Marketplace(vm.addr(deployKey));
 
         vm.stopBroadcast();
     }
