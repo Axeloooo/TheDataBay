@@ -2,8 +2,9 @@
 pragma solidity ^0.8.19;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-contract Marketplace is Ownable {
+contract Marketplace is Ownable, ReentrancyGuard {
     // ============ Errors ============
 
     error Marketplace__ItemDoesNotExist(uint256 itemId);
@@ -14,29 +15,37 @@ contract Marketplace is Ownable {
     error Marketplace__AlreadyHasAccess(address user, uint256 itemId);
     error Marketplace__NothingToWithdraw();
     error Marketplace__WithdrawFailed();
+    error Marketplace__IncorrectPaymentAmount();
 
     // ============ Structs ============
 
     struct DataItem {
-        address seller; // Address of the seller NEW
-        string accessUrl; // IPFS CID / URL of the dataset
-        uint256 price; // Price in wei (1 ETH = 10^18 wei)
+        string title;
+        string description;
+        address seller;
+        uint256 price;
+
+        string datasetUrl;
+        bytes32 datasetHash;
+
+        string signatureUrl;
         bytes32 signatureHash;
-        string signatureVectorUri; // URI of the embedding vector stored off-chain (e.g., IPFS)
+
         bool exists;
-        mapping(address => bool) accessList; // Review access control and check IPFS access control capabilities
+
+        mapping(address => bool) accessList;
     }
 
     // ============ State Variables ============
 
-    uint256 constant PLATFORM_FEE_BASIS_POINTS = 250; // 2.5% platform fee NEW
+    uint256 constant PLATFORM_FEE_BASIS_POINTS = 250;
     uint256 public nextItemId;
     mapping(uint256 => DataItem) private items;
 
     // ============ Events ============
 
     event ItemCreated(
-        uint256 indexed itemId, string accessUrl, uint256 price, bytes32 signatureHash, string signatureVectorUri
+        uint256 indexed itemId, string datasetUrl, uint256 price, bytes32 datasetHash, string signatureUrl
     );
 
     event AccessUrlUpdated(uint256 indexed itemId, string oldUrl, string newUrl);
@@ -45,10 +54,10 @@ contract Marketplace is Ownable {
 
     event SignatureUpdated(
         uint256 indexed itemId,
+        string oldSignatureUrl,
+        string newSignatureUrl,
         bytes32 oldSignatureHash,
-        bytes32 newSignatureHash,
-        string oldSignatureVectorUri,
-        string newSignatureVectorUri
+        bytes32 newSignatureHash
     );
 
     event ItemPurchased(uint256 indexed itemId, address indexed buyer, uint256 pricePaid);
@@ -72,61 +81,77 @@ contract Marketplace is Ownable {
      *
      * @notice Create a new data item in the marketplace.
      *
-     * @param accessUrl The IPFS CID / URL of the dataset.
+     * @param title The title of the dataset.
+     * @param description The description of the dataset.
+     * @param seller The seller's address.
      * @param price The price in wei.
-     * @param signatureHash The keccak256 hash of the embedding vector.
-     * @param signatureVectorUri The URI of the embedding vector.
+     * @param datasetUrl The IPFS CID / URL of the dataset.
+     * @param datasetHash The keccak256 hash of the dataset.
+     * @param signatureUrl The URL of the signature vector.
+     * @param signatureHash The keccak256 hash of the signature.
      */
     function createItem(
-        string calldata accessUrl,
+        string calldata title,
+        string calldata description,
+        address seller,
         uint256 price,
-        bytes32 signatureHash,
-        string calldata signatureVectorUri
+        string calldata datasetUrl,
+        bytes32 datasetHash,
+        string calldata signatureUrl,
+        bytes32 signatureHash
     ) external onlyOwner returns (uint256 itemId) {
         if (price <= 0) {
             revert Marketplace__PriceMustBeGreaterThanZero();
         }
 
-        if (bytes(accessUrl).length == 0) {
+        if (bytes(datasetUrl).length == 0) {
             revert Marketplace__AccessUrlRequired();
         }
 
-        if (bytes(signatureVectorUri).length == 0) {
+        if (bytes(signatureUrl).length == 0) {
             revert Marketplace__SignatureHashRequired();
         }
 
         itemId = nextItemId;
 
         DataItem storage item = items[itemId];
-        item.accessUrl = accessUrl;
+        item.title = title;
+        item.description = description;
+        item.seller = seller;
         item.price = price;
+        item.datasetUrl = datasetUrl;
+        item.datasetHash = datasetHash;
+        item.signatureUrl = signatureUrl;
         item.signatureHash = signatureHash;
-        item.signatureVectorUri = signatureVectorUri;
         item.exists = true;
 
         nextItemId = itemId + 1;
 
-        emit ItemCreated(itemId, accessUrl, price, signatureHash, signatureVectorUri);
+        emit ItemCreated(itemId, datasetUrl, price, datasetHash, signatureUrl);
     }
 
     /**
      *
-     * @notice Update the access URL of an item.
+     * @notice Update the dataset URL of an item.
      *
      * @param itemId The ID of the item.
-     * @param newAccessUrl The new access URL/CID.
+     * @param newDatasetUrl The new dataset URL/CID.
      */
-    function updateAccessUrl(uint256 itemId, string calldata newAccessUrl) external onlyOwner onlyExistingItem(itemId) {
-        if (bytes(newAccessUrl).length == 0) {
+    function updateDatasetUrl(uint256 itemId, string calldata newDatasetUrl)
+        external
+        onlyOwner
+        onlyExistingItem(itemId)
+    {
+        if (bytes(newDatasetUrl).length == 0) {
             revert Marketplace__AccessUrlRequired();
         }
 
         DataItem storage item = items[itemId];
-        string memory oldUrl = item.accessUrl;
+        string memory oldUrl = item.datasetUrl;
 
-        item.accessUrl = newAccessUrl;
+        item.datasetUrl = newDatasetUrl;
 
-        emit AccessUrlUpdated(itemId, oldUrl, newAccessUrl);
+        emit AccessUrlUpdated(itemId, oldUrl, newDatasetUrl);
     }
 
     /**
@@ -150,26 +175,26 @@ contract Marketplace is Ownable {
 
     /**
      *
-     * @notice Update the signature hash and vector URI of an item.
+     * @notice Update the signature URL and hash of an item.
      *
      * @param itemId The ID of the item.
-     * @param newSignatureHash The new keccak256 hash of the embedding vector.
-     * @param newSignatureVectorUri The new URI of the embedding vector.
+     * @param newSignatureUrl The new URL of the signature vector.
+     * @param newSignatureHash The new hash of the signature.
      */
-    function updateSignature(uint256 itemId, bytes32 newSignatureHash, string calldata newSignatureVectorUri)
+    function updateSignature(uint256 itemId, string calldata newSignatureUrl, bytes32 newSignatureHash)
         external
         onlyOwner
         onlyExistingItem(itemId)
     {
         DataItem storage item = items[itemId];
 
+        string memory oldUrl = item.signatureUrl;
         bytes32 oldHash = item.signatureHash;
-        string memory oldUri = item.signatureVectorUri;
 
+        item.signatureUrl = newSignatureUrl;
         item.signatureHash = newSignatureHash;
-        item.signatureVectorUri = newSignatureVectorUri;
 
-        emit SignatureUpdated(itemId, oldHash, newSignatureHash, oldUri, newSignatureVectorUri);
+        emit SignatureUpdated(itemId, oldUrl, newSignatureUrl, oldHash, newSignatureHash);
     }
 
     /**
@@ -210,19 +235,41 @@ contract Marketplace is Ownable {
      * @notice Get item details.
      *
      * @param itemId The ID of the item.
-     * @return accessUrl The IPFS CID / URL of the dataset.
+     * @return title The title of the dataset.
+     * @return description The description of the dataset.
+     * @return seller The seller's address.
      * @return price The price in wei.
-     * @return signatureHash The keccak256 hash of the embedding vector.
-     * @return signatureVectorUri The URI of the embedding vector.
+     * @return datasetUrl The IPFS CID / URL of the dataset.
+     * @return datasetHash The keccak256 hash of the dataset.
+     * @return signatureUrl The URL of the signature vector.
+     * @return signatureHash The keccak256 hash of the signature.
      */
     function getItem(uint256 itemId)
         external
         view
         onlyExistingItem(itemId)
-        returns (string memory accessUrl, uint256 price, bytes32 signatureHash, string memory signatureVectorUri)
+        returns (
+            string memory title,
+            string memory description,
+            address seller,
+            uint256 price,
+            string memory datasetUrl,
+            bytes32 datasetHash,
+            string memory signatureUrl,
+            bytes32 signatureHash
+        )
     {
         DataItem storage item = items[itemId];
-        return (item.accessUrl, item.price, item.signatureHash, item.signatureVectorUri);
+        return (
+            item.title,
+            item.description,
+            item.seller,
+            item.price,
+            item.datasetUrl,
+            item.datasetHash,
+            item.signatureUrl,
+            item.signatureHash
+        );
     }
 
     /**
