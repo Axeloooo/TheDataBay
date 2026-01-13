@@ -13,7 +13,7 @@ contract DeployMarketplace is Script {
     function run() public {
         HelperConfig config = new HelperConfig();
 
-        (uint256 deployKey) = config.activeNetworkConfig;
+        uint256 deployKey = config.activeNetworkConfig.deployKey;
 
         vm.startBroadcast(deployKey);
 
