@@ -3,16 +3,22 @@ LLM router for query rewriting and embedding generation using Ollama.
 """
 
 from fastapi import APIRouter, File, UploadFile, HTTPException
-from ..schemas.llm import (
+from ..schemas.llm_schema import (
     EmbeddingRequest,
     EmbeddingResponse,
-    BatchEmbeddingFileResponse,
+    DatasetEmbeddingResponse,
+    VectorSpec,
+    DatasetStats,
     QueryRewriteRequest,
     QueryRewriteResponse,
 )
+from ..services.llm_service import (
+    parse_dataset_file,
+    record_to_text,
+    generate_embeddings_batch,
+)
 from ..config import settings
 import csv
-import io
 
 router = APIRouter(
     prefix="/llm",
@@ -37,24 +43,24 @@ async def create_embedding(request: EmbeddingRequest):
     return EmbeddingResponse(embedding=[0.0] * 768, model=settings.embedding_model)
 
 
-@router.post("/embed/batch", response_model=BatchEmbeddingFileResponse)
+@router.post("/embed/batch", response_model=DatasetEmbeddingResponse)
 async def create_batch_embeddings(file: UploadFile = File(...)):
-    """Generate embeddings for dataset file (.csv or .data).
+    """Generate embeddings for dataset file (.csv or .data). Accepts uploaded dataset file, parses into records, transforms each record into deterministic structured text, and generates embeddings using Ollama.
 
     Args:
         file (UploadFile): Dataset file (.csv or .data format)
 
     Returns:
-        BatchEmbeddingFileResponse: Batch embedding response with file metadata
+        DatasetEmbeddingResponse: Complete embedding response with signature, vectorSpec, and stats
 
     Raises:
         HTTPException: If file format is not supported or file is invalid
     """
-    # Validate file extension
     if not file.filename:
         raise HTTPException(status_code=400, detail="No filename provided")
 
     file_extension = file.filename.split(".")[-1].lower()
+
     if file_extension not in ["csv", "data"]:
         raise HTTPException(
             status_code=400,
@@ -62,28 +68,40 @@ async def create_batch_embeddings(file: UploadFile = File(...)):
         )
 
     try:
-        # Read file content
         content = await file.read()
         decoded_content = content.decode("utf-8")
 
-        # Parse CSV/data file
-        csv_reader = csv.reader(io.StringIO(decoded_content))
-        rows = list(csv_reader)
+        data_rows, column_names, has_header, empty_rows_skipped = parse_dataset_file(
+            decoded_content, file.filename
+        )
 
-        if not rows:
-            raise HTTPException(status_code=400, detail="File is empty")
+        texts = []
+        for row in data_rows:
+            text = record_to_text(row, column_names, has_header)
+            texts.append(text)
 
-        # TODO: Implement actual batch embedding logic in future PR.
+        embeddings, dimension = generate_embeddings_batch(texts)
 
-        # For now, return placeholder embeddings
-        embeddings = [[0.0] * 768 for _ in rows[:100]]
+        total_columns = len(column_names)
+        total_rows = len(data_rows)
 
-        return BatchEmbeddingFileResponse(
-            embeddings=embeddings,
+        vector_spec = VectorSpec(
             model=settings.embedding_model,
-            count=len(rows),
+            dimension=dimension,
+        )
+
+        stats = DatasetStats(
+            total_rows=total_rows,
+            total_columns=total_columns,
+            empty_rows_skipped=empty_rows_skipped,
+            has_header=has_header,
+        )
+
+        return DatasetEmbeddingResponse(
+            signature=embeddings,
+            vectorSpec=vector_spec,
+            stats=stats,
             filename=file.filename,
-            rows_processed=len(rows),
         )
 
     except UnicodeDecodeError:
@@ -91,8 +109,13 @@ async def create_batch_embeddings(file: UploadFile = File(...)):
             status_code=400,
             detail="File encoding error. Please ensure file is UTF-8 encoded.",
         )
+
     except csv.Error as e:
         raise HTTPException(status_code=400, detail=f"CSV parsing error: {str(e)}")
+
+    except HTTPException:
+        raise
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
