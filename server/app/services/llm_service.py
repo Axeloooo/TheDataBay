@@ -7,7 +7,7 @@ import io
 from typing import List, Tuple
 from fastapi import HTTPException
 import ollama
-from ollama import EmbedResponse
+from ollama import ChatResponse, EmbedResponse
 from ..config import settings
 
 
@@ -149,36 +149,80 @@ def generate_embeddings_batch(texts: List[str]) -> tuple[List[List[float]], int]
         )
 
 
-def create_single_embedding(text: str) -> List[List[float]]:
-    """Generate embedding for a single text.
+def generate_single_embedding(text: str) -> Tuple[List[float], int]:
+    """Generate embedding for a single text using Ollama.
 
     Args:
         text (str): Text to embed
 
     Returns:
-        List[List[float]]: Embedding vector
+        Tuple[List[float], int]: Embedding vector and its dimension
     """
+    if not text or not text.strip():
+        raise HTTPException(status_code=400, detail="Text to embed cannot be empty")
 
-    # TODO: Implement actual embedding logic using Ollama in future PR.
+    try:
+        response: EmbedResponse = ollama.embed(
+            model=settings.embedding_model,
+            input=text,
+        )
 
-    single: EmbedResponse = ollama.embed(
-        model="nomic-embed-text",
-        input=text,
-    )
+        embedding = response.embeddings[0] if response.embeddings else []
+        dimension = len(embedding)
 
-    return single["embeddings"]
+        return embedding, dimension
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating embedding with Ollama: {str(e)}",
+        )
 
 
-def rewrite_query(query: str) -> str:
-    """Rewrite a query using context.
+def rewrite_query_with_thinking(query: str, context: str = None) -> str:
+    """Rewrite a query using a thinking model to make it more retrieval-friendly.
 
     Args:
-        query (str): Original query
+        query (str): Original user query
+        context (str): Optional context to inform rewriting
 
     Returns:
-        str: Rewritten query
+        str: Rewritten query optimized for retrieval
     """
+    if not query or not query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
 
-    # TODO: Implement actual query rewriting logic using Ollama in future PR.
+    try:
+        system_prompt = """
+        You rewrite user queries into a single, explicit, retrieval-friendly query for semantic search over structured medical tabular records.
+        Rules:
+        - Preserve the user's intent; do not add new constraints or numeric thresholds that were not stated.
+        - Expand abbreviations and normalize phrasing to match dataset field concepts (e.g., age, sex, cholesterol, resting blood pressure, chest pain, exercise-induced angina, maximum heart rate, ST depression, ECG).
+        - If the user gives ranges (e.g., 50-65), keep them. If they say "high" or "low", keep it qualitative (do not guess a number).
+        - Keep the output concise: one sentence or a short phrase.
+        - Output ONLY the rewritten query text. No labels, no bullets, no explanations.
+        """.strip()
 
-    return query
+        user_message: str = f"Query: {query}"
+
+        if context:
+            user_message += f"\nContext: {context}"
+
+        response: ChatResponse = ollama.chat(
+            model=settings.thinking_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message},
+            ],
+        )
+
+        rewritten_query: str | None = response.message.content
+
+        if not rewritten_query:
+            return query
+
+        return rewritten_query
+
+    except Exception as e:
+        print(f"Query rewriting failed: {str(e)}")
+        return query

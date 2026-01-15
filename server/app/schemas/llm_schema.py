@@ -6,27 +6,6 @@ from pydantic import BaseModel, Field
 from typing import List
 
 
-class EmbeddingRequest(BaseModel):
-    """Request model for single embedding.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
-
-    text: str = Field(..., description="Text to embed", min_length=1)
-
-
-class EmbeddingResponse(BaseModel):
-    """Response model for embedding.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
-
-    embedding: List[float] = Field(..., description="Generated embedding vector")
-    model: str = Field(..., description="Model used for embedding")
-
-
 class VectorSpec(BaseModel):
     """Vector specification metadata.
 
@@ -89,3 +68,32 @@ class QueryRewriteResponse(BaseModel):
     original_query: str = Field(..., description="Original query")
     rewritten_query: str = Field(..., description="Rewritten query")
     model: str = Field(..., description="Model used for rewriting")
+
+
+class QueryEmbeddingRequest(BaseModel):
+    """Request model for query embedding with rewriting.
+
+    Args:
+        BaseModel (BaseModel): Pydantic BaseModel
+    """
+
+    query: str = Field(..., description="Original query", min_length=1)
+    context: str | None = Field(None, description="Optional context for rewriting")
+
+
+class QueryEmbeddingResponse(BaseModel):
+    """Response model for query embedding with rewriting.
+
+    Args:
+        BaseModel (BaseModel): Pydantic BaseModel
+    """
+
+    original_query: str = Field(..., description="Original user query")
+    rewritten_query: str = Field(..., description="Rewritten retrieval-friendly query")
+    query_embedding: List[float] = Field(
+        ..., description="Embedding of the rewritten query"
+    )
+    vectorSpec: VectorSpec = Field(
+        ..., description="Vector specification - compatible with dataset embeddings"
+    )
+    rewrite_model: str = Field(..., description="Model used for query rewriting")
