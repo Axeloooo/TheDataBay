@@ -1,0 +1,106 @@
+# --------------------
+# Python
+# --------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+*.log
+
+# Byte-compiled / compiled files
+*$py.class
+
+# Cython / build
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --------------------
+# Virtual Environments
+# --------------------
+venv/
+ENV/
+env/
+.venv/
+.ENV/
+
+# --------------------
+# Environment Variables
+# --------------------
+.env
+.env.*
+!.env.example
+
+# --------------------
+# VSCode / IDEs
+# --------------------
+.vscode/
+.idea/
+*.iml
+
+# --------------------
+# Testing / Coverage
+# --------------------
+.pytest_cache/
+.tox/
+coverage.xml
+htmlcov/
+.coverage
+.coverage.*
+
+# --------------------
+# Mypy / Pyright / Type Checkers
+# --------------------
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+pytestdebug.log
+
+# --------------------
+# FastAPI / Uvicorn logs
+# --------------------
+*.db
+*.sqlite3
+
+# --------------------
+# Docker
+# --------------------
+docker-data/
+__docker__/
+*.pid
+
+# --------------------
+# Cache
+# --------------------
+*.sqlite3
+*.db
+.DS_Store
+Thumbs.db
+.cache/
+*.cache
+*.pot
+*.mo
+
+# --------------------
+# Node / Frontend (if using React/Vue dashboards)
+# --------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+
+.DS_Store
