@@ -40,6 +40,7 @@ dist-ssr
 
 .DS_Store
 
+test_query_endpoints.py
 test_embedding.py
 sample_dataset.data
 sample_dataset.csv
