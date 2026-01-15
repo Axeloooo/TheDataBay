@@ -2,11 +2,13 @@
 LLM router for query rewriting and embedding generation using Ollama.
 """
 
-from fastapi import APIRouter, File, UploadFile, HTTPException
+from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks, status
 from ..schemas.llm_schema import (
-    DatasetEmbeddingResponse,
+    JobResponse,
+    JobStatusResponse,
     VectorSpec,
     DatasetStats,
+    SignatureInfo,
     QueryRewriteRequest,
     QueryRewriteResponse,
     QueryEmbeddingRequest,
@@ -15,10 +17,12 @@ from ..schemas.llm_schema import (
 from ..services.llm_service import (
     parse_dataset_file,
     record_to_text,
-    generate_embeddings_batch,
+    generate_embeddings_chunked,
     generate_single_embedding,
     rewrite_query_with_thinking,
 )
+from ..services.job_manager import job_manager, JobStatus
+from ..services.pinata_service import pinata_service
 from ..config import settings
 import csv
 
@@ -28,84 +32,167 @@ router = APIRouter(
 )
 
 
-@router.post("/embed/batch", response_model=DatasetEmbeddingResponse)
-async def create_batch_embeddings(file: UploadFile = File(...)):
-    """Generate embeddings for dataset file (.csv or .data).
-    Accepts uploaded dataset file, parses into records,
-    transforms each record into deterministic structured text, and
-    generates embeddings using Ollama.
+async def process_embedding_job(job_id: str, content: str, filename: str):
+    """Background task to process embedding job.
 
     Args:
-        file (UploadFile): Dataset file (.csv or .data format)
-
-    Returns:
-        DatasetEmbeddingResponse: Complete embedding response with signature, vectorSpec, and stats
-
-    Raises:
-        HTTPException: If file format is not supported or file is invalid
+        job_id (str): Job identifier
+        content (str): File content
+        filename (str): Original filename
     """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided")
-
-    file_extension = file.filename.split(".")[-1].lower()
-
-    if file_extension not in ["csv", "data"]:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file format: .{file_extension}. Only .csv and .data files are supported.",
-        )
-
     try:
-        content = await file.read()
-        decoded_content = content.decode("utf-8")
+        # Update job status to running
+        job_manager.update_status(job_id, JobStatus.RUNNING)
 
+        # Parse dataset
         data_rows, column_names, has_header, empty_rows_skipped = parse_dataset_file(
-            decoded_content, file.filename
+            content, filename
         )
 
+        # Transform to text
         texts = []
         for row in data_rows:
             text = record_to_text(row, column_names)
             texts.append(text)
 
-        embeddings, dimension = generate_embeddings_batch(texts)
+        # Generate embeddings with chunking
+        embeddings, dimension = await generate_embeddings_chunked(texts)
 
-        total_columns = len(column_names)
-        total_rows = len(data_rows)
-
-        vector_spec = VectorSpec(
-            model=settings.embedding_model,
-            dimension=dimension,
+        # Upload to IPFS
+        ipfs_url, signature_hash = await pinata_service.upload_signature(
+            embeddings, filename, compress=True
         )
 
-        stats = DatasetStats(
-            total_rows=total_rows,
-            total_columns=total_columns,
-            empty_rows_skipped=empty_rows_skipped,
-            has_header=has_header,
+        # Build result
+        result = {
+            "vectorSpec": {"model": settings.embedding_model, "dimension": dimension},
+            "stats": {
+                "total_rows": len(data_rows),
+                "total_columns": len(column_names),
+                "empty_rows_skipped": empty_rows_skipped,
+                "has_header": has_header,
+            },
+            "signature": {"signature_url": ipfs_url, "signature_hash": signature_hash},
+        }
+
+        # Mark job as completed
+        job_manager.set_result(job_id, result)
+        job_manager.update_status(job_id, JobStatus.COMPLETED)
+
+    except Exception as e:
+        # Mark job as failed
+        error_msg = str(e)
+        job_manager.set_error(job_id, error_msg)
+
+
+@router.post(
+    "/embed/batch", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED
+)
+async def create_batch_embeddings(
+    background_tasks: BackgroundTasks, file: UploadFile = File(...)
+):
+    """Submit a dataset for batch embedding (async job-based).
+
+    Returns immediately with a job ID. The actual embedding work
+    runs in the background. Poll GET /llm/jobs/{jobId} for status.
+
+    Validates:
+    - File size (max 50MB)
+    - File format (.csv or .data)
+    - Row count (max 50,000 rows)
+
+    Args:
+        background_tasks (BackgroundTasks): FastAPI background tasks
+        file (UploadFile): Dataset file upload
+
+    Returns:
+        JobResponse: Job submission response with job ID
+    """
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
+
+    file_extension = file.filename.split(".")[-1].lower()
+    if file_extension not in ["csv"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format: .{file_extension}. Only .csv files are supported.",
         )
 
-        return DatasetEmbeddingResponse(
-            signature=embeddings,
-            vectorSpec=vector_spec,
-            stats=stats,
-            filename=file.filename,
+    try:
+        content = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
+
+    file_size_mb = len(content) / (1024 * 1024)
+    if file_size_mb > settings.max_file_size_mb:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large: {file_size_mb:.2f}MB. Maximum allowed: {settings.max_file_size_mb}MB",
         )
 
+    try:
+        decoded_content = content.decode("utf-8")
     except UnicodeDecodeError:
         raise HTTPException(
             status_code=400,
             detail="File encoding error. Please ensure file is UTF-8 encoded.",
         )
 
+    try:
+        row_count = len(
+            [row for row in csv.reader(decoded_content.splitlines()) if row]
+        )
+        if row_count > settings.max_dataset_rows:
+            raise HTTPException(
+                status_code=413,
+                detail=f"Too many rows: {row_count}. Maximum allowed: {settings.max_dataset_rows}",
+            )
     except csv.Error as e:
         raise HTTPException(status_code=400, detail=f"CSV parsing error: {str(e)}")
 
-    except HTTPException:
-        raise
+    job_id = job_manager.create_job(
+        filename=file.filename,
+        metadata={"row_count": row_count, "file_size_mb": file_size_mb},
+    )
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+    background_tasks.add_task(
+        process_embedding_job, job_id, decoded_content, file.filename
+    )
+
+    return JobResponse(job_id=job_id, status=JobStatus.QUEUED.value)
+
+
+@router.get("/jobs/{job_id}", response_model=JobStatusResponse)
+async def get_job_status(job_id: str):
+    """Poll job status and retrieve results.
+
+    Args:
+        job_id (str): Job identifier
+
+    Returns:
+        JobStatusResponse: Job status and result details
+    """
+    job = job_manager.get_job(job_id)
+
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+
+    response = JobStatusResponse(
+        job_id=job.job_id,
+        status=job.status.value,
+        filename=job.filename,
+        created_at=job.created_at.isoformat(),
+        started_at=job.started_at.isoformat() if job.started_at else None,
+        completed_at=job.completed_at.isoformat() if job.completed_at else None,
+        error=job.error,
+    )
+
+    if job.status == JobStatus.COMPLETED and job.result:
+        response.vector_spec = VectorSpec(**job.result["vectorSpec"])
+        response.stats = DatasetStats(**job.result["stats"])
+        response.signature = SignatureInfo(**job.result["signature"])
+
+    return response
 
 
 @router.post("/rewrite", response_model=QueryRewriteResponse)
@@ -145,8 +232,6 @@ async def embed_query(request: QueryEmbeddingRequest):
     Returns:
         QueryEmbeddingResponse: Complete response with rewritten query, embedding, and vectorSpec
     """
-    # rewritten_query = rewrite_query_with_thinking(request.query, request.context)
-
     query_embedding, dimension = generate_single_embedding(request.query)
 
     vector_spec = VectorSpec(
@@ -156,7 +241,6 @@ async def embed_query(request: QueryEmbeddingRequest):
 
     return QueryEmbeddingResponse(
         original_query=request.query,
-        rewritten_query=request.query,
         query_embedding=query_embedding,
         vectorSpec=vector_spec,
         rewrite_model=settings.thinking_model,
