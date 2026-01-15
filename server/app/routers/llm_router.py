@@ -45,7 +45,10 @@ async def create_embedding(request: EmbeddingRequest):
 
 @router.post("/embed/batch", response_model=DatasetEmbeddingResponse)
 async def create_batch_embeddings(file: UploadFile = File(...)):
-    """Generate embeddings for dataset file (.csv or .data). Accepts uploaded dataset file, parses into records, transforms each record into deterministic structured text, and generates embeddings using Ollama.
+    """Generate embeddings for dataset file (.csv or .data).
+    Accepts uploaded dataset file, parses into records,
+    transforms each record into deterministic structured text, and
+    generates embeddings using Ollama.
 
     Args:
         file (UploadFile): Dataset file (.csv or .data format)
