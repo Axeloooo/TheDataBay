@@ -143,7 +143,10 @@ def generate_embeddings_batch(texts: List[str]) -> tuple[List[List[float]], int]
         return embeddings, dimension
 
     except Exception as e:
-        raise Exception(f"Error generating embeddings with Ollama: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error generating embeddings with Ollama: {str(e)}",
+        )
 
 
 def create_single_embedding(text: str) -> List[List[float]]:
