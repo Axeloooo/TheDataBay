@@ -85,8 +85,59 @@ The API will be available at:
 ### LLM (`/llm`)
 
 - `POST /llm/embed` - Generate single text embedding
-- `POST /llm/embed/batch` - Generate batch embeddings
+- `POST /llm/embed/batch` - **Dataset embedding pipeline** - Upload CSV or .data file for batch embedding generation
 - `POST /llm/rewrite` - Rewrite query using thinking model
+
+#### Dataset Embedding Pipeline
+
+The `/llm/embed/batch` endpoint implements a complete dataset ingestion and encoding pipeline:
+
+**Features:**
+
+- Accepts multipart file upload (.csv or .data format)
+- Automatically detects headers in CSV files
+- Transforms each record into deterministic structured text using a stable template
+- Generates embeddings using Ollama embedding model
+- Returns signature (embedding vectors), vectorSpec metadata, and dataset statistics
+
+**Example Request:**
+
+```bash
+curl -X POST "http://localhost:8000/llm/embed/batch" \
+  -H "accept: application/json" \
+  -H "Content-Type: multipart/form-data" \
+  -F "file=@sample_dataset.csv"
+```
+
+**Response Format:**
+
+```json
+{
+  "signature": [[0.1, 0.2, ...], [0.3, 0.4, ...], ...],
+  "vectorSpec": {
+    "model": "nomic-embed-text",
+    "dimension": 768,
+    "metric": "cosine",
+    "template_version": "v1.0.0"
+  },
+  "stats": {
+    "total_rows": 100,
+    "total_columns": 5,
+    "empty_rows_skipped": 2,
+    "has_header": true
+  },
+  "filename": "sample_dataset.csv"
+}
+```
+
+**Record-to-Text Template:**
+Each dataset record is transformed using a deterministic template:
+
+```
+column_name: value | column_name: value | ...
+```
+
+This ensures stable, consistent text representation for embedding generation.
 
 ### AI (`/ai`)
 
@@ -125,4 +176,4 @@ curl http://localhost:8000/health
 
 ## Notes
 
-This is a basic skeleton implementation. Actual endpoint implementations will be added in separate PRs.
+The dataset embedding pipeline is fully implemented and production-ready. Other endpoints remain as skeleton implementations for future PRs.
