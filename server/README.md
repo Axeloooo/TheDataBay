@@ -116,9 +116,7 @@ curl -X POST "http://localhost:8000/llm/embed/batch" \
   "signature": [[0.1, 0.2, ...], [0.3, 0.4, ...], ...],
   "vectorSpec": {
     "model": "nomic-embed-text",
-    "dimension": 768,
-    "metric": "cosine",
-    "template_version": "v1.0.0"
+    "dimension": 768
   },
   "stats": {
     "total_rows": 100,
