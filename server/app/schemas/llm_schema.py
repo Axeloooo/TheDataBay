@@ -27,18 +27,45 @@ class EmbeddingResponse(BaseModel):
     model: str = Field(..., description="Model used for embedding")
 
 
-class BatchEmbeddingFileResponse(BaseModel):
-    """Response model for batch embeddings from file upload.
+class VectorSpec(BaseModel):
+    """Vector specification metadata.
 
     Args:
         BaseModel (BaseModel): Pydantic BaseModel
     """
 
-    embeddings: List[List[float]] = Field(..., description="List of embedding vectors")
-    model: str = Field(..., description="Model used for embedding")
-    count: int = Field(..., description="Number of embeddings generated")
-    filename: str = Field(..., description="Name of the uploaded file")
-    rows_processed: int = Field(..., description="Number of rows processed from file")
+    model: str = Field(..., description="Embedding model name")
+    dimension: int = Field(..., description="Embedding vector dimension")
+
+
+class DatasetStats(BaseModel):
+    """Dataset statistics.
+
+    Args:
+        BaseModel (BaseModel): Pydantic BaseModel
+    """
+
+    total_rows: int = Field(..., description="Total number of rows in dataset")
+    total_columns: int = Field(..., description="Total number of columns in dataset")
+    empty_rows_skipped: int = Field(
+        default=0, description="Number of empty rows skipped"
+    )
+    has_header: bool = Field(..., description="Whether dataset has header row")
+
+
+class DatasetEmbeddingResponse(BaseModel):
+    """Response model for dataset embedding with full metadata.
+
+    Args:
+        BaseModel (BaseModel): Pydantic BaseModel
+    """
+
+    signature: List[List[float]] = Field(
+        ..., description="Embedding vectors - one per record [n_rows][dimension]"
+    )
+    vectorSpec: VectorSpec = Field(..., description="Vector specification metadata")
+    stats: DatasetStats = Field(..., description="Dataset statistics")
+    filename: str = Field(..., description="Original filename")
 
 
 class QueryRewriteRequest(BaseModel):
