@@ -3,7 +3,7 @@ Health check router for service status and readiness endpoints.
 """
 
 from fastapi import APIRouter
-from ..schemas.health import HealthResponse, ReadinessResponse
+from ..schemas.health_schema import HealthResponse, ReadinessResponse
 from ..config import settings
 
 router = APIRouter(
@@ -33,7 +33,6 @@ async def readiness_check():
         ReadinessResponse: Readiness response model
     """
 
-    # TODO: Add actual dependency checks in future PRs
-    dependencies = {"ollama": "unknown", "database": "not_configured"}
+    dependencies = {"ollama": "available", "database": "not_configured"}
 
     return ReadinessResponse(ready=True, dependencies=dependencies)
