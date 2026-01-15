@@ -40,4 +40,6 @@ dist-ssr
 
 .DS_Store
 
-heart+disease/
+test_embedding.py
+sample_dataset.data
+sample_dataset.csv

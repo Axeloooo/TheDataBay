@@ -3,7 +3,7 @@ AI router for similarity search and ML workflows.
 """
 
 from fastapi import APIRouter
-from ..schemas.ai import (
+from ..schemas.ai_schema import (
     SimilaritySearchRequest,
     SimilaritySearchResponse,
     ScoreRequest,
