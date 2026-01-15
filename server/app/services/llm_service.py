@@ -87,7 +87,8 @@ def parse_dataset_file(
 
 
 def record_to_text(
-    record: List[str], column_names: List[str] = None, has_header: bool = False
+    record: List[str],
+    column_names: List[str] = None,
 ) -> str:
     """Convert a dataset record to deterministic structured text.
 
@@ -97,7 +98,6 @@ def record_to_text(
     Args:
         record (List[str]): List of values in the record
         column_names (List[str] | None): Optional list of column names. If None, uses index-based naming.
-        has_header (bool): Whether the dataset has a header row
 
     Returns:
         str: Deterministic text representation of the record
