@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     embedding_model: str = "nomic-embed-text"
     thinking_model: str = "llama3.2:latest"
 
+    # Embedding job settings
+    max_file_size_mb: int = 50
+    max_dataset_rows: int = 50000
+    embedding_chunk_size: int = 256
+
+    # Pinata IPFS settings
+    pinata_api_key: str = ""
+    pinata_secret_key: str = ""
+    pinata_gateway_url: str = "https://gateway.pinata.cloud"
+
     # AI/ML settings
     pytorch_device: str = "cpu"  # or "cuda" if GPU available
     similarity_threshold: float = 0.7
