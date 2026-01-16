@@ -15,7 +15,7 @@ from ..config import settings
 def parse_dataset_file(
     content: str, filename: str
 ) -> Tuple[List[List[str]], List[str], bool, int]:
-    """Parse CSV or .data file into records.
+    """Parse CSV file into records.
 
     Args:
         content (str): File content as string

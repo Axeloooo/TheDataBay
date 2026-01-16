@@ -98,7 +98,7 @@ async def create_batch_embeddings(
 
     Validates:
     - File size (max 50MB)
-    - File format (.csv or .data)
+    - File format (.csv only)
     - Row count (max 50,000 rows)
 
     Args:
@@ -195,7 +195,7 @@ async def get_job_status(job_id: str):
     return response
 
 
-@router.post("/rewrite", response_model=QueryRewriteResponse)
+@router.post("/rewrite", response_model=QueryRewriteResponse, deprecated=True)
 async def rewrite_query(request: QueryRewriteRequest):
     """Rewrite query using a 'thinking' model.
 
@@ -219,18 +219,13 @@ async def rewrite_query(request: QueryRewriteRequest):
 
 @router.post("/embed/query", response_model=QueryEmbeddingResponse)
 async def embed_query(request: QueryEmbeddingRequest):
-    """Rewrite and embed a query for retrieval.
-
-    This endpoint performs the complete query processing pipeline:
-    1. Rewrites the query using the thinking model for better retrieval
-    2. Embeds the rewritten query using the embedding model
-    3. Returns vectorSpec compatible with dataset embeddings
+    """Embed a query for retrieval.
 
     Args:
         request (QueryEmbeddingRequest): Query embedding request
 
     Returns:
-        QueryEmbeddingResponse: Complete response with rewritten query, embedding, and vectorSpec
+        QueryEmbeddingResponse: Complete response with embedding, and vectorSpec
     """
     query_embedding, dimension = generate_single_embedding(request.query)
 
@@ -243,5 +238,4 @@ async def embed_query(request: QueryEmbeddingRequest):
         original_query=request.query,
         query_embedding=query_embedding,
         vectorSpec=vector_spec,
-        rewrite_model=settings.thinking_model,
     )

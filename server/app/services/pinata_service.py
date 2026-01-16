@@ -116,7 +116,7 @@ class PinataService:
                     headers=self._get_headers(),
                 )
             return response.status_code == 200
-        except:
+        except Exception:
             return False
 
 

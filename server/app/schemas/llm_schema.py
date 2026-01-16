@@ -82,20 +82,17 @@ class QueryEmbeddingRequest(BaseModel):
 
 
 class QueryEmbeddingResponse(BaseModel):
-    """Response model for query embedding with rewriting.
+    """Response model for query embedding.
 
     Args:
         BaseModel (BaseModel): Pydantic BaseModel
     """
 
     original_query: str = Field(..., description="Original user query")
-    query_embedding: List[float] = Field(
-        ..., description="Embedding of the rewritten query"
-    )
+    query_embedding: List[float] = Field(..., description="Embedding of the query")
     vectorSpec: VectorSpec = Field(
         ..., description="Vector specification - compatible with dataset embeddings"
     )
-    rewrite_model: str = Field(..., description="Model used for query rewriting")
 
 
 class SignatureInfo(BaseModel):
