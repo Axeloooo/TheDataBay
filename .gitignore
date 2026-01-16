@@ -39,7 +39,3 @@ dist-ssr
 *.sw?
 
 .DS_Store
-
-test_embedding.py
-sample_dataset.data
-sample_dataset.csv

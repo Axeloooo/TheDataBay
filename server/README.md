@@ -84,9 +84,9 @@ The API will be available at:
 
 ### LLM (`/llm`)
 
-- `POST /llm/embed` - Generate single text embedding
 - `POST /llm/embed/batch` - **Dataset embedding pipeline** - Upload CSV or .data file for batch embedding generation
-- `POST /llm/rewrite` - Rewrite query using thinking model
+- `POST /llm/embed/query` - **Query embedding pipeline** - Rewrite and embed query in one step
+- `POST /llm/rewrite` - **Query rewriting** - Rewrite natural language query for better retrieval
 
 #### Dataset Embedding Pipeline
 
@@ -136,6 +136,68 @@ column_name: value | column_name: value | ...
 ```
 
 This ensures stable, consistent text representation for embedding generation.
+
+#### Query Rewriting and Embedding Pipeline
+
+**Query Rewriting (`POST /llm/rewrite`)**
+
+Rewrites natural language queries to make them more explicit and retrieval-friendly using a thinking model.
+
+**Example Request:**
+
+```bash
+curl -X POST "http://localhost:8000/llm/rewrite" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "heart disease data", "context": "medical dataset"}'
+```
+
+**Response:**
+
+```json
+{
+  "original_query": "heart disease data",
+  "rewritten_query": "medical dataset containing cardiovascular disease patient records with diagnostic features",
+  "model": "llama3.2:latest"
+}
+```
+
+**Query Embedding (`POST /llm/embed/query`)**
+
+Complete pipeline that:
+
+1. Rewrites query using thinking model for better retrieval
+2. Embeds the rewritten query using embedding model
+3. Returns vectorSpec compatible with dataset embeddings
+
+**Example Request:**
+
+```bash
+curl -X POST "http://localhost:8000/llm/embed/query" \
+  -H "Content-Type: application/json" \
+  -d '{"query": "patients with chest pain"}'
+```
+
+**Response:**
+
+```json
+{
+  "original_query": "patients with chest pain",
+  "rewritten_query": "medical records of patients presenting with chest pain symptoms",
+  "query_embedding": [0.1, 0.2, ...],
+  "vectorSpec": {
+    "model": "nomic-embed-text",
+    "dimension": 768
+  },
+  "rewrite_model": "llama3.2:latest"
+}
+```
+
+**Key Features:**
+
+- Clear separation between rewriting (thinking model) and embedding (embedding model)
+- VectorSpec ensures compatibility with dataset embeddings
+- Context can be provided to inform query rewriting
+- Fallback to original query if rewriting fails
 
 ### AI (`/ai`)
 
