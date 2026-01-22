@@ -4,7 +4,7 @@ Pydantic schemas for LLM endpoints.
 
 from datetime import datetime
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, Dict, List, Optional
 
 
@@ -113,3 +113,5 @@ class Job(BaseModel):
     error: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    model_config = ConfigDict(validate_assignment=True)
