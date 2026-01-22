@@ -35,6 +35,9 @@ async def similarity_search(
     Returns:
         SimilaritySearchResponse: Response containing ranked datasets based on similarity search
     """
+
+    # TODO: Test whole flow with deployed smart contract
+
     datasets: List[MarketplaceDataItem] = (
         await marketplace_service.get_marketplace_items()
     )
