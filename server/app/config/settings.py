@@ -4,7 +4,7 @@ Configuration management using pydantic-settings for environment-based configura
 
 from functools import lru_cache
 from pathlib import Path
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -34,8 +34,8 @@ class Settings(BaseSettings):
     embedding_chunk_size: int = Field(alias="EMBEDDING_CHUNK_SIZE")
 
     # Pinata IPFS settings
-    pinata_api_key: str = Field(alias="PINATA_API_KEY")
-    pinata_secret_key: str = Field(alias="PINATA_SECRET_KEY")
+    pinata_api_key: SecretStr = Field(alias="PINATA_API_KEY")
+    pinata_secret_key: SecretStr = Field(alias="PINATA_SECRET_KEY")
     pinata_gateway_url: str = Field(alias="PINATA_GATEWAY_URL")
 
     model_config = SettingsConfigDict(
