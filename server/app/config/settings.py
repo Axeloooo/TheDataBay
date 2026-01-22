@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     app_name: str = Field(alias="APP_NAME")
     app_version: str = Field(alias="APP_VERSION")
     environment: str = Field(alias="ENVIRONMENT")
-    debug: bool = Field(alias="DEBUG")
 
     # Server settings
     host: str = Field(alias="HOST")

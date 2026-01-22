@@ -2,7 +2,7 @@
 Pydantic schemas for LLM endpoints.
 """
 
-import datetime
+from datetime import datetime
 from enum import Enum
 from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
@@ -41,7 +41,6 @@ class QueryEmbeddingRequest(BaseModel):
     """Request model for query embedding with rewriting."""
 
     query: str = Field(..., description="Original query", min_length=1)
-    context: str | None = Field(None, description="Optional context for rewriting")
 
 
 class QueryEmbeddingResponse(BaseModel):
@@ -108,9 +107,9 @@ class Job(BaseModel):
     job_id: str
     status: JobStatus
     filename: str
-    created_at: datetime.datetime
-    started_at: Optional[datetime.datetime] = None
-    completed_at: Optional[datetime.datetime] = None
+    created_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
     error: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)

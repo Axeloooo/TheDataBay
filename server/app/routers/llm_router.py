@@ -141,7 +141,6 @@ async def create_batch_embeddings(
         row_count = len(
             [row for row in csv.reader(decoded_content.splitlines()) if row]
         )
-        settings = get_settings()
         if row_count > settings.max_dataset_rows:
             raise HTTPException(
                 status_code=413,

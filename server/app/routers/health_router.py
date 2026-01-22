@@ -4,7 +4,7 @@ Health check router for service status and readiness endpoints.
 
 from fastapi import APIRouter
 from ..schemas.health_schema import HealthResponse, ReadinessResponse
-from ..config import settings
+from ..config.settings import get_settings
 
 router = APIRouter(
     prefix="/health",
@@ -19,6 +19,7 @@ async def health_check():
     Returns:
         HealthResponse: Health response model
     """
+    settings = get_settings()
     return HealthResponse(
         status="healthy", version=settings.app_version, service=settings.app_name
     )

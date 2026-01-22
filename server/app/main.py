@@ -31,11 +31,20 @@ app.include_router(llm_router.router)
 app.include_router(ai_router.router)
 
 
-@app.get("/config")
-def read_config(settings: Settings = Depends(get_settings)):
+@app.get("/")
+def read_root(settings: Settings = Depends(get_settings)):
+    """
+    Root endpoint providing basic service info and navigation links.
+    """
     return {
         "service": settings.app_name,
         "version": settings.app_version,
         "environment": settings.environment,
         "debug": settings.debug,
+        "links": {
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "health": "/health",
+            "config": "/config",
+        },
     }
