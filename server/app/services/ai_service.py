@@ -8,20 +8,32 @@ import torch
 import torch.nn.functional as F
 from fastapi import Depends
 
-from ..schemas.ai_schema import DataItem, SimilarityResult
-from ..services.llm_service import generate_single_embedding
+from ..config.settings import Settings, get_settings
+
+from ..schemas.marketplace_schema import MarketplaceDataItem
+
+from ..schemas.ai_schema import RankedDataset, ScoreExplanation
+from ..services.llm_service import get_llm_service, LLMService
 from ..services.pinata_service import PinataService, get_pinata_service
 
 
 class AIService:
-    def __init__(self, pinata_service: PinataService):
+    """AI Service for ranking datasets based on query embeddings."""
+
+    def __init__(
+        self, settings: Settings, pinata_service: PinataService, llm_service: LLMService
+    ):
         """Constructor for AIService.
 
         Args:
+            settings (Settings): Application settings instance
             pinata_service (PinataService): Pinata service instance
+            llm_service (LLMService): LLM service instance
         """
         self._cache: dict[str, torch.Tensor] = {}
+        self.settings = settings
         self.pinata_service = pinata_service
+        self.llm_service = llm_service
 
     def _normalize_rows(self, X: torch.Tensor) -> torch.Tensor:
         """Normalize rows of a tensor.
@@ -54,51 +66,42 @@ class AIService:
         """
         self._cache[signature_hash.lower()] = X
 
-    def _dataset_score_topk_mean(
-        self, q: torch.Tensor, Xn: torch.Tensor, k_rows: int
-    ) -> float:
+    def _dataset_score_topk_mean(self, q: torch.Tensor, Xn: torch.Tensor) -> float:
         """Calculate the mean of the top-k similarity scores between a query and dataset embeddings.
 
         Args:
             q (torch.Tensor): Normalized query tensor of shape (embedding_dim,)
             Xn (torch.Tensor): Normalized dataset embeddings tensor of shape (num_embeddings, embedding_dim)
-            k_rows (int): Number of top similarity scores to consider
 
         Returns:
             float: Mean of the top-k similarity scores
         """
-        sims = Xn @ q  # cosine similarities
-        k_eff = min(k_rows, sims.numel())
-        topk = torch.topk(sims, k_eff).values
+        sims: torch.Tensor = Xn @ q  # cosine similarities
+        k_eff: int = min(self.settings.k_rows, sims.numel())
+        topk: torch.Tensor = torch.topk(sims, k_eff).values
         return float(topk.mean().item())
 
     async def rank_datasets(
         self,
         query: str,
-        datasets: List[DataItem],
-        top_k_datasets: int = 10,
-        threshold: float | None = None,
-        k_rows: int = 100,
-    ) -> List[SimilarityResult]:
+        datasets: List[MarketplaceDataItem],
+    ) -> List[RankedDataset]:
         """Rank datasets based on similarity to the query embedding.
 
         Args:
             query (str): Input query string
             datasets (List[DataItem]): List of dataset dictionaries to rank
-            top_k_datasets (int, optional): Number of top datasets to return. Defaults to 10.
-            threshold (float | None, optional): Minimum score threshold to include a dataset. Defaults to None.
-            k_rows (int, optional): Number of top similarity scores to consider per dataset. Defaults to 100.
+
         Returns:
-            List[SimilarityResult]: List of ranked dataset results with scores and metadata
+            List[RankedDataset]: List of ranked dataset results with scores and metadata
         """
-        q_list, dim = generate_single_embedding(query)
+        q_list, dim = self.llm_service.generate_single_embedding(query)
         q: torch.Tensor = torch.tensor(q_list, dtype=torch.float32)
         q: torch.Tensor = F.normalize(q, p=2, dim=0)
 
-        results: List[SimilarityResult] = []
+        results: List[RankedDataset] = []
 
         for ds in datasets:
-            ds_id = str(ds.id)
             sig_url = ds.signature_url
             sig_hash = ds.signature_hash
 
@@ -114,46 +117,63 @@ class AIService:
                 )
                 X = torch.tensor(embeddings, dtype=torch.float32)
                 if X.ndim != 2 or X.shape[1] != q.shape[0]:
-                    # dimension mismatch (wrong model, wrong file, etc.)
                     continue
 
                 Xn = self._normalize_rows(X)
                 if sig_hash:
                     self._set_cached_tensor(sig_hash, Xn)
 
-            score: float = self._dataset_score_topk_mean(q, Xn, k_rows=k_rows)
+            score: float = self._dataset_score_topk_mean(q, Xn)
 
-            if threshold is not None and score < threshold:
+            if (
+                self.settings.similarity_threshold is not None
+                and score < self.settings.similarity_threshold
+            ):
                 continue
 
             results.append(
-                SimilarityResult(
-                    id=ds_id,
+                RankedDataset(
+                    item=MarketplaceDataItem(
+                        id=ds.id,
+                        title=ds.title,
+                        description=ds.description,
+                        seller=ds.seller,
+                        price=ds.price,
+                        dataset_url=ds.dataset_url,
+                        dataset_hash=ds.dataset_hash,
+                        signature_url=ds.signature_url,
+                        signature_hash=ds.signature_hash,
+                        exists=ds.exists,
+                    ),
                     score=score,
-                    content=ds.description,
-                    metadata={
-                        "signature_url": sig_url,
-                        "k_rows": k_rows,
-                        "rows": int(Xn.shape[0]),
-                        "dimension": int(Xn.shape[1]),
-                    },
+                    explanation=ScoreExplanation(
+                        method="topk_mean_cosine",
+                        k_rows=self.settings.k_rows,
+                        rows_in_dataset=Xn.shape[0],
+                        dimension=dim,
+                        normalized=True,
+                    ),
                 )
             )
 
         results.sort(key=lambda r: r.score, reverse=True)
-        return results[:top_k_datasets]
+        return results[: self.settings.top_k]
 
 
 @lru_cache(maxsize=1)
 def get_ai_service(
+    settings: Settings = Depends(get_settings),
     pinata_service: PinataService = Depends(get_pinata_service),
+    llm_service: LLMService = Depends(get_llm_service),
 ) -> AIService:
     """Get singleton AIService instance.
 
     Args:
+        settings (Settings, optional): Application settings instance. Defaults to Depends(get_settings).
         pinata_service (PinataService, optional): PinataService instance. Defaults to Depends(get_pinata_service).
+        llm_service (LLMService, optional): LLMService instance. Defaults to Depends(get_llm_service).
 
     Returns:
         AIService: Singleton AIService instance with persistent cache
     """
-    return AIService(pinata_service)
+    return AIService(settings, pinata_service, llm_service)

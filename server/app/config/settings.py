@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     max_dataset_rows: int = Field(alias="MAX_DATASET_ROWS")
     embedding_chunk_size: int = Field(alias="EMBEDDING_CHUNK_SIZE")
 
+    # Similarity search settings
+    top_k: int = Field(alias="TOP_K")
+    k_rows: int = Field(alias="K_ROWS")
+    similarity_threshold: float | None = Field(alias="SIMILARITY_THRESHOLD")
+
     # Pinata IPFS settings
     pinata_api_key: SecretStr = Field(alias="PINATA_API_KEY")
     pinata_secret_key: SecretStr = Field(alias="PINATA_SECRET_KEY")
@@ -41,6 +46,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
+        extra="ignore",
     )
 
 
