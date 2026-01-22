@@ -4,33 +4,9 @@ Job manager for tracking async embedding jobs.
 
 import uuid
 from datetime import datetime
-from enum import Enum
 from typing import Dict, Optional, Any
-from dataclasses import dataclass, field
 
-
-class JobStatus(str, Enum):
-    """Job status enumeration."""
-
-    QUEUED = "queued"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-@dataclass
-class Job:
-    """Job data structure."""
-
-    job_id: str
-    status: JobStatus
-    filename: str
-    created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error: Optional[str] = None
-    result: Optional[Dict[str, Any]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+from ..schemas.llm_schema import Job, JobStatus
 
 
 class JobManager:
@@ -54,6 +30,7 @@ class JobManager:
         Returns:
             str: Unique job identifier
         """
+
         job_id = str(uuid.uuid4())
         job = Job(
             job_id=job_id,
@@ -83,6 +60,7 @@ class JobManager:
             job_id (str): Job identifier
             status (JobStatus): New status
         """
+
         job = self._jobs.get(job_id)
         if not job:
             return
@@ -101,6 +79,7 @@ class JobManager:
             job_id (str): Job identifier
             result (Dict[str, Any]): Result data to store
         """
+
         job = self._jobs.get(job_id)
         if job:
             job.result = result
@@ -112,6 +91,7 @@ class JobManager:
             job_id (str): Job identifier
             error (str): Error message
         """
+
         job = self._jobs.get(job_id)
         if job:
             job.error = error
@@ -124,6 +104,7 @@ class JobManager:
         Args:
             job_id (str): Job identifier
         """
+
         self._jobs.pop(job_id, None)
 
     def get_all_jobs(self) -> Dict[str, Job]:
@@ -132,6 +113,7 @@ class JobManager:
         Returns:
             Dict[str, Job]: Dictionary of all jobs
         """
+
         return self._jobs.copy()
 
 

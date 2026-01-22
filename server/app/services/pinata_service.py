@@ -8,13 +8,14 @@ import hashlib
 import httpx
 from typing import Tuple, List
 from fastapi import HTTPException
-from ..config import settings
+from ..config.settings import get_settings
 
 
 class PinataService:
     """Service for uploading files to IPFS via Pinata."""
 
     def __init__(self):
+        settings = get_settings()
         self.api_key = settings.pinata_api_key
         self.secret_key = settings.pinata_secret_key
         self.base_url = "https://api.pinata.cloud"

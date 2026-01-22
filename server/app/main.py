@@ -4,9 +4,11 @@ BridgeMart FastAPI backend service.
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .config import settings
+from fastapi.params import Depends
+from .config.settings import Settings, get_settings
 from .routers import health_router, llm_router, ai_router
 
+settings: Settings = get_settings()
 
 app = FastAPI(
     title=settings.app_name,
@@ -29,13 +31,11 @@ app.include_router(llm_router.router)
 app.include_router(ai_router.router)
 
 
-@app.get("/")
-async def root():
-    """Root endpoint with API information."""
+@app.get("/config")
+def read_config(settings: Settings = Depends(get_settings)):
     return {
         "service": settings.app_name,
         "version": settings.app_version,
-        "status": "running",
-        "docs": "/docs",
-        "redoc": "/redoc",
+        "environment": settings.environment,
+        "debug": settings.debug,
     }

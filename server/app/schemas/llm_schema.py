@@ -2,27 +2,21 @@
 Pydantic schemas for LLM endpoints.
 """
 
+import datetime
+from enum import Enum
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class VectorSpec(BaseModel):
-    """Vector specification metadata.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Vector specification metadata."""
 
     model: str = Field(..., description="Embedding model name")
     dimension: int = Field(..., description="Embedding vector dimension")
 
 
 class DatasetStats(BaseModel):
-    """Dataset statistics.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Dataset statistics."""
 
     total_rows: int = Field(..., description="Total number of rows in dataset")
     total_columns: int = Field(..., description="Total number of columns in dataset")
@@ -33,11 +27,7 @@ class DatasetStats(BaseModel):
 
 
 class DatasetEmbeddingResponse(BaseModel):
-    """Response model for dataset embedding with full metadata.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Response model for dataset embedding with full metadata."""
 
     signature: List[List[float]] = Field(
         ..., description="Embedding vectors - one per record [n_rows][dimension]"
@@ -47,46 +37,15 @@ class DatasetEmbeddingResponse(BaseModel):
     filename: str = Field(..., description="Original filename")
 
 
-class QueryRewriteRequest(BaseModel):
-    """Request model for query rewriting.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
-
-    query: str = Field(..., description="Original query to rewrite", min_length=1)
-    context: str | None = Field(None, description="Optional context for rewriting")
-
-
-class QueryRewriteResponse(BaseModel):
-    """Response model for query rewriting.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
-
-    original_query: str = Field(..., description="Original query")
-    rewritten_query: str = Field(..., description="Rewritten query")
-    model: str = Field(..., description="Model used for rewriting")
-
-
 class QueryEmbeddingRequest(BaseModel):
-    """Request model for query embedding with rewriting.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Request model for query embedding with rewriting."""
 
     query: str = Field(..., description="Original query", min_length=1)
     context: str | None = Field(None, description="Optional context for rewriting")
 
 
 class QueryEmbeddingResponse(BaseModel):
-    """Response model for query embedding.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Response model for query embedding."""
 
     original_query: str = Field(..., description="Original user query")
     query_embedding: List[float] = Field(..., description="Embedding of the query")
@@ -96,11 +55,7 @@ class QueryEmbeddingResponse(BaseModel):
 
 
 class SignatureInfo(BaseModel):
-    """Information about uploaded signature file.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Information about uploaded signature file."""
 
     signature_url: str = Field(..., description="IPFS URL of the signature file")
     signature_hash: str = Field(
@@ -109,22 +64,14 @@ class SignatureInfo(BaseModel):
 
 
 class JobResponse(BaseModel):
-    """Response model for job submission.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Response model for job submission."""
 
     job_id: str = Field(..., description="Unique job identifier")
     status: str = Field(..., description="Job status (queued)")
 
 
 class JobStatusResponse(BaseModel):
-    """Response model for job status polling.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Response model for job status polling."""
 
     job_id: str = Field(..., description="Job identifier")
     status: str = Field(
@@ -144,3 +91,26 @@ class JobStatusResponse(BaseModel):
         None, description="Signature file info (when completed)"
     )
     filename: str = Field(..., description="Original filename")
+
+
+class JobStatus(str, Enum):
+    """Job status enumeration."""
+
+    QUEUED = "queued"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class Job(BaseModel):
+    """Job data structure."""
+
+    job_id: str
+    status: JobStatus
+    filename: str
+    created_at: datetime.datetime
+    started_at: Optional[datetime.datetime] = None
+    completed_at: Optional[datetime.datetime] = None
+    error: Optional[str] = None
+    result: Optional[Dict[str, Any]] = None
+    metadata: Dict[str, Any] = Field(default_factory=dict)

@@ -9,8 +9,6 @@ from ..schemas.llm_schema import (
     VectorSpec,
     DatasetStats,
     SignatureInfo,
-    QueryRewriteRequest,
-    QueryRewriteResponse,
     QueryEmbeddingRequest,
     QueryEmbeddingResponse,
 )
@@ -19,11 +17,10 @@ from ..services.llm_service import (
     record_to_text,
     generate_embeddings_chunked,
     generate_single_embedding,
-    rewrite_query_with_thinking,
 )
 from ..services.job_manager import job_manager, JobStatus
 from ..services.pinata_service import pinata_service
-from ..config import settings
+from ..config.settings import get_settings
 import csv
 
 router = APIRouter(
@@ -64,6 +61,7 @@ async def process_embedding_job(job_id: str, content: str, filename: str):
         )
 
         # Build result
+        settings = get_settings()
         result = {
             "vectorSpec": {"model": settings.embedding_model, "dimension": dimension},
             "stats": {
@@ -123,6 +121,7 @@ async def create_batch_embeddings(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
 
+    settings = get_settings()
     file_size_mb = len(content) / (1024 * 1024)
     if file_size_mb > settings.max_file_size_mb:
         raise HTTPException(
@@ -142,6 +141,7 @@ async def create_batch_embeddings(
         row_count = len(
             [row for row in csv.reader(decoded_content.splitlines()) if row]
         )
+        settings = get_settings()
         if row_count > settings.max_dataset_rows:
             raise HTTPException(
                 status_code=413,
@@ -160,6 +160,31 @@ async def create_batch_embeddings(
     )
 
     return JobResponse(job_id=job_id, status=JobStatus.QUEUED.value)
+
+
+@router.post("/embed/query", response_model=QueryEmbeddingResponse)
+async def embed_query(request: QueryEmbeddingRequest):
+    """Embed a query for retrieval.
+
+    Args:
+        request (QueryEmbeddingRequest): Query embedding request
+
+    Returns:
+        QueryEmbeddingResponse: Complete response with embedding, and vectorSpec
+    """
+    query_embedding, dimension = generate_single_embedding(request.query)
+
+    settings = get_settings()
+    vector_spec = VectorSpec(
+        model=settings.embedding_model,
+        dimension=dimension,
+    )
+
+    return QueryEmbeddingResponse(
+        original_query=request.query,
+        query_embedding=query_embedding,
+        vectorSpec=vector_spec,
+    )
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
@@ -193,49 +218,3 @@ async def get_job_status(job_id: str):
         response.signature = SignatureInfo(**job.result["signature"])
 
     return response
-
-
-@router.post("/rewrite", response_model=QueryRewriteResponse, deprecated=True)
-async def rewrite_query(request: QueryRewriteRequest):
-    """Rewrite query using a 'thinking' model.
-
-    Takes a natural language query and rewrites it to be more explicit
-    and retrieval-friendly using the configured thinking model.
-
-    Args:
-        request (QueryRewriteRequest): Query rewrite request model
-
-    Returns:
-        QueryRewriteResponse: Query rewrite response model
-    """
-    rewritten = rewrite_query_with_thinking(request.query, request.context)
-
-    return QueryRewriteResponse(
-        original_query=request.query,
-        rewritten_query=rewritten,
-        model=settings.thinking_model,
-    )
-
-
-@router.post("/embed/query", response_model=QueryEmbeddingResponse)
-async def embed_query(request: QueryEmbeddingRequest):
-    """Embed a query for retrieval.
-
-    Args:
-        request (QueryEmbeddingRequest): Query embedding request
-
-    Returns:
-        QueryEmbeddingResponse: Complete response with embedding, and vectorSpec
-    """
-    query_embedding, dimension = generate_single_embedding(request.query)
-
-    vector_spec = VectorSpec(
-        model=settings.embedding_model,
-        dimension=dimension,
-    )
-
-    return QueryEmbeddingResponse(
-        original_query=request.query,
-        query_embedding=query_embedding,
-        vectorSpec=vector_spec,
-    )
