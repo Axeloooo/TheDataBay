@@ -19,7 +19,6 @@ async def health_check():
     Returns:
         HealthResponse: Health response model
     """
-
     return HealthResponse(
         status="healthy", version=settings.app_version, service=settings.app_name
     )
@@ -32,7 +31,6 @@ async def readiness_check():
     Returns:
         ReadinessResponse: Readiness response model
     """
-
     dependencies = {"ollama": "available", "database": "not_configured"}
 
     return ReadinessResponse(ready=True, dependencies=dependencies)

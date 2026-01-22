@@ -30,7 +30,6 @@ class JobManager:
         Returns:
             str: Unique job identifier
         """
-
         job_id = str(uuid.uuid4())
         job = Job(
             job_id=job_id,
@@ -60,7 +59,6 @@ class JobManager:
             job_id (str): Job identifier
             status (JobStatus): New status
         """
-
         job = self._jobs.get(job_id)
         if not job:
             return
@@ -79,7 +77,6 @@ class JobManager:
             job_id (str): Job identifier
             result (Dict[str, Any]): Result data to store
         """
-
         job = self._jobs.get(job_id)
         if job:
             job.result = result
@@ -91,7 +88,6 @@ class JobManager:
             job_id (str): Job identifier
             error (str): Error message
         """
-
         job = self._jobs.get(job_id)
         if job:
             job.error = error
@@ -104,7 +100,6 @@ class JobManager:
         Args:
             job_id (str): Job identifier
         """
-
         self._jobs.pop(job_id, None)
 
     def get_all_jobs(self) -> Dict[str, Job]:
@@ -113,7 +108,6 @@ class JobManager:
         Returns:
             Dict[str, Job]: Dictionary of all jobs
         """
-
         return self._jobs.copy()
 
 

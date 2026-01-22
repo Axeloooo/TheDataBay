@@ -7,11 +7,7 @@ from typing import List, Dict, Any
 
 
 class SimilaritySearchRequest(BaseModel):
-    """Request model for similarity search.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Request model for similarity search."""
 
     query: str = Field(..., description="Search query", min_length=1)
     top_k: int = Field(
@@ -23,11 +19,7 @@ class SimilaritySearchRequest(BaseModel):
 
 
 class SimilarityResult(BaseModel):
-    """Individual similarity search result.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Individual similarity search result."""
 
     id: str = Field(..., description="Result identifier")
     score: float = Field(..., description="Similarity score", ge=0.0, le=1.0)
@@ -38,11 +30,7 @@ class SimilarityResult(BaseModel):
 
 
 class SimilaritySearchResponse(BaseModel):
-    """Response model for similarity search.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Response model for similarity search."""
 
     query: str = Field(..., description="Original query")
     results: List[SimilarityResult] = Field(
@@ -52,22 +40,14 @@ class SimilaritySearchResponse(BaseModel):
 
 
 class ScoreRequest(BaseModel):
-    """Request model for ML scoring.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Request model for ML scoring."""
 
     data: Dict[str, Any] = Field(..., description="Data to score")
     model_name: str | None = Field(None, description="Specific model to use")
 
 
 class ScoreResponse(BaseModel):
-    """Response model for ML scoring.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Response model for ML scoring."""
 
     score: float = Field(..., description="Computed score")
     confidence: float = Field(..., description="Confidence level", ge=0.0, le=1.0)
