@@ -2,7 +2,15 @@
 LLM router for query rewriting and embedding generation using Ollama.
 """
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks, status
+from fastapi import (
+    APIRouter,
+    File,
+    UploadFile,
+    HTTPException,
+    BackgroundTasks,
+    status,
+    Depends,
+)
 from ..schemas.llm_schema import (
     JobResponse,
     JobStatusResponse,
@@ -18,8 +26,8 @@ from ..services.llm_service import (
     generate_embeddings_chunked,
     generate_single_embedding,
 )
-from ..services.job_manager import job_manager, JobStatus
-from ..services.pinata_service import pinata_service
+from ..services.job_manager import get_job_manager, JobManager, JobStatus
+from ..services.pinata_service import get_pinata_service, PinataService
 from ..config.settings import get_settings
 import csv
 
@@ -29,13 +37,21 @@ router = APIRouter(
 )
 
 
-async def process_embedding_job(job_id: str, content: str, filename: str):
+async def process_embedding_job(
+    job_id: str,
+    content: str,
+    filename: str,
+    pinata_service: PinataService,
+    job_manager: JobManager,
+):
     """Background task to process embedding job.
 
     Args:
         job_id (str): Job identifier
         content (str): File content
         filename (str): Original filename
+        pinata_service (PinataService): Pinata service instance
+        job_manager (JobManager): Job manager instance
     """
     try:
         # Update job status to running
@@ -87,7 +103,10 @@ async def process_embedding_job(job_id: str, content: str, filename: str):
     "/embed/batch", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED
 )
 async def create_batch_embeddings(
-    background_tasks: BackgroundTasks, file: UploadFile = File(...)
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    pinata_service: PinataService = Depends(get_pinata_service),
+    job_manager: JobManager = Depends(get_job_manager),
 ):
     """Submit a dataset for batch embedding (async job-based).
 
@@ -155,7 +174,12 @@ async def create_batch_embeddings(
     )
 
     background_tasks.add_task(
-        process_embedding_job, job_id, decoded_content, file.filename
+        process_embedding_job,
+        job_id,
+        decoded_content,
+        file.filename,
+        pinata_service,
+        job_manager,
     )
 
     return JobResponse(job_id=job_id, status=JobStatus.QUEUED.value)
@@ -182,16 +206,19 @@ async def embed_query(request: QueryEmbeddingRequest):
     return QueryEmbeddingResponse(
         original_query=request.query,
         query_embedding=query_embedding,
-        vectorSpec=vector_spec,
+        vector_spec=vector_spec,
     )
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
-async def get_job_status(job_id: str):
+async def get_job_status(
+    job_id: str, job_manager: JobManager = Depends(get_job_manager)
+):
     """Poll job status and retrieve results.
 
     Args:
         job_id (str): Job identifier
+        job_manager (JobManager): Job manager instance
 
     Returns:
         JobStatusResponse: Job status and result details

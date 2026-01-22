@@ -40,7 +40,6 @@ def read_root(settings: Settings = Depends(get_settings)):
         "service": settings.app_name,
         "version": settings.app_version,
         "environment": settings.environment,
-        "debug": settings.debug,
         "links": {
             "docs": "/docs",
             "redoc": "/redoc",

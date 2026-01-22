@@ -5,7 +5,7 @@ Job manager for tracking async embedding jobs.
 import uuid
 from datetime import datetime
 from typing import Dict, Optional, Any
-
+from functools import lru_cache
 from ..schemas.llm_schema import Job, JobStatus
 
 
@@ -16,6 +16,7 @@ class JobManager:
     """
 
     def __init__(self):
+        """Constructor for JobManager."""
         self._jobs: Dict[str, Job] = {}
 
     def create_job(
@@ -111,4 +112,11 @@ class JobManager:
         return self._jobs.copy()
 
 
-job_manager = JobManager()
+@lru_cache(maxsize=1)
+def get_job_manager() -> JobManager:
+    """Get singleton JobManager instance.
+
+    Returns:
+        JobManager: Singleton JobManager instance
+    """
+    return JobManager()

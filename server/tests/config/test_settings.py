@@ -3,7 +3,7 @@ from pathlib import Path
 
 from pydantic_settings import SettingsError
 import pytest
-from pydantic import ValidationError
+from pydantic import SecretStr, ValidationError
 
 from app.config.settings import Settings, get_settings
 
@@ -73,8 +73,11 @@ def test_settings_loads_from_env_file(tmp_path, monkeypatch):
     assert s.max_dataset_rows == 50000
     assert s.embedding_chunk_size == 256
 
-    assert s.pinata_api_key == "k"
-    assert s.pinata_secret_key == "s"
+    # fix as both keys as SecretStr
+    assert isinstance(s.pinata_api_key, SecretStr)
+    assert isinstance(s.pinata_secret_key, SecretStr)
+    assert s.pinata_api_key.get_secret_value() == "k"
+    assert s.pinata_secret_key.get_secret_value() == "s"
     assert s.pinata_gateway_url == "https://gateway.pinata.cloud"
 
 
@@ -106,6 +109,10 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
     assert isinstance(s.max_dataset_rows, int) and s.max_dataset_rows == 456
     assert isinstance(s.embedding_chunk_size, int) and s.embedding_chunk_size == 789
     assert isinstance(s.cors_origins, list) and s.cors_origins == ["http://a.com"]
+    assert isinstance(s.pinata_api_key, SecretStr)
+    assert isinstance(s.pinata_secret_key, SecretStr)
+    assert s.pinata_api_key.get_secret_value() == "k"
+    assert s.pinata_secret_key.get_secret_value() == "s"
 
 
 def test_env_vars_override_env_file(tmp_path, monkeypatch):

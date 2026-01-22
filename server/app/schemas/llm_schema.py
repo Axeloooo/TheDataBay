@@ -48,7 +48,7 @@ class QueryEmbeddingResponse(BaseModel):
 
     original_query: str = Field(..., description="Original user query")
     query_embedding: List[float] = Field(..., description="Embedding of the query")
-    vectorSpec: VectorSpec = Field(
+    vector_spec: VectorSpec = Field(
         ..., description="Vector specification - compatible with dataset embeddings"
     )
 

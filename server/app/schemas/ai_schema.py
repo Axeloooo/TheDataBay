@@ -39,18 +39,25 @@ class SimilaritySearchResponse(BaseModel):
     count: int = Field(..., description="Number of results returned")
 
 
-class ScoreRequest(BaseModel):
-    """Request model for ML scoring."""
+class DataItem(BaseModel):
+    """Schema for a single data item."""
 
-    data: Dict[str, Any] = Field(..., description="Data to score")
-    model_name: str | None = Field(None, description="Specific model to use")
-
-
-class ScoreResponse(BaseModel):
-    """Response model for ML scoring."""
-
-    score: float = Field(..., description="Computed score")
-    confidence: float = Field(..., description="Confidence level", ge=0.0, le=1.0)
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional scoring metadata"
+    id: str = Field(..., description="Unique identifier for the data item")
+    title: str = Field(..., description="Title of the data item")
+    description: str = Field(..., description="Description of the data item")
+    seller: str = Field(..., description="Seller address")
+    price: float = Field(..., description="Price in USD", ge=0.0)
+    dataset_url: str = Field(..., description="URL to the dataset")
+    dataset_hash: str = Field(
+        ..., description="Hash of the dataset for integrity verification"
+    )
+    signature_url: str = Field(..., description="URL to the signature embeddings")
+    signature_hash: str = Field(
+        ..., description="Hash of the signature embeddings for integrity verification"
+    )
+    exists: bool = Field(
+        ..., description="Indicates if the item exists in the marketplace"
+    )
+    access_list: Dict[str, bool] = Field(
+        default_factory=dict, description="Mapping of user addresses to access rights"
     )
