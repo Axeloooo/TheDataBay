@@ -1,5 +1,5 @@
 """
-LLM router for query rewriting and embedding generation using Ollama.
+LLM router for embedding generation using Ollama.
 """
 
 from fastapi import (
