@@ -30,7 +30,7 @@ class MarketplaceService:
                 title="Sample Dataset 1",
                 description="This is a sample dataset for testing.",
                 seller="0xSellerAddress1",
-                price=9.99,
+                price=10,
                 dataset_url="ipfs://QmExampleHashDataset1",
                 dataset_hash="0xExampleDatasetHash1",
                 signature_url="ipfs://QmExampleHash1",
