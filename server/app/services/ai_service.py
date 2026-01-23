@@ -1,55 +1,201 @@
 """
-AI service for similarity search and ML workflows using PyTorch.
+AI Service for ranking datasets based on query embeddings.
 """
 
-from typing import List, Dict, Any
+from typing import List, OrderedDict
+from functools import lru_cache
+import torch
+import torch.nn.functional as F
+from fastapi import Depends
+
+from ..config.settings import Settings, get_settings
+
+from ..schemas.marketplace_schema import MarketplaceDataItem
+
+from ..schemas.ai_schema import RankedDataset, ScoreExplanation
+from ..services.llm_service import get_llm_service, LLMService
+from ..services.pinata_service import PinataService, get_pinata_service
 
 
 class AIService:
-    """Service for AI/ML operations including similarity search and scoring."""
+    """AI Service for ranking datasets based on query embeddings."""
 
-    def __init__(self):
-        """Initialize AI service with models and configurations."""
-        # TODO: Initialize PyTorch models in future PR
-        pass
-
-    async def similarity_search(
-        self, query: str, top_k: int = 10, threshold: float = 0.7
-    ) -> List[Dict[str, Any]]:
-        """
-        Perform similarity search using embeddings.
+    def __init__(
+        self,
+        settings: Settings,
+        pinata_service: PinataService,
+        llm_service: LLMService,
+    ):
+        """Constructor for AIService.
 
         Args:
-            query: Search query
-            top_k: Number of results to return
-            threshold: Similarity threshold
-
-        Returns:
-            List of similar items with scores
-
-        TODO: Implement actual similarity search logic
+            settings (Settings): Application settings instance
+            pinata_service (PinataService): Pinata service instance
+            llm_service (LLMService): LLM service instance
         """
-        # Placeholder implementation
-        return []
+        self._cache: OrderedDict[str, torch.Tensor] = OrderedDict()
+        self.settings = settings
+        self.pinata_service = pinata_service
+        self.llm_service = llm_service
 
-    async def score_data(
-        self, data: Dict[str, Any], model_name: str | None = None
-    ) -> Dict[str, Any]:
-        """
-        Score data using PyTorch-based models.
+    def _normalize_rows(self, X: torch.Tensor) -> torch.Tensor:
+        """Normalize rows of a tensor.
 
         Args:
-            data: Data to score
-            model_name: Optional specific model to use
+            X (torch.Tensor): Input tensor with rows to normalize
 
         Returns:
-            Scoring results with confidence
-
-        TODO: Implement actual PyTorch scoring logic
+            torch.Tensor: Tensor with normalized rows
         """
-        # Placeholder implementation
-        return {"score": 0.0, "confidence": 0.0, "metadata": {}}
+        return F.normalize(X, p=2, dim=1)
+
+    def _get_cached_tensor(self, signature_hash: str) -> torch.Tensor | None:
+        """Retrieve cached tensor by signature hash.
+
+        Uses LRU eviction: moves accessed items to the end of the cache.
+
+        Args:
+            signature_hash (str): Signature hash used as the cache key
+
+        Returns:
+            torch.Tensor | None: Cached tensor if found, else None
+        """
+        key = signature_hash.lower()
+        if key in self._cache:
+            # Move to end (most recently used)
+            self._cache.move_to_end(key)
+            return self._cache[key]
+        return None
+
+    def _set_cached_tensor(self, signature_hash: str, X: torch.Tensor) -> None:
+        """Set cached tensor by signature hash with LRU eviction.
+
+        If cache exceeds maxsize, removes the least recently used item.
+
+        Args:
+            signature_hash (str): Signature hash used as the cache key
+            X (torch.Tensor): Tensor to cache
+        """
+        key = signature_hash.lower()
+
+        # If key exists, move to end
+        if key in self._cache:
+            self._cache.move_to_end(key)
+
+        self._cache[key] = X
+
+        # Evict least recently used if cache is full
+        if len(self._cache) > self.settings.cache_maxsize:
+            self._cache.popitem(last=False)  # Remove oldest (first) item
+
+    def _dataset_score_topk_mean(self, q: torch.Tensor, Xn: torch.Tensor) -> float:
+        """Calculate the mean of the top-k similarity scores between a query and dataset embeddings.
+
+        Args:
+            q (torch.Tensor): Normalized query tensor of shape (embedding_dim,)
+            Xn (torch.Tensor): Normalized dataset embeddings tensor of shape (num_embeddings, embedding_dim)
+
+        Returns:
+            float: Mean of the top-k similarity scores
+        """
+        sims: torch.Tensor = Xn @ q  # cosine similarities
+        k_eff: int = min(self.settings.k_rows, sims.numel())
+        topk: torch.Tensor = torch.topk(sims, k_eff).values
+        return float(topk.mean().item())
+
+    async def rank_datasets(
+        self,
+        query: str,
+        datasets: List[MarketplaceDataItem],
+    ) -> List[RankedDataset]:
+        """Rank datasets based on similarity to the query embedding.
+
+        Args:
+            query (str): Input query string
+            datasets (List[MarketplaceDataItem]): List of dataset dictionaries to rank
+
+        Returns:
+            List[RankedDataset]: List of ranked dataset results with scores and metadata
+        """
+        q_list, dim = self.llm_service.generate_single_embedding(query)
+        q: torch.Tensor = torch.tensor(q_list, dtype=torch.float32)
+        q: torch.Tensor = F.normalize(q, p=2, dim=0)
+
+        results: List[RankedDataset] = []
+
+        for ds in datasets:
+            sig_url = ds.signature_url
+            sig_hash = ds.signature_hash
+
+            Xn: torch.Tensor | None = None
+            if sig_hash:
+                Xn = self._get_cached_tensor(sig_hash)
+
+            if Xn is None:
+                embeddings = await self.pinata_service.download_signature_embeddings(
+                    signature_url=sig_url,
+                    expected_signature_hash=sig_hash,
+                    compressed=True,
+                )
+                X = torch.tensor(embeddings, dtype=torch.float32)
+                if X.ndim != 2 or X.shape[1] != q.shape[0]:
+                    continue
+
+                Xn = self._normalize_rows(X)
+                if sig_hash:
+                    self._set_cached_tensor(sig_hash, Xn)
+
+            score: float = self._dataset_score_topk_mean(q, Xn)
+
+            if (
+                self.settings.similarity_threshold is not None
+                and score < self.settings.similarity_threshold
+            ):
+                continue
+
+            results.append(
+                RankedDataset(
+                    item=MarketplaceDataItem(
+                        id=ds.id,
+                        title=ds.title,
+                        description=ds.description,
+                        seller=ds.seller,
+                        price=ds.price,
+                        dataset_url=ds.dataset_url,
+                        dataset_hash=ds.dataset_hash,
+                        signature_url=ds.signature_url,
+                        signature_hash=ds.signature_hash,
+                        exists=ds.exists,
+                    ),
+                    score=score,
+                    explanation=ScoreExplanation(
+                        method="topk_mean_cosine",
+                        k_rows=self.settings.k_rows,
+                        rows_in_dataset=Xn.shape[0],
+                        dimension=dim,
+                        normalized=True,
+                    ),
+                )
+            )
+
+        results.sort(key=lambda r: r.score, reverse=True)
+        return results[: self.settings.top_k]
 
 
-# Global service instance
-ai_service = AIService()
+@lru_cache(maxsize=1)
+def get_ai_service(
+    settings: Settings = Depends(get_settings),
+    pinata_service: PinataService = Depends(get_pinata_service),
+    llm_service: LLMService = Depends(get_llm_service),
+) -> AIService:
+    """Get singleton AIService instance.
+
+    Args:
+        settings (Settings, optional): Application settings instance. Defaults to Depends(get_settings).
+        pinata_service (PinataService, optional): PinataService instance. Defaults to Depends(get_pinata_service).
+        llm_service (LLMService, optional): LLMService instance. Defaults to Depends(get_llm_service).
+
+    Returns:
+        AIService: Singleton AIService instance with persistent LRU cache
+    """
+    return AIService(settings, pinata_service, llm_service)

@@ -7,11 +7,7 @@ from typing import Dict
 
 
 class HealthResponse(BaseModel):
-    """Response model for health check endpoint.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Response model for health check endpoint."""
 
     status: str = Field(..., description="Service health status")
     version: str = Field(..., description="API version")
@@ -19,11 +15,7 @@ class HealthResponse(BaseModel):
 
 
 class ReadinessResponse(BaseModel):
-    """Response model for readiness check endpoint.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    """Response model for readiness check endpoint."""
 
     ready: bool = Field(..., description="Whether the service is ready")
     dependencies: Dict[str, str] = Field(

@@ -4,33 +4,9 @@ Job manager for tracking async embedding jobs.
 
 import uuid
 from datetime import datetime
-from enum import Enum
 from typing import Dict, Optional, Any
-from dataclasses import dataclass, field
-
-
-class JobStatus(str, Enum):
-    """Job status enumeration."""
-
-    QUEUED = "queued"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-
-
-@dataclass
-class Job:
-    """Job data structure."""
-
-    job_id: str
-    status: JobStatus
-    filename: str
-    created_at: datetime
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error: Optional[str] = None
-    result: Optional[Dict[str, Any]] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+from functools import lru_cache
+from ..schemas.llm_schema import Job, JobStatus
 
 
 class JobManager:
@@ -40,6 +16,7 @@ class JobManager:
     """
 
     def __init__(self):
+        """Constructor for JobManager."""
         self._jobs: Dict[str, Job] = {}
 
     def create_job(
@@ -135,4 +112,11 @@ class JobManager:
         return self._jobs.copy()
 
 
-job_manager = JobManager()
+@lru_cache(maxsize=1)
+def get_job_manager() -> JobManager:
+    """Get singleton JobManager instance.
+
+    Returns:
+        JobManager: Singleton JobManager instance
+    """
+    return JobManager()

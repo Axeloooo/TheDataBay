@@ -1,29 +1,29 @@
 """
-LLM router for query rewriting and embedding generation using Ollama.
+LLM router for embedding generation using Ollama.
 """
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, BackgroundTasks, status
+from fastapi import (
+    APIRouter,
+    File,
+    UploadFile,
+    HTTPException,
+    BackgroundTasks,
+    status,
+    Depends,
+)
 from ..schemas.llm_schema import (
     JobResponse,
     JobStatusResponse,
     VectorSpec,
     DatasetStats,
     SignatureInfo,
-    QueryRewriteRequest,
-    QueryRewriteResponse,
     QueryEmbeddingRequest,
     QueryEmbeddingResponse,
 )
-from ..services.llm_service import (
-    parse_dataset_file,
-    record_to_text,
-    generate_embeddings_chunked,
-    generate_single_embedding,
-    rewrite_query_with_thinking,
-)
-from ..services.job_manager import job_manager, JobStatus
-from ..services.pinata_service import pinata_service
-from ..config import settings
+from ..services.llm_service import get_llm_service, LLMService
+from ..services.job_manager import get_job_manager, JobManager, JobStatus
+from ..services.pinata_service import get_pinata_service, PinataService
+from ..config.settings import Settings, get_settings
 import csv
 
 router = APIRouter(
@@ -32,31 +32,43 @@ router = APIRouter(
 )
 
 
-async def process_embedding_job(job_id: str, content: str, filename: str):
+async def process_embedding_job(
+    job_id: str,
+    content: str,
+    filename: str,
+    pinata_service: PinataService,
+    job_manager: JobManager,
+    llm_service: LLMService,
+    settings: Settings,
+):
     """Background task to process embedding job.
 
     Args:
         job_id (str): Job identifier
         content (str): File content
         filename (str): Original filename
+        pinata_service (PinataService): Pinata service instance
+        job_manager (JobManager): Job manager instance
+        llm_service (LLMService): LLM service instance
+        settings (Settings): Application settings instance
     """
     try:
         # Update job status to running
         job_manager.update_status(job_id, JobStatus.RUNNING)
 
         # Parse dataset
-        data_rows, column_names, has_header, empty_rows_skipped = parse_dataset_file(
-            content, filename
+        data_rows, column_names, has_header, empty_rows_skipped = (
+            llm_service.parse_dataset_file(content, filename)
         )
 
         # Transform to text
         texts = []
         for row in data_rows:
-            text = record_to_text(row, column_names)
+            text = llm_service.record_to_text(row, column_names)
             texts.append(text)
 
         # Generate embeddings with chunking
-        embeddings, dimension = await generate_embeddings_chunked(texts)
+        embeddings, dimension = await llm_service.generate_embeddings_chunked(texts)
 
         # Upload to IPFS
         ipfs_url, signature_hash = await pinata_service.upload_signature(
@@ -89,7 +101,12 @@ async def process_embedding_job(job_id: str, content: str, filename: str):
     "/embed/batch", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED
 )
 async def create_batch_embeddings(
-    background_tasks: BackgroundTasks, file: UploadFile = File(...)
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    pinata_service: PinataService = Depends(get_pinata_service),
+    job_manager: JobManager = Depends(get_job_manager),
+    llm_service: LLMService = Depends(get_llm_service),
+    settings: Settings = Depends(get_settings),
 ):
     """Submit a dataset for batch embedding (async job-based).
 
@@ -104,6 +121,10 @@ async def create_batch_embeddings(
     Args:
         background_tasks (BackgroundTasks): FastAPI background tasks
         file (UploadFile): Dataset file upload
+        pinata_service (PinataService): Pinata service instance
+        job_manager (JobManager): Job manager instance
+        llm_service (LLMService): LLM service instance
+        settings (Settings): Application settings instance
 
     Returns:
         JobResponse: Job submission response with job ID
@@ -156,18 +177,58 @@ async def create_batch_embeddings(
     )
 
     background_tasks.add_task(
-        process_embedding_job, job_id, decoded_content, file.filename
+        process_embedding_job,
+        job_id,
+        decoded_content,
+        file.filename,
+        pinata_service,
+        job_manager,
+        llm_service,
+        settings,
     )
 
     return JobResponse(job_id=job_id, status=JobStatus.QUEUED.value)
 
 
+@router.post("/embed/query", response_model=QueryEmbeddingResponse)
+async def embed_query(
+    request: QueryEmbeddingRequest,
+    llm_service: LLMService = Depends(get_llm_service),
+    settings: Settings = Depends(get_settings),
+):
+    """Embed a query for retrieval.
+
+    Args:
+        request (QueryEmbeddingRequest): Query embedding request
+        llm_service (LLMService): LLM service instance
+        settings (Settings): Application settings instance
+
+    Returns:
+        QueryEmbeddingResponse: Complete response with embedding, and vectorSpec
+    """
+    query_embedding, dimension = llm_service.generate_single_embedding(request.query)
+
+    vector_spec = VectorSpec(
+        model=settings.embedding_model,
+        dimension=dimension,
+    )
+
+    return QueryEmbeddingResponse(
+        original_query=request.query,
+        query_embedding=query_embedding,
+        vector_spec=vector_spec,
+    )
+
+
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
-async def get_job_status(job_id: str):
+async def get_job_status(
+    job_id: str, job_manager: JobManager = Depends(get_job_manager)
+):
     """Poll job status and retrieve results.
 
     Args:
         job_id (str): Job identifier
+        job_manager (JobManager): Job manager instance
 
     Returns:
         JobStatusResponse: Job status and result details
@@ -193,49 +254,3 @@ async def get_job_status(job_id: str):
         response.signature = SignatureInfo(**job.result["signature"])
 
     return response
-
-
-@router.post("/rewrite", response_model=QueryRewriteResponse, deprecated=True)
-async def rewrite_query(request: QueryRewriteRequest):
-    """Rewrite query using a 'thinking' model.
-
-    Takes a natural language query and rewrites it to be more explicit
-    and retrieval-friendly using the configured thinking model.
-
-    Args:
-        request (QueryRewriteRequest): Query rewrite request model
-
-    Returns:
-        QueryRewriteResponse: Query rewrite response model
-    """
-    rewritten = rewrite_query_with_thinking(request.query, request.context)
-
-    return QueryRewriteResponse(
-        original_query=request.query,
-        rewritten_query=rewritten,
-        model=settings.thinking_model,
-    )
-
-
-@router.post("/embed/query", response_model=QueryEmbeddingResponse)
-async def embed_query(request: QueryEmbeddingRequest):
-    """Embed a query for retrieval.
-
-    Args:
-        request (QueryEmbeddingRequest): Query embedding request
-
-    Returns:
-        QueryEmbeddingResponse: Complete response with embedding, and vectorSpec
-    """
-    query_embedding, dimension = generate_single_embedding(request.query)
-
-    vector_spec = VectorSpec(
-        model=settings.embedding_model,
-        dimension=dimension,
-    )
-
-    return QueryEmbeddingResponse(
-        original_query=request.query,
-        query_embedding=query_embedding,
-        vectorSpec=vector_spec,
-    )

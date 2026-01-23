@@ -3,74 +3,38 @@ Pydantic schemas for AI endpoints.
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any
+from typing import List
+
+from ..schemas.marketplace_schema import MarketplaceDataItem
 
 
 class SimilaritySearchRequest(BaseModel):
-    """Request model for similarity search.
+    """Request model for similarity search."""
 
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
-
-    query: str = Field(..., description="Search query", min_length=1)
-    top_k: int = Field(
-        default=10, description="Number of results to return", ge=1, le=100
-    )
-    threshold: float | None = Field(
-        None, description="Similarity threshold", ge=0.0, le=1.0
-    )
+    query: str = Field(..., description="Search query")
 
 
-class SimilarityResult(BaseModel):
-    """Individual similarity search result.
+class ScoreExplanation(BaseModel):
+    """Explanation of the scoring method used."""
 
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
+    method: str = "topk_mean_cosine"
+    k_rows: int
+    rows_in_dataset: int
+    dimension: int
+    normalized: bool = True
 
-    id: str = Field(..., description="Result identifier")
-    score: float = Field(..., description="Similarity score", ge=0.0, le=1.0)
-    content: str = Field(..., description="Result content")
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata"
-    )
+
+class RankedDataset(BaseModel):
+    """Ranked dataset item with score and explanation."""
+
+    item: MarketplaceDataItem
+    score: float = Field(..., ge=-1.0, le=1.0)
+    explanation: ScoreExplanation
 
 
 class SimilaritySearchResponse(BaseModel):
-    """Response model for similarity search.
+    """Response model for similarity search."""
 
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
-
-    query: str = Field(..., description="Original query")
-    results: List[SimilarityResult] = Field(
-        default_factory=list, description="Search results"
-    )
+    query: str = Field(..., description="Search query")
+    results: List[RankedDataset] = Field(..., description="Search results")
     count: int = Field(..., description="Number of results returned")
-
-
-class ScoreRequest(BaseModel):
-    """Request model for ML scoring.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
-
-    data: Dict[str, Any] = Field(..., description="Data to score")
-    model_name: str | None = Field(None, description="Specific model to use")
-
-
-class ScoreResponse(BaseModel):
-    """Response model for ML scoring.
-
-    Args:
-        BaseModel (BaseModel): Pydantic BaseModel
-    """
-
-    score: float = Field(..., description="Computed score")
-    confidence: float = Field(..., description="Confidence level", ge=0.0, le=1.0)
-    metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional scoring metadata"
-    )

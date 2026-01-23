@@ -2,49 +2,55 @@
 AI router for similarity search and ML workflows.
 """
 
+from typing import List
 from fastapi import APIRouter
+from fastapi.params import Depends
+
+from ..services.marketplace_service import MarketplaceService, get_marketplace_service
+
+from ..schemas.marketplace_schema import MarketplaceDataItem
 from ..schemas.ai_schema import (
+    RankedDataset,
     SimilaritySearchRequest,
     SimilaritySearchResponse,
-    ScoreRequest,
-    ScoreResponse,
 )
+from ..services.ai_service import get_ai_service, AIService
 
-router = APIRouter(
-    prefix="/ai",
-    tags=["ai"],
-)
+router = APIRouter(prefix="/ai", tags=["ai"])
 
 
 @router.post("/similarity-search", response_model=SimilaritySearchResponse)
-async def similarity_search(request: SimilaritySearchRequest):
-    """Perform similarity search using embeddings.
+async def similarity_search(
+    request: SimilaritySearchRequest,
+    ai_service: AIService = Depends(get_ai_service),
+    marketplace_service: MarketplaceService = Depends(get_marketplace_service),
+):
+    """Perform similarity search over marketplace datasets based on query embedding.
 
     Args:
         request (SimilaritySearchRequest): Similarity search request model
+        ai_service (AIService, optional): AI service instance. Defaults to Depends(get_ai_service).
+        marketplace_service (MarketplaceService, optional): Marketplace service instance. Defaults to Depends(get_marketplace_service).
 
     Returns:
-        SimilaritySearchResponse: Similarity search response model
+        SimilaritySearchResponse: Response containing ranked datasets based on similarity search
     """
 
-    # TODO: Implement in future PR.
+    # TODO: Test whole flow with deployed smart contract
 
-    # Placeholder for similarity search implementation
-    return SimilaritySearchResponse(query=request.query, results=[], count=0)
+    datasets: List[MarketplaceDataItem] = (
+        await marketplace_service.get_marketplace_items()
+    )
+    if not datasets:
+        return SimilaritySearchResponse(query=request.query, results=[], count=0)
 
+    ranked: List[RankedDataset] = await ai_service.rank_datasets(
+        query=request.query,
+        datasets=datasets,
+    )
 
-@router.post("/score", response_model=ScoreResponse)
-async def score_data(request: ScoreRequest):
-    """Score data using PyTorch-based models.
-
-    Args:
-        request (ScoreRequest): Score request model
-
-    Returns:
-        ScoreResponse: Score response model
-    """
-
-    # TODO: Implement in future PR.
-
-    # Placeholder for ML scoring implementation
-    return ScoreResponse(score=0.0, confidence=0.0, metadata={})
+    return SimilaritySearchResponse(
+        query=request.query,
+        results=ranked,
+        count=len(ranked),
+    )
