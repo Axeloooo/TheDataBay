@@ -2,7 +2,7 @@
 AI Service for ranking datasets based on query embeddings.
 """
 
-from typing import List
+from typing import List, OrderedDict
 from functools import lru_cache
 import torch
 import torch.nn.functional as F
@@ -21,7 +21,10 @@ class AIService:
     """AI Service for ranking datasets based on query embeddings."""
 
     def __init__(
-        self, settings: Settings, pinata_service: PinataService, llm_service: LLMService
+        self,
+        settings: Settings,
+        pinata_service: PinataService,
+        llm_service: LLMService,
     ):
         """Constructor for AIService.
 
@@ -30,7 +33,7 @@ class AIService:
             pinata_service (PinataService): Pinata service instance
             llm_service (LLMService): LLM service instance
         """
-        self._cache: dict[str, torch.Tensor] = {}
+        self._cache: OrderedDict[str, torch.Tensor] = OrderedDict()
         self.settings = settings
         self.pinata_service = pinata_service
         self.llm_service = llm_service
@@ -49,22 +52,41 @@ class AIService:
     def _get_cached_tensor(self, signature_hash: str) -> torch.Tensor | None:
         """Retrieve cached tensor by signature hash.
 
+        Uses LRU eviction: moves accessed items to the end of the cache.
+
         Args:
             signature_hash (str): Signature hash used as the cache key
 
         Returns:
             torch.Tensor | None: Cached tensor if found, else None
         """
-        return self._cache.get(signature_hash.lower())
+        key = signature_hash.lower()
+        if key in self._cache:
+            # Move to end (most recently used)
+            self._cache.move_to_end(key)
+            return self._cache[key]
+        return None
 
     def _set_cached_tensor(self, signature_hash: str, X: torch.Tensor) -> None:
-        """Set cached tensor by signature hash.
+        """Set cached tensor by signature hash with LRU eviction.
+
+        If cache exceeds maxsize, removes the least recently used item.
 
         Args:
             signature_hash (str): Signature hash used as the cache key
             X (torch.Tensor): Tensor to cache
         """
-        self._cache[signature_hash.lower()] = X
+        key = signature_hash.lower()
+
+        # If key exists, move to end
+        if key in self._cache:
+            self._cache.move_to_end(key)
+
+        self._cache[key] = X
+
+        # Evict least recently used if cache is full
+        if len(self._cache) > self.settings.cache_maxsize:
+            self._cache.popitem(last=False)  # Remove oldest (first) item
 
     def _dataset_score_topk_mean(self, q: torch.Tensor, Xn: torch.Tensor) -> float:
         """Calculate the mean of the top-k similarity scores between a query and dataset embeddings.
@@ -174,6 +196,6 @@ def get_ai_service(
         llm_service (LLMService, optional): LLMService instance. Defaults to Depends(get_llm_service).
 
     Returns:
-        AIService: Singleton AIService instance with persistent cache
+        AIService: Singleton AIService instance with persistent LRU cache
     """
     return AIService(settings, pinata_service, llm_service)

@@ -23,7 +23,7 @@ from ..schemas.llm_schema import (
 from ..services.llm_service import get_llm_service, LLMService
 from ..services.job_manager import get_job_manager, JobManager, JobStatus
 from ..services.pinata_service import get_pinata_service, PinataService
-from ..config.settings import get_settings
+from ..config.settings import Settings, get_settings
 import csv
 
 router = APIRouter(
@@ -39,6 +39,7 @@ async def process_embedding_job(
     pinata_service: PinataService,
     job_manager: JobManager,
     llm_service: LLMService,
+    settings: Settings,
 ):
     """Background task to process embedding job.
 
@@ -49,6 +50,7 @@ async def process_embedding_job(
         pinata_service (PinataService): Pinata service instance
         job_manager (JobManager): Job manager instance
         llm_service (LLMService): LLM service instance
+        settings (Settings): Application settings instance
     """
     try:
         # Update job status to running
@@ -74,7 +76,6 @@ async def process_embedding_job(
         )
 
         # Build result
-        settings = get_settings()
         result = {
             "vectorSpec": {"model": settings.embedding_model, "dimension": dimension},
             "stats": {
@@ -105,6 +106,7 @@ async def create_batch_embeddings(
     pinata_service: PinataService = Depends(get_pinata_service),
     job_manager: JobManager = Depends(get_job_manager),
     llm_service: LLMService = Depends(get_llm_service),
+    settings: Settings = Depends(get_settings),
 ):
     """Submit a dataset for batch embedding (async job-based).
 
@@ -119,6 +121,10 @@ async def create_batch_embeddings(
     Args:
         background_tasks (BackgroundTasks): FastAPI background tasks
         file (UploadFile): Dataset file upload
+        pinata_service (PinataService): Pinata service instance
+        job_manager (JobManager): Job manager instance
+        llm_service (LLMService): LLM service instance
+        settings (Settings): Application settings instance
 
     Returns:
         JobResponse: Job submission response with job ID
@@ -138,7 +144,6 @@ async def create_batch_embeddings(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error reading file: {str(e)}")
 
-    settings = get_settings()
     file_size_mb = len(content) / (1024 * 1024)
     if file_size_mb > settings.max_file_size_mb:
         raise HTTPException(
@@ -179,6 +184,7 @@ async def create_batch_embeddings(
         pinata_service,
         job_manager,
         llm_service,
+        settings,
     )
 
     return JobResponse(job_id=job_id, status=JobStatus.QUEUED.value)
@@ -188,19 +194,20 @@ async def create_batch_embeddings(
 async def embed_query(
     request: QueryEmbeddingRequest,
     llm_service: LLMService = Depends(get_llm_service),
+    settings: Settings = Depends(get_settings),
 ):
     """Embed a query for retrieval.
 
     Args:
         request (QueryEmbeddingRequest): Query embedding request
         llm_service (LLMService): LLM service instance
+        settings (Settings): Application settings instance
 
     Returns:
         QueryEmbeddingResponse: Complete response with embedding, and vectorSpec
     """
     query_embedding, dimension = llm_service.generate_single_embedding(request.query)
 
-    settings = get_settings()
     vector_spec = VectorSpec(
         model=settings.embedding_model,
         dimension=dimension,

@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     top_k: int = Field(alias="TOP_K")
     k_rows: int = Field(alias="K_ROWS")
     similarity_threshold: float | None = Field(alias="SIMILARITY_THRESHOLD")
+    cache_maxsize: int = Field(alias="CACHE_MAXSIZE")
 
     # Pinata IPFS settings
     pinata_api_key: SecretStr = Field(alias="PINATA_API_KEY")

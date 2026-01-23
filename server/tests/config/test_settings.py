@@ -22,6 +22,7 @@ EMBEDDING_CHUNK_SIZE=256
 TOP_K=10
 K_ROWS=100
 SIMILARITY_THRESHOLD=0.5
+CACHE_MAXSIZE=100
 PINATA_API_KEY="k"
 PINATA_SECRET_KEY="s"
 PINATA_GATEWAY_URL="https://gateway.pinata.cloud"
@@ -50,6 +51,7 @@ def clear_relevant_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "TOP_K",
         "K_ROWS",
         "SIMILARITY_THRESHOLD",
+        "CACHE_MAXSIZE",
         "PINATA_API_KEY",
         "PINATA_SECRET_KEY",
         "PINATA_GATEWAY_URL",
@@ -82,8 +84,8 @@ def test_settings_loads_from_env_file(tmp_path, monkeypatch):
     assert s.top_k == 10
     assert s.k_rows == 100
     assert s.similarity_threshold == 0.5
+    assert s.cache_maxsize == 100
 
-    # fix as both keys as SecretStr
     assert isinstance(s.pinata_api_key, SecretStr)
     assert isinstance(s.pinata_secret_key, SecretStr)
     assert s.pinata_api_key.get_secret_value() == "k"
@@ -109,6 +111,7 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
         TOP_K="15"
         K_ROWS="200"
         SIMILARITY_THRESHOLD="0.7"
+        CACHE_MAXSIZE="150"
         PINATA_API_KEY="k"
         PINATA_SECRET_KEY="s"
         PINATA_GATEWAY_URL="https://gateway.pinata.cloud"
@@ -124,6 +127,7 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
     assert isinstance(s.top_k, int) and s.top_k == 15
     assert isinstance(s.k_rows, int) and s.k_rows == 200
     assert isinstance(s.similarity_threshold, float) and s.similarity_threshold == 0.7
+    assert isinstance(s.cache_maxsize, int) and s.cache_maxsize == 150
     assert isinstance(s.cors_origins, list) and s.cors_origins == ["http://a.com"]
     assert isinstance(s.pinata_api_key, SecretStr)
     assert isinstance(s.pinata_secret_key, SecretStr)
@@ -190,6 +194,7 @@ def test_invalid_cors_origins_format_raises(tmp_path, monkeypatch):
         TOP_K=10
         K_ROWS=100
         SIMILARITY_THRESHOLD=0.5
+        CACHE_MAXSIZE=100
         PINATA_API_KEY="k"
         PINATA_SECRET_KEY="s"
         PINATA_GATEWAY_URL="https://gateway.pinata.cloud"
@@ -221,6 +226,7 @@ def test_get_settings_cache_behavior(monkeypatch, tmp_path):
     monkeypatch.setenv("TOP_K", "10")
     monkeypatch.setenv("K_ROWS", "100")
     monkeypatch.setenv("SIMILARITY_THRESHOLD", "0.5")
+    monkeypatch.setenv("CACHE_MAXSIZE", "100")
     monkeypatch.setenv("PINATA_API_KEY", "k")
     monkeypatch.setenv("PINATA_SECRET_KEY", "s")
     monkeypatch.setenv("PINATA_GATEWAY_URL", "https://gateway.pinata.cloud")
