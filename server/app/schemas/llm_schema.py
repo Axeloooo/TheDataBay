@@ -38,7 +38,7 @@ class DatasetEmbeddingResponse(BaseModel):
 
 
 class QueryEmbeddingRequest(BaseModel):
-    """Request model for query embedding with rewriting."""
+    """Request model for query embedding."""
 
     query: str = Field(..., description="Original query", min_length=1)
 
