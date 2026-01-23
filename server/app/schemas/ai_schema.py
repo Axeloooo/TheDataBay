@@ -3,7 +3,7 @@ Pydantic schemas for AI endpoints.
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
+from typing import List
 
 from ..schemas.marketplace_schema import MarketplaceDataItem
 
