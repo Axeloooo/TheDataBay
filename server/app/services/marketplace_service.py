@@ -36,7 +36,6 @@ class MarketplaceService:
                 signature_url="ipfs://QmExampleHash1",
                 signature_hash="0xExampleHash1",
                 exists=True,
-                access_list={"0xBuyerAddress1": True},
             ),
         ]
 
