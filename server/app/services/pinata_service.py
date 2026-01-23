@@ -21,8 +21,16 @@ class PinataService:
         Args:
             settings (Settings): Application settings instance
         """
-        self.api_key = settings.pinata_api_key
-        self.secret_key = settings.pinata_secret_key
+        self.api_key = (
+            settings.pinata_api_key.get_secret_value()
+            if settings.pinata_api_key is not None
+            else None
+        )
+        self.secret_key = (
+            settings.pinata_secret_key.get_secret_value()
+            if settings.pinata_secret_key is not None
+            else None
+        )
         self.base_url = "https://api.pinata.cloud"
         self.gateway_url = settings.pinata_gateway_url
 
