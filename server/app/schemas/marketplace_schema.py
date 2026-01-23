@@ -2,7 +2,6 @@
 Pydantic schemas for Marketplace endpoints.
 """
 
-from typing import Dict
 from pydantic import BaseModel, Field
 
 
