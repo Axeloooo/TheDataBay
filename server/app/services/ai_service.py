@@ -90,7 +90,7 @@ class AIService:
 
         Args:
             query (str): Input query string
-            datasets (List[DataItem]): List of dataset dictionaries to rank
+            datasets (List[MarketplaceDataItem]): List of dataset dictionaries to rank
 
         Returns:
             List[RankedDataset]: List of ranked dataset results with scores and metadata
