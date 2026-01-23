@@ -26,7 +26,7 @@ class MarketplaceService:
 
         return [
             MarketplaceDataItem(
-                id="dataset1",
+                id=1,
                 title="Sample Dataset 1",
                 description="This is a sample dataset for testing.",
                 seller="0xSellerAddress1",
