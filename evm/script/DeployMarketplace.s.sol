@@ -6,18 +6,22 @@ import {HelperConfig} from "./HelperConfig.s.sol";
 import {Marketplace} from "../src/Marketplace.sol";
 
 contract DeployMarketplace is Script {
+    /**
+     * @notice Marketplace instance
+     */
     Marketplace public marketplace;
 
-    function setUp() public {}
-
+    /**
+     * @notice Deploys the Marketplace contract using network-specific configuration
+     */
     function run() public {
         HelperConfig config = new HelperConfig();
 
-        uint256 deployKey = config.activeNetworkConfig();
+        (uint256 deployKey, address feeRecipient, uint256 feeBps) = config.activeNetworkConfig();
 
         vm.startBroadcast(deployKey);
 
-        marketplace = new Marketplace(vm.addr(deployKey));
+        marketplace = new Marketplace(vm.addr(deployKey), feeRecipient, feeBps);
 
         vm.stopBroadcast();
     }
