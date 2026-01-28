@@ -15,13 +15,13 @@ contract MarketplaceTest is Test {
     uint256 feeBps = 250; // 2.5%
 
     // Sample item data
-    string TITLE = "Test Dataset";
-    string DESC = "Synthetic dataset for testing";
-    string DATASET_URL = "ipfs://dataset";
-    bytes32 DATASET_HASH = bytes32(uint256(0x1111));
-    string SIG_URL = "ipfs://signature.json.gz";
-    bytes32 SIG_HASH = bytes32(uint256(0x2222));
-    uint256 PRICE = 1 ether;
+    string constant TITLE = "Test Dataset";
+    string constant DESC = "Synthetic dataset for testing";
+    string constant DATASET_URL = "ipfs://dataset";
+    bytes32 constant DATASET_HASH = bytes32(uint256(0x1111));
+    string constant SIG_URL = "ipfs://signature.json.gz";
+    bytes32 constant SIG_HASH = bytes32(uint256(0x2222));
+    uint256 constant PRICE = 1 ether;
 
     function setUp() public {
         // deploy as test contract; but owner is set in constructor
@@ -220,9 +220,12 @@ contract MarketplaceTest is Test {
     function test_buyItem_revert_wrongPayment() public {
         uint256 itemId = _createDefaultItem();
 
+        uint256 fee = (PRICE * feeBps) / 10_000;
+        uint256 totalPrice = PRICE + fee;
+
         vm.prank(buyer);
-        vm.expectRevert(abi.encodeWithSelector(Marketplace.InvalidPayment.selector, PRICE, uint256(PRICE - 1)));
-        marketplace.buyItem{value: PRICE - 1}(itemId);
+        vm.expectRevert(abi.encodeWithSelector(Marketplace.InvalidPayment.selector, totalPrice, uint256(PRICE)));
+        marketplace.buyItem{value: PRICE}(itemId);
     }
 
     /**
@@ -232,21 +235,21 @@ contract MarketplaceTest is Test {
         uint256 itemId = _createDefaultItem();
 
         uint256 fee = (PRICE * feeBps) / 10_000;
-        uint256 sellerAmount = PRICE - fee;
+        uint256 totalPrice = PRICE + fee;
 
         uint256 feeBalBefore = feeRecipient.balance;
         uint256 sellerBalBefore = seller.balance;
 
         // buy
-        _buy(itemId, buyer, PRICE);
+        _buy(itemId, buyer, totalPrice);
 
         // access
         bool has = marketplace.hasAccess(itemId, buyer);
         assertTrue(has);
 
-        // payouts
+        // payouts - seller receives full price, fee recipient receives fee
         assertEq(feeRecipient.balance, feeBalBefore + fee);
-        assertEq(seller.balance, sellerBalBefore + sellerAmount);
+        assertEq(seller.balance, sellerBalBefore + PRICE);
 
         // frozen via purchaseCount
         Marketplace.DataItemView memory v = marketplace.getItemView(itemId);
@@ -258,11 +261,13 @@ contract MarketplaceTest is Test {
      */
     function test_buyItem_revert_alreadyHasAccess() public {
         uint256 itemId = _createDefaultItem();
-        _buy(itemId, buyer, PRICE);
+        uint256 fee = (PRICE * feeBps) / 10_000;
+        uint256 totalPrice = PRICE + fee;
+        _buy(itemId, buyer, totalPrice);
 
         vm.prank(buyer);
         vm.expectRevert(abi.encodeWithSelector(Marketplace.AlreadyHasAccess.selector, buyer, itemId));
-        marketplace.buyItem{value: PRICE}(itemId);
+        marketplace.buyItem{value: totalPrice}(itemId);
     }
 
     // ========= update functions (freeze rules) =========
@@ -312,7 +317,9 @@ contract MarketplaceTest is Test {
      */
     function test_updates_revertAfterFirstPurchase_itemFrozen() public {
         uint256 itemId = _createDefaultItem();
-        _buy(itemId, buyer, PRICE);
+        uint256 fee = (PRICE * feeBps) / 10_000;
+        uint256 totalPrice = PRICE + fee;
+        _buy(itemId, buyer, totalPrice);
 
         vm.prank(owner);
         vm.expectRevert(abi.encodeWithSelector(Marketplace.ItemFrozen.selector, itemId));

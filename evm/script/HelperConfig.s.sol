@@ -42,12 +42,11 @@ contract HelperConfig is Script {
      * @dev Returns the Sepolia network configuration.
      */
     function getSepoliaEthConfig() public view returns (NetworkConfig memory) {
-        uint256 pk = vm.envUint("PRIVATE_KEY");
+        uint256 pk = vm.envUint("SEPOLIA_PRIVATE_KEY");
         address deployer = vm.addr(pk);
 
-        address feeR = vm.envOr("FEE_RECIPIENT", deployer);
-        uint256 feeBps = vm.envOr("FEE_BPS", uint256(250));
-
+        address feeR = vm.envOr("SEPOLIA_FEE_RECIPIENT", deployer);
+        uint256 feeBps = vm.envOr("SEPOLIA_FEE_BPS", uint256(250));
         return NetworkConfig({deployKey: pk, feeRecipient: feeR, feeBps: feeBps});
     }
 
@@ -59,9 +58,8 @@ contract HelperConfig is Script {
             return activeNetworkConfig;
         }
 
-        address DEFAULT_FEE_RECIPIENT = vm.addr(DEFAULT_ANVIL_KEY);
+        address defaultFeeRecipient = vm.addr(DEFAULT_ANVIL_KEY);
 
-        return
-            NetworkConfig({deployKey: DEFAULT_ANVIL_KEY, feeRecipient: DEFAULT_FEE_RECIPIENT, feeBps: DEFAULT_FEE_BPS});
+        return NetworkConfig({deployKey: DEFAULT_ANVIL_KEY, feeRecipient: defaultFeeRecipient, feeBps: DEFAULT_FEE_BPS});
     }
 }

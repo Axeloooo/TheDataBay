@@ -22,7 +22,7 @@ help:
 	@echo "  buy-item      - buy itemId=0 with msg.value=PRICE_WEI"
 	@echo ""
 	@echo "Env in .env:"
-	@echo "  ANVIL_RPC_URL, ANVIL_PRIVATE_KEY, FEE_RECIPIENT, FEE_BPS"
+	@echo "  ANVIL_RPC_URL, ANVIL_PRIVATE_KEY, ANVIL_FEE_RECIPIENT, ANVIL_FEE_BPS"
 
 anvil:
 	@anvil --host 127.0.0.1 --port 8545
