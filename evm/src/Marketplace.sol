@@ -11,16 +11,19 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
  */
 contract Marketplace is Ownable, ReentrancyGuard {
     // ========= Errors =========
-    error ItemDoesNotExist(uint256 itemId);
-    error PriceMustBeGreaterThanZero();
-    error DatasetUrlRequired();
-    error SignatureUrlRequired();
-    error InvalidPayment(uint256 required, uint256 provided);
-    error AlreadyHasAccess(address buyer, uint256 itemId);
-    error TransferFailed();
-    error InvalidFeeBps(uint256 bps);
-    error FeeRecipientRequired();
-    error ItemFrozen(uint256 itemId);
+    error Marketplace__ItemDoesNotExist(uint256 itemId);
+    error Marketplace__PriceMustBeGreaterThanZero();
+    error Marketplace__TitleRequired();
+    error Marketplace__DescriptionRequired();
+    error Marketplace__DatasetUrlRequired();
+    error Marketplace__SignatureUrlRequired();
+    error Marketplace__InvalidPayment(uint256 required, uint256 provided);
+    error Marketplace__AlreadyHasAccess(address buyer, uint256 itemId);
+    error Marketplace__TransferFailed();
+    error Marketplace__InvalidFeeBps(uint256 bps);
+    error Marketplace__FeeRecipientRequired();
+    error Marketplace__SellerRequired();
+    error Marketplace__ItemFrozen(uint256 itemId);
 
     // ========= Storage =========
 
@@ -92,19 +95,19 @@ contract Marketplace is Ownable, ReentrancyGuard {
 
     // ========= Modifiers =========
     modifier onlyExistingItem(uint256 itemId) {
-        if (!items[itemId].exists) revert ItemDoesNotExist(itemId);
+        if (!items[itemId].exists) revert Marketplace__ItemDoesNotExist(itemId);
         _;
     }
 
     modifier onlyIfNotFrozen(uint256 itemId) {
-        if (items[itemId].purchaseCount > 0) revert ItemFrozen(itemId);
+        if (items[itemId].purchaseCount > 0) revert Marketplace__ItemFrozen(itemId);
         _;
     }
 
     // ========= Constructor =========
     constructor(address initialOwner, address _feeRecipient, uint256 _feeBps) Ownable(initialOwner) {
-        if (_feeRecipient == address(0)) revert FeeRecipientRequired();
-        if (_feeBps > 10_000) revert InvalidFeeBps(_feeBps);
+        if (_feeRecipient == address(0)) revert Marketplace__FeeRecipientRequired();
+        if (_feeBps > 10_000) revert Marketplace__InvalidFeeBps(_feeBps);
         feeRecipient = _feeRecipient;
         feeBps = _feeBps;
     }
@@ -118,8 +121,8 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @param _feeBps The fee in basis points (bps)
      */
     function setFeeConfig(address _feeRecipient, uint256 _feeBps) external onlyOwner {
-        if (_feeRecipient == address(0)) revert FeeRecipientRequired();
-        if (_feeBps > 10_000) revert InvalidFeeBps(_feeBps);
+        if (_feeRecipient == address(0)) revert Marketplace__FeeRecipientRequired();
+        if (_feeBps > 10_000) revert Marketplace__InvalidFeeBps(_feeBps);
 
         address oldR = feeRecipient;
         uint256 oldB = feeBps;
@@ -142,6 +145,8 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @param datasetHash The hash of the dataset
      * @param signatureUrl The URL of the signature
      * @param signatureHash The hash of the signature
+     *
+     * @return itemId The ID of the created item
      */
     function createItem(
         string calldata title,
@@ -153,10 +158,12 @@ contract Marketplace is Ownable, ReentrancyGuard {
         string calldata signatureUrl,
         bytes32 signatureHash
     ) external onlyOwner returns (uint256 itemId) {
-        if (price == 0) revert PriceMustBeGreaterThanZero();
-        if (bytes(datasetUrl).length == 0) revert DatasetUrlRequired();
-        if (bytes(signatureUrl).length == 0) revert SignatureUrlRequired();
-        if (seller == address(0)) revert FeeRecipientRequired(); // reuse simple error
+        if (bytes(title).length == 0) revert Marketplace__TitleRequired();
+        if (bytes(description).length == 0) revert Marketplace__DescriptionRequired();
+        if (price == 0) revert Marketplace__PriceMustBeGreaterThanZero();
+        if (bytes(datasetUrl).length == 0) revert Marketplace__DatasetUrlRequired();
+        if (bytes(signatureUrl).length == 0) revert Marketplace__SignatureUrlRequired();
+        if (seller == address(0)) revert Marketplace__SellerRequired();
 
         itemId = nextItemId;
         nextItemId = itemId + 1;
@@ -188,7 +195,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         onlyExistingItem(itemId)
         onlyIfNotFrozen(itemId)
     {
-        if (bytes(newDatasetUrl).length == 0) revert DatasetUrlRequired();
+        if (bytes(newDatasetUrl).length == 0) revert Marketplace__DatasetUrlRequired();
         DataItem storage it = items[itemId];
         string memory old = it.datasetUrl;
         it.datasetUrl = newDatasetUrl;
@@ -209,7 +216,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         onlyExistingItem(itemId)
         onlyIfNotFrozen(itemId)
     {
-        if (bytes(newSignatureUrl).length == 0) revert SignatureUrlRequired();
+        if (bytes(newSignatureUrl).length == 0) revert Marketplace__SignatureUrlRequired();
         DataItem storage it = items[itemId];
 
         string memory oldUrl = it.signatureUrl;
@@ -234,7 +241,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         onlyExistingItem(itemId)
         onlyIfNotFrozen(itemId)
     {
-        if (newPrice == 0) revert PriceMustBeGreaterThanZero();
+        if (newPrice == 0) revert Marketplace__PriceMustBeGreaterThanZero();
         DataItem storage it = items[itemId];
         uint256 old = it.price;
         it.price = newPrice;
@@ -267,20 +274,19 @@ contract Marketplace is Ownable, ReentrancyGuard {
         uint256 fee = (it.price * feeBps) / 10_000;
         uint256 totalPrice = it.price + fee;
 
-        if (amountPaid != totalPrice) revert InvalidPayment(totalPrice, amountPaid);
-        if (it.accessList[buyer]) revert AlreadyHasAccess(buyer, itemId);
+        if (amountPaid != totalPrice) revert Marketplace__InvalidPayment(totalPrice, amountPaid);
+        if (it.accessList[buyer]) revert Marketplace__AlreadyHasAccess(buyer, itemId);
 
         if (fee > 0) {
             (bool okFee,) = feeRecipient.call{value: fee}("");
-            if (!okFee) revert TransferFailed();
+            if (!okFee) revert Marketplace__TransferFailed();
         }
 
         (bool okSeller,) = it.seller.call{value: it.price}("");
-        if (!okSeller) revert TransferFailed();
+        if (!okSeller) revert Marketplace__TransferFailed();
 
         it.accessList[buyer] = true;
 
-        // Freeze after first purchase (integrity guarantee)
         it.purchaseCount += 1;
         if (it.purchaseCount == 1) emit ItemFrozenAfterSale(itemId);
 
@@ -294,6 +300,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      *
      * @param itemId The ID of the item
      * @param user The address of the user
+     *
      * @return bool Whether the user has access
      */
     function hasAccess(uint256 itemId, address user) external view onlyExistingItem(itemId) returns (bool) {
@@ -305,6 +312,8 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @notice Get the view data of an item.
      *
      * @param itemId The ID of the item
+     *
+     * @return DataItemView The view data of the item
      */
     function getItemView(uint256 itemId) public view onlyExistingItem(itemId) returns (DataItemView memory) {
         DataItem storage it = items[itemId];
@@ -325,12 +334,76 @@ contract Marketplace is Ownable, ReentrancyGuard {
 
     /**
      * @notice Get all items in the marketplace.
+     * @dev WARNING: This function can consume high gas as the marketplace grows.
+     *      Intended for off-chain queries (static calls) only. For on-chain or large datasets, use getItems() with pagination.
+     *      Only returns items that exist (items[i].exists == true).
+     *
+     * @return DataItemView[] An array of all item views
      */
     function getAllItems() external view returns (DataItemView[] memory) {
-        DataItemView[] memory out = new DataItemView[](nextItemId);
+        // First, count how many items actually exist
+        uint256 existCount = 0;
         for (uint256 i = 0; i < nextItemId; i++) {
-            out[i] = getItemView(i);
+            if (items[i].exists) {
+                existCount++;
+            }
         }
+
+        // Allocate array of correct size
+        DataItemView[] memory out = new DataItemView[](existCount);
+        uint256 index = 0;
+
+        // Populate array with existing items only
+        for (uint256 i = 0; i < nextItemId; i++) {
+            if (items[i].exists) {
+                out[index] = getItemView(i);
+                index++;
+            }
+        }
+
+        return out;
+    }
+
+    /**
+     * @notice Get a paginated list of items from the marketplace.
+     * @dev Only returns items that exist (items[i].exists == true). The returned array may be smaller than
+     *      the requested count if some items don't exist or if reaching the end of available items.
+     *
+     * @param startId The starting item ID (inclusive)
+     * @param count The maximum number of items to return
+     *
+     * @return DataItemView[] An array of item views (may be smaller than count if reaching the end or items don't exist)
+     */
+    function getItems(uint256 startId, uint256 count) external view returns (DataItemView[] memory) {
+        if (startId >= nextItemId) {
+            return new DataItemView[](0);
+        }
+
+        uint256 endId = startId + count;
+        if (endId > nextItemId) {
+            endId = nextItemId;
+        }
+
+        // Count existing items in range
+        uint256 existCount = 0;
+        for (uint256 i = startId; i < endId; i++) {
+            if (items[i].exists) {
+                existCount++;
+            }
+        }
+
+        // Allocate array of correct size
+        DataItemView[] memory out = new DataItemView[](existCount);
+        uint256 index = 0;
+
+        // Populate array with existing items only
+        for (uint256 i = startId; i < endId; i++) {
+            if (items[i].exists) {
+                out[index] = getItemView(i);
+                index++;
+            }
+        }
+
         return out;
     }
 }
