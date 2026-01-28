@@ -286,6 +286,34 @@ contract MarketplaceTest is Test {
     }
 
     /**
+     * @notice Tests that createItem reverts when price exceeds MAX_PRICE
+     */
+    function test_createItem_revert_priceExceedsMaximum() public {
+        uint256 maxPrice = marketplace.MAX_PRICE();
+        uint256 tooHighPrice = maxPrice + 1;
+
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(Marketplace.Marketplace__PriceExceedsMaximum.selector, tooHighPrice, maxPrice)
+        );
+        marketplace.createItem(TITLE, DESC, seller, tooHighPrice, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH);
+    }
+
+    /**
+     * @notice Tests that createItem succeeds at MAX_PRICE
+     */
+    function test_createItem_succeedsAtMaxPrice() public {
+        uint256 maxPrice = marketplace.MAX_PRICE();
+
+        vm.prank(owner);
+        uint256 itemId =
+            marketplace.createItem(TITLE, DESC, seller, maxPrice, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH);
+
+        Marketplace.DataItemView memory v = marketplace.getItemView(itemId);
+        assertEq(v.price, maxPrice);
+    }
+
+    /**
      * @notice Tests that getAllItems returns all created items
      */
     function test_getAllItems_returnsAll() public {
@@ -592,6 +620,35 @@ contract MarketplaceTest is Test {
 
         Marketplace.DataItemView memory v = marketplace.getItemView(itemId);
         assertEq(v.price, 2 ether);
+    }
+
+    /**
+     * @notice Tests that updatePrice reverts when new price exceeds MAX_PRICE
+     */
+    function test_updatePrice_revert_priceExceedsMaximum() public {
+        uint256 itemId = _createDefaultItem();
+        uint256 maxPrice = marketplace.MAX_PRICE();
+        uint256 tooHighPrice = maxPrice + 1;
+
+        vm.prank(owner);
+        vm.expectRevert(
+            abi.encodeWithSelector(Marketplace.Marketplace__PriceExceedsMaximum.selector, tooHighPrice, maxPrice)
+        );
+        marketplace.updatePrice(itemId, tooHighPrice);
+    }
+
+    /**
+     * @notice Tests that updatePrice succeeds at MAX_PRICE
+     */
+    function test_updatePrice_succeedsAtMaxPrice() public {
+        uint256 itemId = _createDefaultItem();
+        uint256 maxPrice = marketplace.MAX_PRICE();
+
+        vm.prank(owner);
+        marketplace.updatePrice(itemId, maxPrice);
+
+        Marketplace.DataItemView memory v = marketplace.getItemView(itemId);
+        assertEq(v.price, maxPrice);
     }
 
     /**

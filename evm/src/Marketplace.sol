@@ -11,8 +11,10 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
  */
 contract Marketplace is Ownable, ReentrancyGuard {
     // ========= Errors =========
+    error Marketplace__InitialOwnerRequired();
     error Marketplace__ItemDoesNotExist(uint256 itemId);
     error Marketplace__PriceMustBeGreaterThanZero();
+    error Marketplace__PriceExceedsMaximum(uint256 price, uint256 maxPrice);
     error Marketplace__TitleRequired();
     error Marketplace__DescriptionRequired();
     error Marketplace__DatasetUrlRequired();
@@ -70,6 +72,11 @@ contract Marketplace is Ownable, ReentrancyGuard {
     uint256 public feeBps;
     address public feeRecipient;
 
+    // Maximum price to prevent overflow in totalPrice calculation (price + fee)
+    // Set to 10^6 ETH (1 million ETH) which is practical and leaves ample room for fee addition
+    // With max fee of 100% (feeBps = 10000), max totalPrice = 2 * 10^6 ETH, well below uint256 max
+    uint256 public constant MAX_PRICE = 1_000_000 ether;
+
     // ========= Events =========
     event FeeConfigUpdated(uint256 oldFeeBps, uint256 newFeeBps, address oldRecipient, address newRecipient);
 
@@ -105,7 +112,16 @@ contract Marketplace is Ownable, ReentrancyGuard {
     }
 
     // ========= Constructor =========
+    /**
+     *
+     * @notice Marketplace constructor
+     *
+     * @param initialOwner The address of the initial owner
+     * @param _feeRecipient The address that will receive marketplace fees
+     * @param _feeBps The fee in basis points (bps)
+     */
     constructor(address initialOwner, address _feeRecipient, uint256 _feeBps) Ownable(initialOwner) {
+        if (initialOwner == address(0)) revert Marketplace__InitialOwnerRequired();
         if (_feeRecipient == address(0)) revert Marketplace__FeeRecipientRequired();
         if (_feeBps > 10_000) revert Marketplace__InvalidFeeBps(_feeBps);
         feeRecipient = _feeRecipient;
@@ -161,6 +177,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         if (bytes(title).length == 0) revert Marketplace__TitleRequired();
         if (bytes(description).length == 0) revert Marketplace__DescriptionRequired();
         if (price == 0) revert Marketplace__PriceMustBeGreaterThanZero();
+        if (price > MAX_PRICE) revert Marketplace__PriceExceedsMaximum(price, MAX_PRICE);
         if (bytes(datasetUrl).length == 0) revert Marketplace__DatasetUrlRequired();
         if (bytes(signatureUrl).length == 0) revert Marketplace__SignatureUrlRequired();
         if (seller == address(0)) revert Marketplace__SellerRequired();
@@ -242,6 +259,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         onlyIfNotFrozen(itemId)
     {
         if (newPrice == 0) revert Marketplace__PriceMustBeGreaterThanZero();
+        if (newPrice > MAX_PRICE) revert Marketplace__PriceExceedsMaximum(newPrice, MAX_PRICE);
         DataItem storage it = items[itemId];
         uint256 old = it.price;
         it.price = newPrice;
@@ -263,6 +281,10 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @notice Internal purchase logic, can be called by CCIP handler later for cross-chain purchases.
      *
      * @dev Internal purchase path. Later CCIP receiver can call this after receiving bridged USDC (or ETH).
+     *      Fee and totalPrice calculations are overflow-safe due to MAX_PRICE enforcement.
+     *      With MAX_PRICE = 10^6 ETH and max feeBps = 10000 (100%), max totalPrice = 2 * 10^6 ETH,
+     *      which is well within uint256 range and practically sendable as msg.value.
+     *      Follows checks-effects-interactions pattern: all state changes occur before external calls.
      *
      * @param itemId The ID of the item to purchase
      * @param buyer The address of the buyer
@@ -277,6 +299,9 @@ contract Marketplace is Ownable, ReentrancyGuard {
         if (amountPaid != totalPrice) revert Marketplace__InvalidPayment(totalPrice, amountPaid);
         if (it.accessList[buyer]) revert Marketplace__AlreadyHasAccess(buyer, itemId);
 
+        it.accessList[buyer] = true;
+        it.purchaseCount += 1;
+
         if (fee > 0) {
             (bool okFee,) = feeRecipient.call{value: fee}("");
             if (!okFee) revert Marketplace__TransferFailed();
@@ -285,11 +310,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         (bool okSeller,) = it.seller.call{value: it.price}("");
         if (!okSeller) revert Marketplace__TransferFailed();
 
-        it.accessList[buyer] = true;
-
-        it.purchaseCount += 1;
         if (it.purchaseCount == 1) emit ItemFrozenAfterSale(itemId);
-
         emit ItemPurchased(itemId, buyer, amountPaid, fee, it.price);
     }
 
@@ -334,6 +355,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
 
     /**
      * @notice Get all items in the marketplace.
+     *
      * @dev WARNING: This function can consume high gas as the marketplace grows.
      *      Intended for off-chain queries (static calls) only. For on-chain or large datasets, use getItems() with pagination.
      *      Only returns items that exist (items[i].exists == true).
@@ -341,7 +363,6 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @return DataItemView[] An array of all item views
      */
     function getAllItems() external view returns (DataItemView[] memory) {
-        // First, count how many items actually exist
         uint256 existCount = 0;
         for (uint256 i = 0; i < nextItemId; i++) {
             if (items[i].exists) {
@@ -349,11 +370,9 @@ contract Marketplace is Ownable, ReentrancyGuard {
             }
         }
 
-        // Allocate array of correct size
         DataItemView[] memory out = new DataItemView[](existCount);
         uint256 index = 0;
 
-        // Populate array with existing items only
         for (uint256 i = 0; i < nextItemId; i++) {
             if (items[i].exists) {
                 out[index] = getItemView(i);
@@ -366,6 +385,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
 
     /**
      * @notice Get a paginated list of items from the marketplace.
+     *
      * @dev Only returns items that exist (items[i].exists == true). The returned array may be smaller than
      *      the requested count if some items don't exist or if reaching the end of available items.
      *
@@ -384,7 +404,6 @@ contract Marketplace is Ownable, ReentrancyGuard {
             endId = nextItemId;
         }
 
-        // Count existing items in range
         uint256 existCount = 0;
         for (uint256 i = startId; i < endId; i++) {
             if (items[i].exists) {
@@ -392,11 +411,9 @@ contract Marketplace is Ownable, ReentrancyGuard {
             }
         }
 
-        // Allocate array of correct size
         DataItemView[] memory out = new DataItemView[](existCount);
         uint256 index = 0;
 
-        // Populate array with existing items only
         for (uint256 i = startId; i < endId; i++) {
             if (items[i].exists) {
                 out[index] = getItemView(i);
