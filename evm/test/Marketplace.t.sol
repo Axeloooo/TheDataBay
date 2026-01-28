@@ -149,7 +149,7 @@ contract MarketplaceTest is Test {
     }
 
     /**
-     * @notice Tests that feeBps = 10000 (100%) works correctly (all to fee recipient, seller gets nothing)
+     * @notice Tests that feeBps = 10000 (100%) works correctly (buyer pays 2x price: seller receives price, fee recipient receives price as fee)
      */
     function test_setFeeConfig_maxFee_feeRecipientReceivesAll() public {
         // Set fee to 100%
