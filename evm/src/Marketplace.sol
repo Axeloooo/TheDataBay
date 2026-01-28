@@ -121,7 +121,6 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @param _feeBps The fee in basis points (bps)
      */
     constructor(address initialOwner, address _feeRecipient, uint256 _feeBps) Ownable(initialOwner) {
-        if (initialOwner == address(0)) revert Marketplace__InitialOwnerRequired();
         if (_feeRecipient == address(0)) revert Marketplace__FeeRecipientRequired();
         if (_feeBps > 10_000) revert Marketplace__InvalidFeeBps(_feeBps);
         feeRecipient = _feeRecipient;
