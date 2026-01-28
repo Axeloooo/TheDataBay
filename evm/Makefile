@@ -80,12 +80,20 @@ create-item:
 	  "$$TITLE" "$$DESC" $$SELLER $$PRICE_WEI "$$DATASET_URL" $$DATASET_HASH "$$SIG_URL" $$SIG_HASH \
 	  --rpc-url $(ANVIL_RPC_URL) --private-key $(ANVIL_PRIVATE_KEY)
 
-# Buy itemId=0. Provide PRICE_WEI to match stored price.
-# make buy-item BUYER_KEY=0x... PRICE_WEI=...
+# Buy itemId=0. Calculates total price (price + fee) automatically.
+# make buy-item BUYER_PK=0x... PRICE_WEI=...
 buy-item:
 	@ADDR=$$(cat $(ANVIL_ADDR_FILE)); \
 	PRICE_WEI=$${PRICE_WEI:-10000000000000000}; \
 	BUYER_PK=$${BUYER_PK:-$(ANVIL_PRIVATE_KEY)}; \
-	echo "Buying item 0 for $$PRICE_WEI wei..."; \
+	echo "Reading feeBps from contract..."; \
+	FEE_BPS=$$(cast call $$ADDR "feeBps()(uint256)" --rpc-url $(ANVIL_RPC_URL)); \
+	FEE_BPS_DEC=$$(printf "%d" $$FEE_BPS); \
+	echo "Price: $$PRICE_WEI wei, Fee: $$FEE_BPS_DEC bps"; \
+	FEE_AMOUNT=$$(echo "scale=0; $$PRICE_WEI * $$FEE_BPS_DEC / 10000" | bc); \
+	TOTAL_PRICE=$$(echo "$$PRICE_WEI + $$FEE_AMOUNT" | bc); \
+	echo "Fee amount: $$FEE_AMOUNT wei"; \
+	echo "Total price to pay: $$TOTAL_PRICE wei"; \
+	echo "Buying item 0..."; \
 	cast send $$ADDR "buyItem(uint256)" 0 \
-	  --rpc-url $(ANVIL_RPC_URL) --private-key $$BUYER_PK --value $$PRICE_WEI
+	  --rpc-url $(ANVIL_RPC_URL) --private-key $$BUYER_PK --value $$TOTAL_PRICE
