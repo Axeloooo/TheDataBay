@@ -86,7 +86,7 @@ contract MarketplaceTest is Test {
      */
     function test_setFeeConfig_onlyOwner() public {
         vm.prank(address(123));
-        vm.expectRevert(); // Ownable: caller is not the owner (OZ revert string)
+        vm.expectRevert();
         marketplace.setFeeConfig(address(0xBEEF), 100);
     }
 
