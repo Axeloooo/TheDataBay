@@ -1,0 +1,53 @@
+# Load extensions
+load('ext://restart_process', 'docker_build_with_restart')
+load('ext://secret', 'secret_create_generic')
+
+### K8s Config ###
+
+k8s_yaml('./infra/development/k8s/secrets.yaml')
+
+### End of K8s Config ###
+### Adminer ###
+
+k8s_yaml('./infra/development/k8s/adminer.yaml')
+k8s_resource('adminer', port_forwards=8081, labels="adminer")
+
+### End of Adminer ###
+### MySQL ###
+
+k8s_yaml('./infra/development/k8s/mysql.yaml')
+k8s_resource('mysql', port_forwards=3306, labels="database")
+
+### End of MySQL ###
+### UI ###
+
+docker_build_with_restart(
+    'bridgemart/client', 
+    '.', 
+    dockerfile='./infra/development/docker/client.Dockerfile', 
+    entrypoint='npm run dev -- --host 0.0.0.0 --port 5173', 
+    live_update=[
+        sync('./client', '/app')
+    ]
+)
+
+k8s_yaml('./infra/development/k8s/client-deployment.yaml')
+k8s_resource('client', port_forwards=5173, labels="client")
+
+### End of UI ###
+### API ###
+    
+docker_build_with_restart(
+    'bridgemart/server', 
+    '.', 
+    dockerfile='./infra/development/docker/server.Dockerfile', 
+    entrypoint='fastapi dev app/main.py --host 0.0.0.0 --port 8080', 
+    live_update=[
+        sync('./server', '/code')
+    ]
+)
+
+k8s_yaml('./infra/development/k8s/server-deployment.yaml')
+k8s_resource('server', port_forwards=8080, resource_deps=['mysql'], labels="server")
+
+### End of API ###
