@@ -27,7 +27,7 @@ from ..config.settings import Settings, get_settings
 import csv
 
 router = APIRouter(
-    prefix="/llm",
+    prefix="/api/v1/llm",
     tags=["llm"],
 )
 

@@ -7,7 +7,7 @@ from ..schemas.health_schema import HealthResponse, ReadinessResponse
 from ..config.settings import get_settings
 
 router = APIRouter(
-    prefix="/health",
+    prefix="/api/v1/health",
     tags=["health"],
 )
 

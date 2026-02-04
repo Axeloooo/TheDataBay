@@ -16,7 +16,7 @@ from ..schemas.ai_schema import (
 )
 from ..services.ai_service import get_ai_service, AIService
 
-router = APIRouter(prefix="/ai", tags=["ai"])
+router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 
 
 @router.post("/similarity-search", response_model=SimilaritySearchResponse)

@@ -24,6 +24,12 @@ help:
 	@echo "Env in .env:"
 	@echo "  ANVIL_RPC_URL, ANVIL_PRIVATE_KEY, ANVIL_FEE_RECIPIENT, ANVIL_FEE_BPS"
 
+build:
+	mkdir -p ../server/app/config/abi
+	forge build
+	jq '.abi' out/Marketplace.sol/Marketplace.json > ../server/app/config/abi/Marketplace.json
+
+
 anvil:
 	@anvil --host 127.0.0.1 --port 8545
 
