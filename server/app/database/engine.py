@@ -3,6 +3,7 @@ Database configuration and session management.
 """
 
 from functools import lru_cache
+from typing import Any, Generator
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 from ..config.settings import Settings, get_settings
@@ -29,11 +30,11 @@ def create_db_and_tables() -> None:
     SQLModel.metadata.create_all(bind=engine)
 
 
-def get_session() -> Session:
+def get_session() -> Generator[Session, Any, None]:
     """Get a database session.
 
     Yields:
-        Session: Database session
+        Generator[Session, Any, None]: Database session
     """
     engine: Engine = get_engine()
     with Session(bind=engine) as session:
