@@ -5,8 +5,9 @@ LLM router for embedding generation using Ollama.
 from fastapi import APIRouter, File, UploadFile, BackgroundTasks, status, Depends
 from ..schemas.job_schema import JobResponse, JobStatusResponse
 from ..schemas.llm_schema import VectorSpec, QueryEmbeddingRequest, QueryEmbeddingResponse
-from ..services.llm_service import get_llm_service, LLMService
-from ..services.llm_job_service import get_llm_job_service, LLMJobService
+from ..services.job_manager import JobManager, get_job_manager
+from ..services.llm_job_service import enqueue_batch_job, get_job_status as get_job_status_service
+from ..services.llm_service import generate_single_embedding
 from ..config.settings import Settings, get_settings
 
 router = APIRouter(
@@ -21,7 +22,8 @@ router = APIRouter(
 async def create_batch_embeddings(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
-    llm_job_service: LLMJobService = Depends(get_llm_job_service),
+    settings: Settings = Depends(get_settings),
+    job_manager: JobManager = Depends(get_job_manager),
 ):
     """Submit a dataset for batch embedding (async job-based).
 
@@ -36,31 +38,35 @@ async def create_batch_embeddings(
     Args:
         background_tasks (BackgroundTasks): FastAPI background tasks
         file (UploadFile): Dataset file upload
-        llm_job_service (LLMJobService): Job orchestration service
+        settings (Settings): Application settings instance
+        job_manager (JobManager): Job manager instance
 
     Returns:
         JobResponse: Job submission response with job ID
     """
-    return await llm_job_service.enqueue_batch_job(file, background_tasks)
+    return await enqueue_batch_job(
+        file=file,
+        background_tasks=background_tasks,
+        settings=settings,
+        job_manager=job_manager,
+    )
 
 
 @router.post("/embed/query", response_model=QueryEmbeddingResponse)
 async def embed_query(
     request: QueryEmbeddingRequest,
-    llm_service: LLMService = Depends(get_llm_service),
     settings: Settings = Depends(get_settings),
 ):
     """Embed a query for retrieval.
 
     Args:
         request (QueryEmbeddingRequest): Query embedding request
-        llm_service (LLMService): LLM service instance
         settings (Settings): Application settings instance
 
     Returns:
         QueryEmbeddingResponse: Complete response with embedding, and vectorSpec
     """
-    query_embedding, dimension = llm_service.generate_single_embedding(request.query)
+    query_embedding, dimension = generate_single_embedding(request.query, settings)
 
     vector_spec = VectorSpec(
         model=settings.embedding_model,
@@ -76,15 +82,15 @@ async def embed_query(
 
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
 async def get_job_status(
-    job_id: str, llm_job_service: LLMJobService = Depends(get_llm_job_service)
+    job_id: str, job_manager: JobManager = Depends(get_job_manager)
 ):
     """Poll job status and retrieve results.
 
     Args:
         job_id (str): Job identifier
-        llm_job_service (LLMJobService): Job orchestration service
+        job_manager (JobManager): Job manager instance
 
     Returns:
         JobStatusResponse: Job status and result details
     """
-    return llm_job_service.get_job_status(job_id)
+    return get_job_status_service(job_id, job_manager)

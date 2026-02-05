@@ -6,7 +6,8 @@ from typing import List
 from fastapi import APIRouter
 from fastapi.params import Depends
 
-from ..services.marketplace_service import MarketplaceService, get_marketplace_service
+from ..services.marketplace_service import get_marketplace_items
+from ..config.settings import Settings, get_settings
 
 from ..schemas.marketplace_schema import MarketplaceDataItem
 from ..schemas.ai_schema import (
@@ -23,14 +24,14 @@ router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 async def similarity_search(
     request: SimilaritySearchRequest,
     ai_service: AIService = Depends(get_ai_service),
-    marketplace_service: MarketplaceService = Depends(get_marketplace_service),
+    settings: Settings = Depends(get_settings),
 ):
     """Perform similarity search over marketplace datasets based on query embedding.
 
     Args:
         request (SimilaritySearchRequest): Similarity search request model
         ai_service (AIService, optional): AI service instance. Defaults to Depends(get_ai_service).
-        marketplace_service (MarketplaceService, optional): Marketplace service instance. Defaults to Depends(get_marketplace_service).
+        settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
 
     Returns:
         SimilaritySearchResponse: Response containing ranked datasets based on similarity search
@@ -38,9 +39,7 @@ async def similarity_search(
 
     # TODO: Test whole flow with deployed smart contract
 
-    datasets: List[MarketplaceDataItem] = (
-        await marketplace_service.get_marketplace_items()
-    )
+    datasets: List[MarketplaceDataItem] = await get_marketplace_items(settings)
     if not datasets:
         return SimilaritySearchResponse(query=request.query, results=[], count=0)
 

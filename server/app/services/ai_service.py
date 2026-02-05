@@ -13,8 +13,8 @@ from ..config.settings import Settings, get_settings
 from ..schemas.marketplace_schema import MarketplaceDataItem
 
 from ..schemas.ai_schema import RankedDataset, ScoreExplanation
-from ..services.llm_service import get_llm_service, LLMService
-from ..services.pinata_service import PinataService, get_pinata_service
+from ..services.llm_service import generate_single_embedding
+from ..services.pinata_service import download_signature_embeddings
 
 
 class AIService:
@@ -23,20 +23,14 @@ class AIService:
     def __init__(
         self,
         settings: Settings,
-        pinata_service: PinataService,
-        llm_service: LLMService,
     ):
         """Constructor for AIService.
 
         Args:
             settings (Settings): Application settings instance
-            pinata_service (PinataService): Pinata service instance
-            llm_service (LLMService): LLM service instance
         """
         self._cache: OrderedDict[str, torch.Tensor] = OrderedDict()
         self.settings = settings
-        self.pinata_service = pinata_service
-        self.llm_service = llm_service
 
     def _normalize_rows(self, X: torch.Tensor) -> torch.Tensor:
         """Normalize rows of a tensor.
@@ -117,7 +111,7 @@ class AIService:
         Returns:
             List[RankedDataset]: List of ranked dataset results with scores and metadata
         """
-        q_list, dim = self.llm_service.generate_single_embedding(query)
+        q_list, dim = generate_single_embedding(query, self.settings)
         q: torch.Tensor = torch.tensor(q_list, dtype=torch.float32)
         q: torch.Tensor = F.normalize(q, p=2, dim=0)
 
@@ -132,10 +126,11 @@ class AIService:
                 Xn = self._get_cached_tensor(sig_hash)
 
             if Xn is None:
-                embeddings = await self.pinata_service.download_signature_embeddings(
+                embeddings = await download_signature_embeddings(
                     signature_url=sig_url,
                     expected_signature_hash=sig_hash,
                     compressed=True,
+                    settings=self.settings,
                 )
                 X = torch.tensor(embeddings, dtype=torch.float32)
                 if X.ndim != 2 or X.shape[1] != q.shape[0]:
@@ -185,17 +180,12 @@ class AIService:
 @lru_cache(maxsize=1)
 def get_ai_service(
     settings: Settings = Depends(get_settings),
-    pinata_service: PinataService = Depends(get_pinata_service),
-    llm_service: LLMService = Depends(get_llm_service),
 ) -> AIService:
     """Get singleton AIService instance.
 
     Args:
         settings (Settings, optional): Application settings instance. Defaults to Depends(get_settings).
-        pinata_service (PinataService, optional): PinataService instance. Defaults to Depends(get_pinata_service).
-        llm_service (LLMService, optional): LLMService instance. Defaults to Depends(get_llm_service).
-
     Returns:
         AIService: Singleton AIService instance with persistent LRU cache
     """
-    return AIService(settings, pinata_service, llm_service)
+    return AIService(settings)

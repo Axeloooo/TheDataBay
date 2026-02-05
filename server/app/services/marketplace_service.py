@@ -1,55 +1,31 @@
-from functools import lru_cache
+"""
+Marketplace service module for handling marketplace-related operations.
+"""
+
 from typing import List
-from fastapi import Depends
 
 from ..schemas.marketplace_schema import MarketplaceDataItem
-from ..config.settings import Settings, get_settings
+from ..config.settings import Settings
 
 
-class MarketplaceService:
-    """Service for managing marketplace items."""
-
-    def __init__(self, settings: Settings):
-        """Constructor for MarketplaceService.
-
-        Args:
-            settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
-        """
-        self.settings = settings
-
-    async def get_marketplace_items(self) -> List[MarketplaceDataItem]:
-        """Retrieve all marketplace items.
-
-        Returns:
-            List[MarketplaceDataItem]: List of marketplace data items
-        """
-
-        return [
-            MarketplaceDataItem(
-                id=1,
-                title="Sample Dataset 1",
-                description="This is a sample dataset for testing.",
-                seller="0xSellerAddress1",
-                price=10,
-                dataset_url="ipfs://QmExampleHashDataset1",
-                dataset_hash="0xExampleDatasetHash1",
-                signature_url="ipfs://QmExampleHash1",
-                signature_hash="0xExampleHash1",
-                exists=True,
-            ),
-        ]
-
-
-@lru_cache(maxsize=1)
-def get_marketplace_service(
-    settings: Settings = Depends(get_settings),
-) -> MarketplaceService:
-    """Get singleton instance of MarketplaceService.
-
-    Args:
-        settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
+async def get_marketplace_items(settings: Settings) -> List[MarketplaceDataItem]:
+    """Retrieve all marketplace items.
 
     Returns:
-        MarketplaceService: Instance of MarketplaceService
+        List[MarketplaceDataItem]: List of marketplace data items
     """
-    return MarketplaceService(settings)
+    _ = settings
+    return [
+        MarketplaceDataItem(
+            id=1,
+            title="Sample Dataset 1",
+            description="This is a sample dataset for testing.",
+            seller="0xSellerAddress1",
+            price=10,
+            dataset_url="ipfs://QmExampleHashDataset1",
+            dataset_hash="0xExampleDatasetHash1",
+            signature_url="ipfs://QmExampleHash1",
+            signature_hash="0xExampleHash1",
+            exists=True,
+        ),
+    ]
