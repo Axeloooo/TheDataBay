@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     pinata_secret_key: SecretStr = Field(alias="PINATA_SECRET_KEY")
     pinata_gateway_url: str = Field(alias="PINATA_GATEWAY_URL")
 
+    # Database settings
+    database_url: SecretStr = Field(alias="DATABASE_URL")
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
