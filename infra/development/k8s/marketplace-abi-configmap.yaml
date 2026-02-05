@@ -1,0 +1,898 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: marketplace-abi
+data:
+  Marketplace.json: |
+    [
+      {
+        "type": "constructor",
+        "inputs": [
+          {
+            "name": "initialOwner",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "_feeRecipient",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "_feeBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "type": "function",
+        "name": "MAX_PRICE",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "buyItem",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "outputs": [],
+        "stateMutability": "payable"
+      },
+      {
+        "type": "function",
+        "name": "createItem",
+        "inputs": [
+          {
+            "name": "title",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "seller",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "price",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "datasetUrl",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "datasetHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "signatureUrl",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "signatureHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "type": "function",
+        "name": "feeBps",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "feeRecipient",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "getAllItems",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "",
+            "type": "tuple[]",
+            "internalType": "struct Marketplace.DataItemView[]",
+            "components": [
+              {
+                "name": "itemId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "title",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "description",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "seller",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "price",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "datasetUrl",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "datasetHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "signatureUrl",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "signatureHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "exists",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "purchaseCount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "getItemView",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "",
+            "type": "tuple",
+            "internalType": "struct Marketplace.DataItemView",
+            "components": [
+              {
+                "name": "itemId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "title",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "description",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "seller",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "price",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "datasetUrl",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "datasetHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "signatureUrl",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "signatureHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "exists",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "purchaseCount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "getItems",
+        "inputs": [
+          {
+            "name": "startId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "count",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "",
+            "type": "tuple[]",
+            "internalType": "struct Marketplace.DataItemView[]",
+            "components": [
+              {
+                "name": "itemId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "title",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "description",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "seller",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "price",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "datasetUrl",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "datasetHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "signatureUrl",
+                "type": "string",
+                "internalType": "string"
+              },
+              {
+                "name": "signatureHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "exists",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "purchaseCount",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "hasAccess",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "user",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "nextItemId",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "owner",
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "stateMutability": "view"
+      },
+      {
+        "type": "function",
+        "name": "renounceOwnership",
+        "inputs": [],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "type": "function",
+        "name": "setFeeConfig",
+        "inputs": [
+          {
+            "name": "_feeRecipient",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "_feeBps",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "type": "function",
+        "name": "transferOwnership",
+        "inputs": [
+          {
+            "name": "newOwner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "type": "function",
+        "name": "updateDatasetUrl",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "newDatasetUrl",
+            "type": "string",
+            "internalType": "string"
+          }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "type": "function",
+        "name": "updatePrice",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "newPrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "type": "function",
+        "name": "updateSignature",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "newSignatureUrl",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "newSignatureHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ],
+        "outputs": [],
+        "stateMutability": "nonpayable"
+      },
+      {
+        "type": "event",
+        "name": "DatasetUrlUpdated",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "indexed": true,
+            "internalType": "uint256"
+          },
+          {
+            "name": "oldUrl",
+            "type": "string",
+            "indexed": false,
+            "internalType": "string"
+          },
+          {
+            "name": "newUrl",
+            "type": "string",
+            "indexed": false,
+            "internalType": "string"
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "event",
+        "name": "FeeConfigUpdated",
+        "inputs": [
+          {
+            "name": "oldFeeBps",
+            "type": "uint256",
+            "indexed": false,
+            "internalType": "uint256"
+          },
+          {
+            "name": "newFeeBps",
+            "type": "uint256",
+            "indexed": false,
+            "internalType": "uint256"
+          },
+          {
+            "name": "oldRecipient",
+            "type": "address",
+            "indexed": false,
+            "internalType": "address"
+          },
+          {
+            "name": "newRecipient",
+            "type": "address",
+            "indexed": false,
+            "internalType": "address"
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "event",
+        "name": "ItemCreated",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "indexed": true,
+            "internalType": "uint256"
+          },
+          {
+            "name": "seller",
+            "type": "address",
+            "indexed": true,
+            "internalType": "address"
+          },
+          {
+            "name": "price",
+            "type": "uint256",
+            "indexed": false,
+            "internalType": "uint256"
+          },
+          {
+            "name": "datasetUrl",
+            "type": "string",
+            "indexed": false,
+            "internalType": "string"
+          },
+          {
+            "name": "datasetHash",
+            "type": "bytes32",
+            "indexed": false,
+            "internalType": "bytes32"
+          },
+          {
+            "name": "signatureUrl",
+            "type": "string",
+            "indexed": false,
+            "internalType": "string"
+          },
+          {
+            "name": "signatureHash",
+            "type": "bytes32",
+            "indexed": false,
+            "internalType": "bytes32"
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "event",
+        "name": "ItemFrozenAfterSale",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "indexed": true,
+            "internalType": "uint256"
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "event",
+        "name": "ItemPurchased",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "indexed": true,
+            "internalType": "uint256"
+          },
+          {
+            "name": "buyer",
+            "type": "address",
+            "indexed": true,
+            "internalType": "address"
+          },
+          {
+            "name": "pricePaid",
+            "type": "uint256",
+            "indexed": false,
+            "internalType": "uint256"
+          },
+          {
+            "name": "feePaid",
+            "type": "uint256",
+            "indexed": false,
+            "internalType": "uint256"
+          },
+          {
+            "name": "sellerPaid",
+            "type": "uint256",
+            "indexed": false,
+            "internalType": "uint256"
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "event",
+        "name": "OwnershipTransferred",
+        "inputs": [
+          {
+            "name": "previousOwner",
+            "type": "address",
+            "indexed": true,
+            "internalType": "address"
+          },
+          {
+            "name": "newOwner",
+            "type": "address",
+            "indexed": true,
+            "internalType": "address"
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "event",
+        "name": "PriceUpdated",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "indexed": true,
+            "internalType": "uint256"
+          },
+          {
+            "name": "oldPrice",
+            "type": "uint256",
+            "indexed": false,
+            "internalType": "uint256"
+          },
+          {
+            "name": "newPrice",
+            "type": "uint256",
+            "indexed": false,
+            "internalType": "uint256"
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "event",
+        "name": "SignatureUpdated",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "indexed": true,
+            "internalType": "uint256"
+          },
+          {
+            "name": "oldUrl",
+            "type": "string",
+            "indexed": false,
+            "internalType": "string"
+          },
+          {
+            "name": "newUrl",
+            "type": "string",
+            "indexed": false,
+            "internalType": "string"
+          },
+          {
+            "name": "oldHash",
+            "type": "bytes32",
+            "indexed": false,
+            "internalType": "bytes32"
+          },
+          {
+            "name": "newHash",
+            "type": "bytes32",
+            "indexed": false,
+            "internalType": "bytes32"
+          }
+        ],
+        "anonymous": false
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__AlreadyHasAccess",
+        "inputs": [
+          {
+            "name": "buyer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__DatasetUrlRequired",
+        "inputs": []
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__DescriptionRequired",
+        "inputs": []
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__FeeRecipientRequired",
+        "inputs": []
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__InitialOwnerRequired",
+        "inputs": []
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__InvalidFeeBps",
+        "inputs": [
+          {
+            "name": "bps",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__InvalidPayment",
+        "inputs": [
+          {
+            "name": "required",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "provided",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__ItemDoesNotExist",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__ItemFrozen",
+        "inputs": [
+          {
+            "name": "itemId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__PriceExceedsMaximum",
+        "inputs": [
+          {
+            "name": "price",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxPrice",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__PriceMustBeGreaterThanZero",
+        "inputs": []
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__SellerRequired",
+        "inputs": []
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__SignatureUrlRequired",
+        "inputs": []
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__TitleRequired",
+        "inputs": []
+      },
+      {
+        "type": "error",
+        "name": "Marketplace__TransferFailed",
+        "inputs": []
+      },
+      {
+        "type": "error",
+        "name": "OwnableInvalidOwner",
+        "inputs": [
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      },
+      {
+        "type": "error",
+        "name": "OwnableUnauthorizedAccount",
+        "inputs": [
+          {
+            "name": "account",
+            "type": "address",
+            "internalType": "address"
+          }
+        ]
+      },
+      {
+        "type": "error",
+        "name": "ReentrancyGuardReentrantCall",
+        "inputs": []
+      }
+    ]
