@@ -8,14 +8,8 @@ import csv
 from fastapi import BackgroundTasks, Depends, HTTPException, UploadFile
 
 from ..config.settings import Settings, get_settings
-from ..schemas.llm_schema import (
-    DatasetStats,
-    JobResponse,
-    JobStatus,
-    JobStatusResponse,
-    SignatureInfo,
-    VectorSpec,
-)
+from ..schemas.job_schema import JobResponse, JobStatus, JobStatusResponse
+from ..schemas.llm_schema import DatasetStats, SignatureInfo, VectorSpec
 from ..services.job_manager import JobManager, get_job_manager
 from ..services.llm_service import LLMService, get_llm_service
 from ..services.pinata_service import PinataService, get_pinata_service
