@@ -4,7 +4,7 @@ from app.services import ai_service
 from app.schemas.marketplace_schema import MarketplaceDataItem
 
 
-def make_item(item_id: int, sig_url: str, sig_hash: str):
+def make_item(item_id: str, sig_url: str, sig_hash: str):
     return MarketplaceDataItem(
         id=item_id,
         title=f"Dataset {item_id}",
@@ -16,6 +16,7 @@ def make_item(item_id: int, sig_url: str, sig_hash: str):
         signature_url=sig_url,
         signature_hash=sig_hash,
         exists=True,
+        purchase_count=0,
     )
 
 
@@ -42,14 +43,14 @@ def test_rank_datasets_sorted_and_cached(monkeypatch, settings):
 
     service = ai_service.AIService(settings)
     datasets = [
-        make_item(1, "ipfs://a", "0xhash"),
-        make_item(2, "ipfs://b", "0xhash"),
+        make_item("0x" + "01" * 32, "ipfs://a", "0xhash"),
+        make_item("0x" + "02" * 32, "ipfs://b", "0xhash"),
     ]
 
     results = asyncio.run(service.rank_datasets("query", datasets))
 
     assert len(results) == 2
-    assert results[0].item.id == 1
+    assert results[0].item.id == "0x" + "01" * 32
     assert call_count["count"] == 1
 
 
@@ -71,7 +72,7 @@ def test_similarity_threshold_filters(monkeypatch, settings):
 
     strict_settings = settings.model_copy(update={"similarity_threshold": 0.99})
     service = ai_service.AIService(strict_settings)
-    datasets = [make_item(1, "ipfs://a", "0xhash")]
+    datasets = [make_item("0x" + "01" * 32, "ipfs://a", "0xhash")]
 
     results = asyncio.run(service.rank_datasets("query", datasets))
 

@@ -29,6 +29,11 @@ def make_settings(**overrides) -> Settings:
         "PINATA_API_KEY": "k",
         "PINATA_SECRET_KEY": "s",
         "PINATA_GATEWAY_URL": "https://gateway.pinata.cloud",
+        "CONTRACT_ADDRESS": "0x0000000000000000000000000000000000000000",
+        "CONTRACT_ABI_PATH": "/tmp/Marketplace.json",
+        "CHAIN_ID": 31337,
+        "RPC_URL": "http://127.0.0.1:8545",
+        "SERVER_PRIVATE_KEY": "0x" + "11" * 32,
         "DATABASE_URL": "mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4",
     }
     data.update(overrides)
@@ -90,6 +95,23 @@ def test_upload_signature_success(monkeypatch, settings):
 
     assert ipfs_url == "ipfs://QmHash"
     assert signature_hash == expected_hash
+
+
+def test_upload_bytes_success(monkeypatch, settings):
+    response = FakeResponse(status_code=200, json_data={"IpfsHash": "QmHash"})
+    monkeypatch.setattr(
+        pinata_service.httpx,
+        "AsyncClient",
+        make_async_client(post_response=response),
+    )
+
+    payload = b"ciphertext"
+    ipfs_url, file_hash = asyncio.run(
+        pinata_service.upload_bytes(payload, "data.csv", settings)
+    )
+
+    assert ipfs_url == "ipfs://QmHash"
+    assert file_hash.startswith("0x")
 
 
 def test_upload_signature_missing_credentials():

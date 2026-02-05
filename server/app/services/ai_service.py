@@ -161,6 +161,7 @@ class AIService:
                         signature_url=ds.signature_url,
                         signature_hash=ds.signature_hash,
                         exists=ds.exists,
+                        purchase_count=ds.purchase_count,
                     ),
                     score=score,
                     explanation=ScoreExplanation(

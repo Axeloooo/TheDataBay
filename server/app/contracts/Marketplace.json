@@ -39,8 +39,8 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -50,6 +50,11 @@
     "type": "function",
     "name": "createItem",
     "inputs": [
+      {
+        "name": "itemId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
       {
         "name": "title",
         "type": "string",
@@ -93,9 +98,9 @@
     ],
     "outputs": [
       {
-        "name": "itemId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "createdItemId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "nonpayable"
@@ -138,8 +143,8 @@
         "components": [
           {
             "name": "itemId",
-            "type": "uint256",
-            "internalType": "uint256"
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
             "name": "title",
@@ -202,8 +207,8 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
@@ -214,8 +219,8 @@
         "components": [
           {
             "name": "itemId",
-            "type": "uint256",
-            "internalType": "uint256"
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
             "name": "title",
@@ -277,7 +282,7 @@
     "name": "getItems",
     "inputs": [
       {
-        "name": "startId",
+        "name": "start",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -295,8 +300,8 @@
         "components": [
           {
             "name": "itemId",
-            "type": "uint256",
-            "internalType": "uint256"
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
             "name": "title",
@@ -355,17 +360,35 @@
   },
   {
     "type": "function",
+    "name": "grantAccess",
+    "inputs": [
+      {
+        "name": "itemId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "walletId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "hasAccess",
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
+        "name": "walletId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
@@ -373,19 +396,6 @@
         "name": "",
         "type": "bool",
         "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "nextItemId",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -447,8 +457,8 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
         "name": "newDatasetUrl",
@@ -465,8 +475,8 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
         "name": "newPrice",
@@ -483,8 +493,8 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
         "name": "newSignatureUrl",
@@ -506,9 +516,9 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
+        "type": "bytes32",
         "indexed": true,
-        "internalType": "uint256"
+        "internalType": "bytes32"
       },
       {
         "name": "oldUrl",
@@ -562,9 +572,9 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
+        "type": "bytes32",
         "indexed": true,
-        "internalType": "uint256"
+        "internalType": "bytes32"
       },
       {
         "name": "seller",
@@ -611,9 +621,9 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
+        "type": "bytes32",
         "indexed": true,
-        "internalType": "uint256"
+        "internalType": "bytes32"
       }
     ],
     "anonymous": false
@@ -624,9 +634,9 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
+        "type": "bytes32",
         "indexed": true,
-        "internalType": "uint256"
+        "internalType": "bytes32"
       },
       {
         "name": "buyer",
@@ -680,9 +690,9 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
+        "type": "bytes32",
         "indexed": true,
-        "internalType": "uint256"
+        "internalType": "bytes32"
       },
       {
         "name": "oldPrice",
@@ -705,9 +715,9 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
+        "type": "bytes32",
         "indexed": true,
-        "internalType": "uint256"
+        "internalType": "bytes32"
       },
       {
         "name": "oldUrl",
@@ -741,14 +751,14 @@
     "name": "Marketplace__AlreadyHasAccess",
     "inputs": [
       {
-        "name": "buyer",
-        "type": "address",
-        "internalType": "address"
+        "name": "walletId",
+        "type": "bytes32",
+        "internalType": "bytes32"
       },
       {
         "name": "itemId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   },
@@ -801,12 +811,23 @@
   },
   {
     "type": "error",
+    "name": "Marketplace__ItemAlreadyExists",
+    "inputs": [
+      {
+        "name": "itemId",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "Marketplace__ItemDoesNotExist",
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   },
@@ -816,8 +837,8 @@
     "inputs": [
       {
         "name": "itemId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   },
@@ -888,5 +909,21 @@
     "type": "error",
     "name": "ReentrancyGuardReentrantCall",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "StringsInsufficientHexLength",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "length",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   }
 ]

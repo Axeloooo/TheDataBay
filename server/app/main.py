@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.params import Depends
 from .config.settings import Settings, get_settings
-from .routers import health_router, llm_router, ai_router
+from .routers import health_router, llm_router, ai_router, datasets_router
 from .database.engine import create_db_and_tables
 
 settings: Settings = get_settings()
@@ -51,6 +51,7 @@ app.add_middleware(
 app.include_router(health_router.router)
 app.include_router(llm_router.router)
 app.include_router(ai_router.router)
+app.include_router(datasets_router.router)
 
 
 @app.get("/")

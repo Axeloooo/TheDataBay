@@ -25,9 +25,9 @@ help:
 	@echo "  ANVIL_RPC_URL, ANVIL_PRIVATE_KEY, ANVIL_FEE_RECIPIENT, ANVIL_FEE_BPS"
 
 build:
-	mkdir -p ../server/app/config/abi
+	mkdir -p ../server/app/contracts
 	forge build
-	jq '.abi' out/Marketplace.sol/Marketplace.json > ../server/app/config/abi/Marketplace.json
+	jq '.abi' out/Marketplace.sol/Marketplace.json > ../server/app/contracts/Marketplace.json
 
 
 anvil:
@@ -66,13 +66,14 @@ fee:
 
 getall:
 	@ADDR=$$(cat $(ANVIL_ADDR_FILE)); \
-	cast call $$ADDR "getAllItems()((uint256,string,string,address,uint256,string,bytes32,string,bytes32,bool,uint256)[])" --rpc-url $(ANVIL_RPC_URL)
+	cast call $$ADDR "getAllItems()((bytes32,string,string,address,uint256,string,bytes32,string,bytes32,bool,uint256)[])" --rpc-url $(ANVIL_RPC_URL)
 
 # Create a sample item. Set these vars when running:
-# make create-item SELLER=0x... PRICE_WEI=10000000000000000 DATASET_URL=... SIG_URL=... DATASET_HASH=0x... SIG_HASH=0x...
+# make create-item ITEM_ID=0x... SELLER=0x... PRICE_WEI=10000000000000000 DATASET_URL=... SIG_URL=... DATASET_HASH=0x... SIG_HASH=0x...
 create-item:
 	@ADDR=$$(cat $(ANVIL_ADDR_FILE)); \
 	SELLER=$${SELLER:-$$(cast wallet address --private-key $(ANVIL_PRIVATE_KEY))}; \
+	ITEM_ID=$${ITEM_ID:-0x0000000000000000000000000000000000000000000000000000000000000001}; \
 	PRICE_WEI=$${PRICE_WEI:-10000000000000000}; \
 	TITLE=$${TITLE:-"Test Dataset"}; \
 	DESC=$${DESC:-"Synthetic dataset for local testing"}; \
@@ -82,16 +83,17 @@ create-item:
 	SIG_HASH=$${SIG_HASH:-0x0000000000000000000000000000000000000000000000000000000000000000}; \
 	echo "Creating item as owner..."; \
 	cast send $$ADDR \
-	  "createItem(string,string,address,uint256,string,bytes32,string,bytes32)" \
-	  "$$TITLE" "$$DESC" $$SELLER $$PRICE_WEI "$$DATASET_URL" $$DATASET_HASH "$$SIG_URL" $$SIG_HASH \
+	  "createItem(bytes32,string,string,address,uint256,string,bytes32,string,bytes32)" \
+	  $$ITEM_ID "$$TITLE" "$$DESC" $$SELLER $$PRICE_WEI "$$DATASET_URL" $$DATASET_HASH "$$SIG_URL" $$SIG_HASH \
 	  --rpc-url $(ANVIL_RPC_URL) --private-key $(ANVIL_PRIVATE_KEY)
 
-# Buy itemId=0. Calculates total price (price + fee) automatically.
-# make buy-item BUYER_PK=0x... PRICE_WEI=...
+# Buy item by bytes32 ID. Calculates total price (price + fee) automatically.
+# make buy-item BUYER_PK=0x... PRICE_WEI=... ITEM_ID=0x...
 buy-item:
 	@ADDR=$$(cat $(ANVIL_ADDR_FILE)); \
 	PRICE_WEI=$${PRICE_WEI:-10000000000000000}; \
 	BUYER_PK=$${BUYER_PK:-$(ANVIL_PRIVATE_KEY)}; \
+	ITEM_ID=$${ITEM_ID:-0x0000000000000000000000000000000000000000000000000000000000000001}; \
 	echo "Reading feeBps from contract..."; \
 	FEE_BPS=$$(cast call $$ADDR "feeBps()(uint256)" --rpc-url $(ANVIL_RPC_URL)); \
 	FEE_BPS_DEC=$$(printf "%d" $$FEE_BPS); \
@@ -100,6 +102,6 @@ buy-item:
 	TOTAL_PRICE=$$(echo "$$PRICE_WEI + $$FEE_AMOUNT" | bc); \
 	echo "Fee amount: $$FEE_AMOUNT wei"; \
 	echo "Total price to pay: $$TOTAL_PRICE wei"; \
-	echo "Buying item 0..."; \
-	cast send $$ADDR "buyItem(uint256)" 0 \
+	echo "Buying item $$ITEM_ID..."; \
+	cast send $$ADDR "buyItem(bytes32)" $$ITEM_ID \
 	  --rpc-url $(ANVIL_RPC_URL) --private-key $$BUYER_PK --value $$TOTAL_PRICE

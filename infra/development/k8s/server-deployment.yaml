@@ -143,7 +143,11 @@ spec:
                 secretKeyRef:
                   name: bridgemart-secrets
                   key: RPC_URL
-
+            - name: SERVER_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: bridgemart-secrets
+                  key: SERVER_PRIVATE_KEY
           resources:
             requests:
               memory: "64Mi"
@@ -153,17 +157,6 @@ spec:
               cpu: "500m"
           ports:
             - containerPort: 8080
-          volumeMounts:
-            - name: contract-abi
-              mountPath: /config
-              readOnly: true
-      volumes:
-        - name: contract-abi
-          configMap:
-            name: marketplace-abi
-            items:
-              - key: Marketplace.json
-                path: Marketplace.json
 ---
 apiVersion: v1
 kind: Service

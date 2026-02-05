@@ -23,6 +23,7 @@ def warmup_model(settings: Settings) -> bool:
     Returns:
         bool: True if warmup succeeded, False otherwise
     """
+
     try:
         test_text = "warmup test"
         ollama.embed(model=settings.embedding_model, input=test_text)
@@ -43,6 +44,7 @@ def parse_dataset_file(
     Returns:
         Tuple[List[List[str]], List[str], bool, int]: Parsed data rows, column names, has_header flag, empty rows skipped
     """
+
     csv_reader = csv.reader(io.StringIO(content))
     all_rows = list(csv_reader)
 
@@ -113,6 +115,7 @@ def record_to_text(
     Returns:
         str: Deterministic text representation of the record
     """
+
     if not record:
         return ""
 
@@ -148,6 +151,7 @@ async def generate_embeddings_chunked(
     Returns:
         Tuple[List[List[float]], int]: List of embedding vectors and their dimension
     """
+
     if not texts:
         return [], 0
 
@@ -198,6 +202,7 @@ def generate_single_embedding(
     Returns:
         Tuple[List[float], int]: Embedding vector and its dimension
     """
+
     if not text or not text.strip():
         raise HTTPException(status_code=400, detail="Text to embed cannot be empty")
 

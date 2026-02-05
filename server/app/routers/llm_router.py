@@ -2,7 +2,9 @@
 LLM router for embedding generation using Ollama.
 """
 
-from fastapi import APIRouter, File, UploadFile, BackgroundTasks, status, Depends
+from fastapi import APIRouter, File, UploadFile, BackgroundTasks, status, Depends, Form
+
+from ..database.engine import get_session
 from ..schemas.job_schema import JobResponse, JobStatusResponse
 from ..schemas.llm_schema import (
     VectorSpec,
@@ -18,7 +20,7 @@ from ..services.llm_service import generate_single_embedding
 from ..config.settings import Settings, get_settings
 
 router = APIRouter(
-    prefix="/llm",
+    prefix="/api/v1/llm",
     tags=["llm"],
 )
 
@@ -29,8 +31,14 @@ router = APIRouter(
 async def create_batch_embeddings(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
+    title: str = Form(...),
+    description: str = Form(...),
+    seller: str = Form(...),
+    price: int = Form(...),
+    seller_wallet_type: str = Form("evm"),
     settings: Settings = Depends(get_settings),
     job_manager: JobManager = Depends(get_job_manager),
+    session=Depends(get_session),
 ):
     """Submit a dataset for batch embedding (async job-based).
 
@@ -45,17 +53,30 @@ async def create_batch_embeddings(
     Args:
         background_tasks (BackgroundTasks): FastAPI background tasks
         file (UploadFile): Dataset file upload
+        title (str): Dataset title
+        description (str): Dataset description
+        seller (str): Seller EVM address
+        price (int): Price in wei
+        seller_wallet_type (str): Seller wallet type (evm only for now)
         settings (Settings): Application settings instance
         job_manager (JobManager): Job manager instance
+        session (Session): Database session
 
     Returns:
         JobResponse: Job submission response with job ID
     """
+
     return await enqueue_batch_job(
         file=file,
         background_tasks=background_tasks,
         settings=settings,
         job_manager=job_manager,
+        title=title,
+        description=description,
+        seller=seller,
+        price=price,
+        session=session,
+        seller_wallet_type=seller_wallet_type,
     )
 
 

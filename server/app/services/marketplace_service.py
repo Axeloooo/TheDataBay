@@ -17,7 +17,7 @@ async def get_marketplace_items(settings: Settings) -> List[MarketplaceDataItem]
     _ = settings
     return [
         MarketplaceDataItem(
-            id=1,
+            id="0x0000000000000000000000000000000000000000000000000000000000000001",
             title="Sample Dataset 1",
             description="This is a sample dataset for testing.",
             seller="0xSellerAddress1",
@@ -27,5 +27,6 @@ async def get_marketplace_items(settings: Settings) -> List[MarketplaceDataItem]
             signature_url="ipfs://QmExampleHash1",
             signature_hash="0xExampleHash1",
             exists=True,
+            purchase_count=0,
         ),
     ]

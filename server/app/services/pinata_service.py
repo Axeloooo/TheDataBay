@@ -132,6 +132,68 @@ async def upload_signature(
         ) from exc
 
 
+async def upload_bytes(
+    payload: bytes,
+    filename: str,
+    settings: Settings,
+) -> Tuple[str, str]:
+    """Upload raw bytes to IPFS via Pinata.
+
+    Args:
+        payload (bytes): Raw bytes to upload
+        filename (str): Original filename for metadata
+        settings (Settings): Application settings instance
+
+    Returns:
+        Tuple[str, str]: IPFS URL and SHA-256 hash (0x-prefixed)
+    """
+    api_key, secret_key = _get_credentials(settings)
+    if not api_key or not secret_key:
+        raise HTTPException(
+            status_code=500, detail="Pinata API credentials not configured"
+        )
+
+    base_url = "https://api.pinata.cloud"
+
+    try:
+        file_hash = "0x" + hashlib.sha256(payload).hexdigest()
+        upload_filename = f"dataset_{filename}.enc"
+        files = {"file": (upload_filename, payload, "application/octet-stream")}
+
+        async with httpx.AsyncClient(timeout=120.0) as client:
+            response = await client.post(
+                f"{base_url}/pinning/pinFileToIPFS",
+                headers=_get_headers(settings),
+                files=files,
+            )
+
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=500, detail=f"Pinata upload failed: {response.text}"
+            )
+
+        result = response.json()
+        ipfs_hash = result.get("IpfsHash")
+
+        if not ipfs_hash:
+            raise HTTPException(
+                status_code=500, detail="No IPFS hash returned from Pinata"
+            )
+
+        ipfs_url = f"ipfs://{ipfs_hash}"
+
+        return ipfs_url, file_hash
+
+    except httpx.HTTPError as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Network error uploading to Pinata: {str(exc)}"
+        ) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500, detail=f"Error uploading to IPFS: {str(exc)}"
+        ) from exc
+
+
 async def test_connection(settings: Settings) -> bool:
     """Test connection to Pinata API.
 

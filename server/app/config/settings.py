@@ -44,6 +44,13 @@ class Settings(BaseSettings):
     pinata_secret_key: SecretStr = Field(alias="PINATA_SECRET_KEY")
     pinata_gateway_url: str = Field(alias="PINATA_GATEWAY_URL")
 
+    # Smart contract settings
+    contract_address: str = Field(alias="CONTRACT_ADDRESS")
+    contract_abi_path: str = Field(alias="CONTRACT_ABI_PATH")
+    chain_id: int = Field(alias="CHAIN_ID")
+    rpc_url: str = Field(alias="RPC_URL")
+    server_private_key: SecretStr = Field(alias="SERVER_PRIVATE_KEY")
+
     # Database settings
     database_url: SecretStr = Field(alias="DATABASE_URL")
 

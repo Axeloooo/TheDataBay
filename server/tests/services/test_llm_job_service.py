@@ -22,12 +22,18 @@ def test_enqueue_batch_job_success(settings, job_manager):
             background_tasks=tasks,
             settings=settings,
             job_manager=job_manager,
+            title="Dataset",
+            description="Desc",
+            seller="0x0000000000000000000000000000000000000001",
+            price=100,
+            session=object(),
         )
     )
 
     assert response.status == JobStatus.QUEUED.value
     assert job_manager.get_job(response.job_id) is not None
     assert len(tasks.tasks) == 1
+    assert response.listing_id is not None
 
 
 def test_enqueue_batch_job_invalid_extension(settings, job_manager):
@@ -41,6 +47,11 @@ def test_enqueue_batch_job_invalid_extension(settings, job_manager):
                 background_tasks=tasks,
                 settings=settings,
                 job_manager=job_manager,
+                title="Dataset",
+                description="Desc",
+                seller="0x0000000000000000000000000000000000000001",
+                price=100,
+                session=object(),
             )
         )
 
@@ -58,6 +69,11 @@ def test_enqueue_batch_job_too_large(settings, job_manager):
                 background_tasks=tasks,
                 settings=tiny_settings,
                 job_manager=job_manager,
+                title="Dataset",
+                description="Desc",
+                seller="0x0000000000000000000000000000000000000001",
+                price=100,
+                session=object(),
             )
         )
 
@@ -73,6 +89,11 @@ def test_enqueue_batch_job_decode_error(settings, job_manager):
                 background_tasks=tasks,
                 settings=settings,
                 job_manager=job_manager,
+                title="Dataset",
+                description="Desc",
+                seller="0x0000000000000000000000000000000000000001",
+                price=100,
+                session=object(),
             )
         )
 
@@ -90,15 +111,24 @@ def test_enqueue_batch_job_too_many_rows(settings, job_manager):
                 background_tasks=tasks,
                 settings=strict_settings,
                 job_manager=job_manager,
+                title="Dataset",
+                description="Desc",
+                seller="0x0000000000000000000000000000000000000001",
+                price=100,
+                session=object(),
             )
         )
 
 
 def test_get_job_status_completed(settings, job_manager):
-    job_id = job_manager.create_job(filename="data.csv")
+    job_id = job_manager.create_job(
+        filename="data.csv", metadata={"listing_id": "123e4567-e89b-12d3-a456-426614174000"}
+    )
     job_manager.set_result(
         job_id,
         {
+            "listing_id": "123e4567-e89b-12d3-a456-426614174000",
+            "dataset": {"dataset_url": "ipfs://QmData", "dataset_hash": "0xdata"},
             "vectorSpec": {"model": settings.embedding_model, "dimension": 2},
             "stats": {
                 "total_rows": 2,
@@ -117,8 +147,10 @@ def test_get_job_status_completed(settings, job_manager):
     response = llm_job_service.get_job_status(job_id, job_manager)
 
     assert response.status == JobStatus.COMPLETED.value
+    assert response.dataset_url == "ipfs://QmData"
     assert response.vector_spec is not None
     assert response.signature is not None
+    assert response.listing_id == "123e4567-e89b-12d3-a456-426614174000"
 
 
 def test_process_embedding_job_success(monkeypatch, settings, job_manager):
@@ -133,23 +165,49 @@ def test_process_embedding_job_success(monkeypatch, settings, job_manager):
     async def fake_generate_embeddings_chunked(texts, settings):
         return [[0.1, 0.2]], 2
 
+    def fake_generate_key():
+        return b"k" * 32
+
+    def fake_encrypt_bytes(content_bytes, key, aad):
+        return b"ciphertext", b"nonce12345678"
+
+    async def fake_upload_bytes(payload, filename, settings):
+        return "ipfs://QmData", "0xdata"
+
     async def fake_upload_signature(embeddings, filename, settings, compress=True):
         return "ipfs://QmHash", "0xabc"
+
+    def fake_upsert_dataset_key(**kwargs):
+        return None
+
+    def fake_create_item(**kwargs):
+        return "0xtx"
 
     monkeypatch.setattr(llm_job_service, "parse_dataset_file", fake_parse_dataset_file)
     monkeypatch.setattr(llm_job_service, "record_to_text", fake_record_to_text)
     monkeypatch.setattr(
         llm_job_service, "generate_embeddings_chunked", fake_generate_embeddings_chunked
     )
+    monkeypatch.setattr(llm_job_service, "generate_key", fake_generate_key)
+    monkeypatch.setattr(llm_job_service, "encrypt_bytes", fake_encrypt_bytes)
+    monkeypatch.setattr(llm_job_service, "upload_bytes", fake_upload_bytes)
     monkeypatch.setattr(llm_job_service, "upload_signature", fake_upload_signature)
+    monkeypatch.setattr(llm_job_service, "upsert_dataset_key", fake_upsert_dataset_key)
+    monkeypatch.setattr(llm_job_service.contract_service, "create_item", fake_create_item)
 
     asyncio.run(
         llm_job_service._process_embedding_job(
             job_id=job_id,
-            content="col1,col2\n1,2\n",
+            content_bytes=b"col1,col2\n1,2\n",
             filename="data.csv",
             settings=settings,
             job_manager=job_manager,
+            listing_id="123e4567-e89b-12d3-a456-426614174000",
+            title="Dataset",
+            description="Desc",
+            seller="0x0000000000000000000000000000000000000001",
+            price=100,
+            session=object(),
         )
     )
 
@@ -175,10 +233,16 @@ def test_process_embedding_job_failure(monkeypatch, settings, job_manager):
     asyncio.run(
         llm_job_service._process_embedding_job(
             job_id=job_id,
-            content="col1,col2\n1,2\n",
+            content_bytes=b"col1,col2\n1,2\n",
             filename="data.csv",
             settings=settings,
             job_manager=job_manager,
+            listing_id="123e4567-e89b-12d3-a456-426614174000",
+            title="Dataset",
+            description="Desc",
+            seller="0x0000000000000000000000000000000000000001",
+            price=100,
+            session=object(),
         )
     )
 

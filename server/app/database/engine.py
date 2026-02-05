@@ -26,6 +26,7 @@ def get_engine() -> Engine:
 
 def create_db_and_tables() -> None:
     """Create the database and tables."""
+
     engine: Engine = get_engine()
     SQLModel.metadata.create_all(bind=engine)
 
