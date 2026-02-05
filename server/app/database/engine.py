@@ -38,10 +38,4 @@ def get_session() -> Generator[Session, Any, None]:
     """
     engine: Engine = get_engine()
     with Session(bind=engine) as session:
-        try:
-            yield session
-        except Exception:
-            session.rollback()
-            raise
-        finally:
-            session.close()
+        yield session
