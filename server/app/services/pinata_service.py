@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from ..config.settings import Settings
 
 
-def _get_credentials(settings: Settings) -> tuple[str | None, str | None]:
+def _get_credentials(settings: Settings) -> Tuple[str | None, str | None]:
     """Retrieve Pinata API credentials from settings.
 
     Args:
