@@ -4,14 +4,21 @@ LLM router for embedding generation using Ollama.
 
 from fastapi import APIRouter, File, UploadFile, BackgroundTasks, status, Depends
 from ..schemas.job_schema import JobResponse, JobStatusResponse
-from ..schemas.llm_schema import VectorSpec, QueryEmbeddingRequest, QueryEmbeddingResponse
+from ..schemas.llm_schema import (
+    VectorSpec,
+    QueryEmbeddingRequest,
+    QueryEmbeddingResponse,
+)
 from ..services.job_manager import JobManager, get_job_manager
-from ..services.llm_job_service import enqueue_batch_job, get_job_status as get_job_status_service
+from ..services.llm_job_service import (
+    enqueue_batch_job,
+    get_job_status as get_job_status_service,
+)
 from ..services.llm_service import generate_single_embedding
 from ..config.settings import Settings, get_settings
 
 router = APIRouter(
-    prefix="/api/v1/llm",
+    prefix="/llm",
     tags=["llm"],
 )
 

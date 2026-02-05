@@ -15,7 +15,7 @@ settings: Settings = get_settings()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> Generator[None, Any, None]:
+async def lifespan(app: FastAPI):
     """Lifespan event handler for FastAPI app.
 
     Args:
@@ -24,8 +24,11 @@ async def lifespan(app: FastAPI) -> Generator[None, Any, None]:
     Yields:
         Generator[None, Any, None]: Generator that yields None
     """
-    create_db_and_tables()
-    yield
+    try:
+        create_db_and_tables()
+        yield
+    except Exception as e:
+        raise e
 
 
 app = FastAPI(
@@ -33,7 +36,6 @@ app = FastAPI(
     version=settings.app_version,
     description="FastAPI backend for BridgeMart AI workloads and API orchestration",
     docs_url="/docs",
-    redoc_url="/redoc",
     redoc_url="/redoc",
     lifespan=lifespan,
 )
@@ -67,7 +69,6 @@ def read_root(settings: Settings = Depends(get_settings)) -> dict[str, Any]:
         "environment": settings.environment,
         "links": {
             "docs": "/docs",
-            "redoc": "/redoc",
             "health": "/health",
             "config": "/config",
         },

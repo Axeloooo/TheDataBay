@@ -39,7 +39,6 @@ def parse_dataset_file(
 
     Args:
         content (str): File content as string
-        filename (str | None): Original filename (unused, kept for compatibility)
 
     Returns:
         Tuple[List[List[str]], List[str], bool, int]: Parsed data rows, column names, has_header flag, empty rows skipped
