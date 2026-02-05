@@ -26,6 +26,7 @@ CACHE_MAXSIZE=100
 PINATA_API_KEY="k"
 PINATA_SECRET_KEY="s"
 PINATA_GATEWAY_URL="https://gateway.pinata.cloud"
+DATABASE_URL="mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4"
 """
 
 
@@ -55,6 +56,7 @@ def clear_relevant_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "PINATA_API_KEY",
         "PINATA_SECRET_KEY",
         "PINATA_GATEWAY_URL",
+        "DATABASE_URL",
     ]
     for k in keys:
         monkeypatch.delenv(k, raising=False)
@@ -91,6 +93,11 @@ def test_settings_loads_from_env_file(tmp_path, monkeypatch):
     assert s.pinata_api_key.get_secret_value() == "k"
     assert s.pinata_secret_key.get_secret_value() == "s"
     assert s.pinata_gateway_url == "https://gateway.pinata.cloud"
+    assert isinstance(s.database_url, SecretStr)
+    assert (
+        s.database_url.get_secret_value()
+        == "mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4"
+    )
 
 
 def test_settings_type_coercion(tmp_path, monkeypatch):
@@ -115,6 +122,7 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
         PINATA_API_KEY="k"
         PINATA_SECRET_KEY="s"
         PINATA_GATEWAY_URL="https://gateway.pinata.cloud"
+        DATABASE_URL="mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4"
         """,
     )
 
@@ -133,6 +141,7 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
     assert isinstance(s.pinata_secret_key, SecretStr)
     assert s.pinata_api_key.get_secret_value() == "k"
     assert s.pinata_secret_key.get_secret_value() == "s"
+    assert isinstance(s.database_url, SecretStr)
 
 
 def test_env_vars_override_env_file(tmp_path, monkeypatch):
@@ -172,6 +181,7 @@ def test_missing_required_vars_raises_validation_error(tmp_path, monkeypatch):
     assert "HOST" in msg or "host" in msg
     assert "PORT" in msg or "port" in msg
     assert "CORS_ORIGINS" in msg or "cors_origins" in msg
+    assert "DATABASE_URL" in msg or "database_url" in msg
 
 
 def test_invalid_cors_origins_format_raises(tmp_path, monkeypatch):
@@ -198,6 +208,7 @@ def test_invalid_cors_origins_format_raises(tmp_path, monkeypatch):
         PINATA_API_KEY="k"
         PINATA_SECRET_KEY="s"
         PINATA_GATEWAY_URL="https://gateway.pinata.cloud"
+        DATABASE_URL="mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4"
         """,
     )
 
@@ -230,6 +241,10 @@ def test_get_settings_cache_behavior(monkeypatch, tmp_path):
     monkeypatch.setenv("PINATA_API_KEY", "k")
     monkeypatch.setenv("PINATA_SECRET_KEY", "s")
     monkeypatch.setenv("PINATA_GATEWAY_URL", "https://gateway.pinata.cloud")
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4",
+    )
 
     get_settings.cache_clear()
     s1 = get_settings()
