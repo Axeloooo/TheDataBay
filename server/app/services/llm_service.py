@@ -32,12 +32,14 @@ def warmup_model(settings: Settings) -> bool:
         return False
 
 
-def parse_dataset_file(content: str) -> Tuple[List[List[str]], List[str], bool, int]:
+def parse_dataset_file(
+    content: str, filename: str | None = None
+) -> Tuple[List[List[str]], List[str], bool, int]:
     """Parse CSV file into records.
 
     Args:
         content (str): File content as string
-        filename (str): Original filename
+        filename (str | None): Original filename (unused, kept for compatibility)
 
     Returns:
         Tuple[List[List[str]], List[str], bool, int]: Parsed data rows, column names, has_header flag, empty rows skipped

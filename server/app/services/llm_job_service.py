@@ -159,7 +159,7 @@ async def _process_embedding_job(
 
         # Parse dataset
         data_rows, column_names, has_header, empty_rows_skipped = parse_dataset_file(
-            content
+            content, filename
         )
 
         # Transform to text
