@@ -34,6 +34,7 @@ app = FastAPI(
     description="FastAPI backend for BridgeMart AI workloads and API orchestration",
     docs_url="/docs",
     redoc_url="/redoc",
+    redoc_url="/redoc",
     lifespan=lifespan,
 )
 
