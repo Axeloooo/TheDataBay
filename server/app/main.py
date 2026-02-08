@@ -2,13 +2,37 @@
 BridgeMart FastAPI backend service.
 """
 
+from contextlib import asynccontextmanager
+from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.params import Depends
 from .config.settings import Settings, get_settings
-from .routers import health_router, llm_router, ai_router
+from .routers import (
+    health_router,
+    llm_router,
+    ai_router,
+    datasets_router,
+    contract_router,
+)
+from .database.engine import create_db_and_tables
 
 settings: Settings = get_settings()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for FastAPI app.
+
+    Args:
+        app (FastAPI): FastAPI application instance
+
+    Yields:
+        Generator[None, Any, None]: Generator that yields None
+    """
+    create_db_and_tables()
+    yield
+
 
 app = FastAPI(
     title=settings.app_name,
@@ -16,6 +40,7 @@ app = FastAPI(
     description="FastAPI backend for BridgeMart AI workloads and API orchestration",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -29,12 +54,19 @@ app.add_middleware(
 app.include_router(health_router.router)
 app.include_router(llm_router.router)
 app.include_router(ai_router.router)
+app.include_router(datasets_router.router)
+app.include_router(contract_router.router)
 
 
 @app.get("/")
-def read_root(settings: Settings = Depends(get_settings)):
-    """
-    Root endpoint providing basic service info and navigation links.
+def read_root(settings: Settings = Depends(get_settings)) -> dict[str, Any]:
+    """Get basic service info.
+
+    Args:
+        settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
+
+    Returns:
+        dict: Service information
     """
     return {
         "service": settings.app_name,
@@ -42,7 +74,6 @@ def read_root(settings: Settings = Depends(get_settings)):
         "environment": settings.environment,
         "links": {
             "docs": "/docs",
-            "redoc": "/redoc",
             "health": "/health",
             "config": "/config",
         },

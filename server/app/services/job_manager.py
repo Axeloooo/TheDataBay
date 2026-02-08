@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime
 from typing import Dict, Optional, Any
 from functools import lru_cache
-from ..schemas.llm_schema import Job, JobStatus
+from ..schemas.job_schema import Job, JobStatus
 
 
 class JobManager:

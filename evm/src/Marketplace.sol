@@ -3,6 +3,7 @@ pragma solidity ^0.8.19;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title BridgeMart Marketplace (single-chain now, CCIP-ready later)
@@ -12,7 +13,8 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 contract Marketplace is Ownable, ReentrancyGuard {
     // ========= Errors =========
     error Marketplace__InitialOwnerRequired();
-    error Marketplace__ItemDoesNotExist(uint256 itemId);
+    error Marketplace__ItemDoesNotExist(bytes32 itemId);
+    error Marketplace__ItemAlreadyExists(bytes32 itemId);
     error Marketplace__PriceMustBeGreaterThanZero();
     error Marketplace__PriceExceedsMaximum(uint256 price, uint256 maxPrice);
     error Marketplace__TitleRequired();
@@ -20,12 +22,12 @@ contract Marketplace is Ownable, ReentrancyGuard {
     error Marketplace__DatasetUrlRequired();
     error Marketplace__SignatureUrlRequired();
     error Marketplace__InvalidPayment(uint256 required, uint256 provided);
-    error Marketplace__AlreadyHasAccess(address buyer, uint256 itemId);
+    error Marketplace__AlreadyHasAccess(bytes32 walletId, bytes32 itemId);
     error Marketplace__TransferFailed();
     error Marketplace__InvalidFeeBps(uint256 bps);
     error Marketplace__FeeRecipientRequired();
     error Marketplace__SellerRequired();
-    error Marketplace__ItemFrozen(uint256 itemId);
+    error Marketplace__ItemFrozen(bytes32 itemId);
 
     // ========= Storage =========
 
@@ -44,12 +46,12 @@ contract Marketplace is Ownable, ReentrancyGuard {
         bool exists;
 
         uint256 purchaseCount; // used to freeze metadata after first sale
-        mapping(address => bool) accessList;
+        mapping(bytes32 => bool) accessList;
     }
 
     // View-only struct (no mappings)
     struct DataItemView {
-        uint256 itemId;
+        bytes32 itemId;
         string title;
         string description;
         address seller;
@@ -65,8 +67,8 @@ contract Marketplace is Ownable, ReentrancyGuard {
         uint256 purchaseCount;
     }
 
-    uint256 public nextItemId;
-    mapping(uint256 => DataItem) private items;
+    bytes32[] private itemIds;
+    mapping(bytes32 => DataItem) private items;
 
     // fee in basis points (bps): 100 = 1%, 250 = 2.5%, 10000 = 100%
     uint256 public feeBps;
@@ -81,7 +83,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
     event FeeConfigUpdated(uint256 oldFeeBps, uint256 newFeeBps, address oldRecipient, address newRecipient);
 
     event ItemCreated(
-        uint256 indexed itemId,
+        bytes32 indexed itemId,
         address indexed seller,
         uint256 price,
         string datasetUrl,
@@ -91,22 +93,22 @@ contract Marketplace is Ownable, ReentrancyGuard {
     );
 
     event ItemPurchased(
-        uint256 indexed itemId, address indexed buyer, uint256 pricePaid, uint256 feePaid, uint256 sellerPaid
+        bytes32 indexed itemId, address indexed buyer, uint256 pricePaid, uint256 feePaid, uint256 sellerPaid
     );
 
-    event ItemFrozenAfterSale(uint256 indexed itemId);
+    event ItemFrozenAfterSale(bytes32 indexed itemId);
 
-    event DatasetUrlUpdated(uint256 indexed itemId, string oldUrl, string newUrl);
-    event SignatureUpdated(uint256 indexed itemId, string oldUrl, string newUrl, bytes32 oldHash, bytes32 newHash);
-    event PriceUpdated(uint256 indexed itemId, uint256 oldPrice, uint256 newPrice);
+    event DatasetUrlUpdated(bytes32 indexed itemId, string oldUrl, string newUrl);
+    event SignatureUpdated(bytes32 indexed itemId, string oldUrl, string newUrl, bytes32 oldHash, bytes32 newHash);
+    event PriceUpdated(bytes32 indexed itemId, uint256 oldPrice, uint256 newPrice);
 
     // ========= Modifiers =========
-    modifier onlyExistingItem(uint256 itemId) {
+    modifier onlyExistingItem(bytes32 itemId) {
         if (!items[itemId].exists) revert Marketplace__ItemDoesNotExist(itemId);
         _;
     }
 
-    modifier onlyIfNotFrozen(uint256 itemId) {
+    modifier onlyIfNotFrozen(bytes32 itemId) {
         if (items[itemId].purchaseCount > 0) revert Marketplace__ItemFrozen(itemId);
         _;
     }
@@ -161,9 +163,10 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @param signatureUrl The URL of the signature
      * @param signatureHash The hash of the signature
      *
-     * @return itemId The ID of the created item
+     * @return createdItemId The ID of the created item
      */
     function createItem(
+        bytes32 itemId,
         string calldata title,
         string calldata description,
         address seller,
@@ -172,7 +175,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         bytes32 datasetHash,
         string calldata signatureUrl,
         bytes32 signatureHash
-    ) external onlyOwner returns (uint256 itemId) {
+    ) external onlyOwner returns (bytes32 createdItemId) {
         if (bytes(title).length == 0) revert Marketplace__TitleRequired();
         if (bytes(description).length == 0) revert Marketplace__DescriptionRequired();
         if (price == 0) revert Marketplace__PriceMustBeGreaterThanZero();
@@ -180,9 +183,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         if (bytes(datasetUrl).length == 0) revert Marketplace__DatasetUrlRequired();
         if (bytes(signatureUrl).length == 0) revert Marketplace__SignatureUrlRequired();
         if (seller == address(0)) revert Marketplace__SellerRequired();
-
-        itemId = nextItemId;
-        nextItemId = itemId + 1;
+        if (items[itemId].exists) revert Marketplace__ItemAlreadyExists(itemId);
 
         DataItem storage it = items[itemId];
         it.title = title;
@@ -195,7 +196,10 @@ contract Marketplace is Ownable, ReentrancyGuard {
         it.signatureHash = signatureHash;
         it.exists = true;
 
+        itemIds.push(itemId);
+
         emit ItemCreated(itemId, seller, price, datasetUrl, datasetHash, signatureUrl, signatureHash);
+        createdItemId = itemId;
     }
 
     /**
@@ -205,7 +209,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @param itemId The ID of the item to update
      * @param newDatasetUrl The new URL of the dataset
      */
-    function updateDatasetUrl(uint256 itemId, string calldata newDatasetUrl)
+    function updateDatasetUrl(bytes32 itemId, string calldata newDatasetUrl)
         external
         onlyOwner
         onlyExistingItem(itemId)
@@ -226,7 +230,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @param newSignatureUrl The new URL of the signature
      * @param newSignatureHash The new hash of the signature
      */
-    function updateSignature(uint256 itemId, string calldata newSignatureUrl, bytes32 newSignatureHash)
+    function updateSignature(bytes32 itemId, string calldata newSignatureUrl, bytes32 newSignatureHash)
         external
         onlyOwner
         onlyExistingItem(itemId)
@@ -251,7 +255,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @param itemId The ID of the item to update
      * @param newPrice The new price of the item
      */
-    function updatePrice(uint256 itemId, uint256 newPrice)
+    function updatePrice(bytes32 itemId, uint256 newPrice)
         external
         onlyOwner
         onlyExistingItem(itemId)
@@ -271,7 +275,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      *
      * @param itemId The ID of the item to purchase
      */
-    function buyItem(uint256 itemId) external payable nonReentrant onlyExistingItem(itemId) {
+    function buyItem(bytes32 itemId) external payable nonReentrant onlyExistingItem(itemId) {
         _purchase(itemId, msg.sender, msg.value);
     }
 
@@ -289,16 +293,17 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @param buyer The address of the buyer
      * @param amountPaid The amount paid by the buyer
      */
-    function _purchase(uint256 itemId, address buyer, uint256 amountPaid) internal {
+    function _purchase(bytes32 itemId, address buyer, uint256 amountPaid) internal {
         DataItem storage it = items[itemId];
 
         uint256 fee = (it.price * feeBps) / 10_000;
         uint256 totalPrice = it.price + fee;
 
         if (amountPaid != totalPrice) revert Marketplace__InvalidPayment(totalPrice, amountPaid);
-        if (it.accessList[buyer]) revert Marketplace__AlreadyHasAccess(buyer, itemId);
+        bytes32 walletId = _walletIdForEvm(buyer);
+        if (it.accessList[walletId]) revert Marketplace__AlreadyHasAccess(walletId, itemId);
 
-        it.accessList[buyer] = true;
+        it.accessList[walletId] = true;
         it.purchaseCount += 1;
 
         if (fee > 0) {
@@ -316,15 +321,15 @@ contract Marketplace is Ownable, ReentrancyGuard {
     // ========= Views =========
 
     /**
-     * @notice Check if a user has access to a specific item.
+     * @notice Check if a walletId has access to a specific item.
      *
      * @param itemId The ID of the item
-     * @param user The address of the user
+     * @param walletId The wallet identifier (bytes32)
      *
-     * @return bool Whether the user has access
+     * @return bool Whether the walletId has access
      */
-    function hasAccess(uint256 itemId, address user) external view onlyExistingItem(itemId) returns (bool) {
-        return items[itemId].accessList[user];
+    function hasAccess(bytes32 itemId, bytes32 walletId) external view onlyExistingItem(itemId) returns (bool) {
+        return items[itemId].accessList[walletId];
     }
 
     /**
@@ -335,7 +340,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      *
      * @return DataItemView The view data of the item
      */
-    function getItemView(uint256 itemId) public view onlyExistingItem(itemId) returns (DataItemView memory) {
+    function getItemView(bytes32 itemId) public view onlyExistingItem(itemId) returns (DataItemView memory) {
         DataItem storage it = items[itemId];
         return DataItemView({
             itemId: itemId,
@@ -362,64 +367,55 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @return DataItemView[] An array of all item views
      */
     function getAllItems() external view returns (DataItemView[] memory) {
-        uint256 existCount = 0;
-        for (uint256 i = 0; i < nextItemId; i++) {
-            if (items[i].exists) {
-                existCount++;
-            }
+        uint256 count = itemIds.length;
+        DataItemView[] memory out = new DataItemView[](count);
+        for (uint256 i = 0; i < count; i++) {
+            out[i] = getItemView(itemIds[i]);
         }
-
-        DataItemView[] memory out = new DataItemView[](existCount);
-        uint256 index = 0;
-
-        for (uint256 i = 0; i < nextItemId; i++) {
-            if (items[i].exists) {
-                out[index] = getItemView(i);
-                index++;
-            }
-        }
-
         return out;
     }
 
     /**
      * @notice Get a paginated list of items from the marketplace.
      *
-     * @dev Only returns items that exist (items[i].exists == true). The returned array may be smaller than
-     *      the requested count if some items don't exist or if reaching the end of available items.
+     * @dev Returns items by index in the itemIds array.
      *
-     * @param startId The starting item ID (inclusive)
+     * @param start The starting index (inclusive)
      * @param count The maximum number of items to return
      *
-     * @return DataItemView[] An array of item views (may be smaller than count if reaching the end or items don't exist)
+     * @return DataItemView[] An array of item views
      */
-    function getItems(uint256 startId, uint256 count) external view returns (DataItemView[] memory) {
-        if (startId >= nextItemId) {
+    function getItems(uint256 start, uint256 count) external view returns (DataItemView[] memory) {
+        uint256 total = itemIds.length;
+        if (start >= total) {
             return new DataItemView[](0);
         }
 
-        uint256 endId = startId + count;
-        if (endId > nextItemId) {
-            endId = nextItemId;
+        uint256 end = start + count;
+        if (end > total) {
+            end = total;
         }
 
-        uint256 existCount = 0;
-        for (uint256 i = startId; i < endId; i++) {
-            if (items[i].exists) {
-                existCount++;
-            }
-        }
-
-        DataItemView[] memory out = new DataItemView[](existCount);
+        DataItemView[] memory out = new DataItemView[](end - start);
         uint256 index = 0;
 
-        for (uint256 i = startId; i < endId; i++) {
-            if (items[i].exists) {
-                out[index] = getItemView(i);
-                index++;
-            }
+        for (uint256 i = start; i < end; i++) {
+            out[index] = getItemView(itemIds[i]);
+            index++;
         }
 
         return out;
+    }
+
+    function grantAccess(bytes32 itemId, bytes32 walletId) external onlyOwner onlyExistingItem(itemId) {
+        DataItem storage it = items[itemId];
+        if (it.accessList[walletId]) revert Marketplace__AlreadyHasAccess(walletId, itemId);
+        it.accessList[walletId] = true;
+    }
+
+    function _walletIdForEvm(address user) internal view returns (bytes32) {
+        string memory chainStr = Strings.toString(block.chainid);
+        string memory addrStr = Strings.toHexString(uint160(user), 20);
+        return keccak256(abi.encodePacked("eip155:", chainStr, ":", addrStr));
     }
 }

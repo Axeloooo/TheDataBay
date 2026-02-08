@@ -26,6 +26,12 @@ CACHE_MAXSIZE=100
 PINATA_API_KEY="k"
 PINATA_SECRET_KEY="s"
 PINATA_GATEWAY_URL="https://gateway.pinata.cloud"
+CONTRACT_ADDRESS="0x0000000000000000000000000000000000000000"
+CONTRACT_ABI_PATH="/tmp/Marketplace.json"
+CHAIN_ID=31337
+RPC_URL="http://127.0.0.1:8545"
+SERVER_PRIVATE_KEY="0x1111111111111111111111111111111111111111111111111111111111111111"
+POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/bridgemart"
 """
 
 
@@ -55,6 +61,12 @@ def clear_relevant_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "PINATA_API_KEY",
         "PINATA_SECRET_KEY",
         "PINATA_GATEWAY_URL",
+        "CONTRACT_ADDRESS",
+        "CONTRACT_ABI_PATH",
+        "CHAIN_ID",
+        "RPC_URL",
+        "SERVER_PRIVATE_KEY",
+        "POSTGRES_URL",
     ]
     for k in keys:
         monkeypatch.delenv(k, raising=False)
@@ -91,6 +103,16 @@ def test_settings_loads_from_env_file(tmp_path, monkeypatch):
     assert s.pinata_api_key.get_secret_value() == "k"
     assert s.pinata_secret_key.get_secret_value() == "s"
     assert s.pinata_gateway_url == "https://gateway.pinata.cloud"
+    assert s.contract_address == "0x0000000000000000000000000000000000000000"
+    assert s.contract_abi_path == "/tmp/Marketplace.json"
+    assert s.chain_id == 31337
+    assert s.rpc_url == "http://127.0.0.1:8545"
+    assert isinstance(s.server_private_key, SecretStr)
+    assert isinstance(s.database_url, SecretStr)
+    assert (
+        s.database_url.get_secret_value()
+        == "postgresql+psycopg://user:password@localhost:5432/bridgemart"
+    )
 
 
 def test_settings_type_coercion(tmp_path, monkeypatch):
@@ -115,6 +137,12 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
         PINATA_API_KEY="k"
         PINATA_SECRET_KEY="s"
         PINATA_GATEWAY_URL="https://gateway.pinata.cloud"
+        CONTRACT_ADDRESS="0x0000000000000000000000000000000000000000"
+        CONTRACT_ABI_PATH="/tmp/Marketplace.json"
+        CHAIN_ID="31337"
+        RPC_URL="http://127.0.0.1:8545"
+        SERVER_PRIVATE_KEY="0x1111111111111111111111111111111111111111111111111111111111111111"
+        POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/bridgemart"
         """,
     )
 
@@ -133,6 +161,8 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
     assert isinstance(s.pinata_secret_key, SecretStr)
     assert s.pinata_api_key.get_secret_value() == "k"
     assert s.pinata_secret_key.get_secret_value() == "s"
+    assert isinstance(s.server_private_key, SecretStr)
+    assert isinstance(s.database_url, SecretStr)
 
 
 def test_env_vars_override_env_file(tmp_path, monkeypatch):
@@ -172,6 +202,10 @@ def test_missing_required_vars_raises_validation_error(tmp_path, monkeypatch):
     assert "HOST" in msg or "host" in msg
     assert "PORT" in msg or "port" in msg
     assert "CORS_ORIGINS" in msg or "cors_origins" in msg
+    assert "CONTRACT_ADDRESS" in msg or "contract_address" in msg
+    assert "RPC_URL" in msg or "rpc_url" in msg
+    assert "SERVER_PRIVATE_KEY" in msg or "server_private_key" in msg
+    assert "DATABASE_URL" in msg or "POSTGRES_URL" in msg or "database_url" in msg
 
 
 def test_invalid_cors_origins_format_raises(tmp_path, monkeypatch):
@@ -198,6 +232,12 @@ def test_invalid_cors_origins_format_raises(tmp_path, monkeypatch):
         PINATA_API_KEY="k"
         PINATA_SECRET_KEY="s"
         PINATA_GATEWAY_URL="https://gateway.pinata.cloud"
+        CONTRACT_ADDRESS="0x0000000000000000000000000000000000000000"
+        CONTRACT_ABI_PATH="/tmp/Marketplace.json"
+        CHAIN_ID=31337
+        RPC_URL="http://127.0.0.1:8545"
+        SERVER_PRIVATE_KEY="0x1111111111111111111111111111111111111111111111111111111111111111"
+        POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/bridgemart"
         """,
     )
 
@@ -230,6 +270,18 @@ def test_get_settings_cache_behavior(monkeypatch, tmp_path):
     monkeypatch.setenv("PINATA_API_KEY", "k")
     monkeypatch.setenv("PINATA_SECRET_KEY", "s")
     monkeypatch.setenv("PINATA_GATEWAY_URL", "https://gateway.pinata.cloud")
+    monkeypatch.setenv("CONTRACT_ADDRESS", "0x0000000000000000000000000000000000000000")
+    monkeypatch.setenv("CONTRACT_ABI_PATH", "/tmp/Marketplace.json")
+    monkeypatch.setenv("CHAIN_ID", "31337")
+    monkeypatch.setenv("RPC_URL", "http://127.0.0.1:8545")
+    monkeypatch.setenv(
+        "SERVER_PRIVATE_KEY",
+        "0x1111111111111111111111111111111111111111111111111111111111111111",
+    )
+    monkeypatch.setenv(
+        "POSTGRES_URL",
+        "postgresql+psycopg://user:password@localhost:5432/bridgemart",
+    )
 
     get_settings.cache_clear()
     s1 = get_settings()
