@@ -6,7 +6,7 @@ from typing import List
 from fastapi import APIRouter
 from fastapi.params import Depends
 
-from ..services.marketplace_service import get_marketplace_items
+from ..services.contract_service import get_all_items
 from ..config.settings import Settings, get_settings
 
 from ..schemas.marketplace_schema import MarketplaceDataItem
@@ -37,9 +37,7 @@ async def similarity_search(
         SimilaritySearchResponse: Response containing ranked datasets based on similarity search
     """
 
-    # TODO: Test whole flow with deployed smart contract
-
-    datasets: List[MarketplaceDataItem] = await get_marketplace_items(settings)
+    datasets: List[MarketplaceDataItem] = await get_all_items(settings)
     if not datasets:
         return SimilaritySearchResponse(query=request.query, results=[], count=0)
 

@@ -13,7 +13,7 @@ from web3 import Web3
 from ..config.settings import Settings
 from ..schemas.job_schema import JobResponse, JobStatus, JobStatusResponse
 from ..schemas.llm_schema import DatasetStats, SignatureInfo, VectorSpec
-from ..services import contract_service
+from ..services.contract_service import create_item
 from .dataset_key_repo import upsert_dataset_key
 from ..services.encryption_service import encrypt_bytes, generate_key
 from ..services.job_manager import JobManager
@@ -228,7 +228,7 @@ async def _process_embedding_job(
 
         # Parse dataset
         data_rows, column_names, has_header, empty_rows_skipped = parse_dataset_file(
-            decoded_content, filename
+            decoded_content
         )
 
         # Transform to text
@@ -254,6 +254,7 @@ async def _process_embedding_job(
         # Persist key material
         key_b64 = base64.b64encode(key).decode("utf-8")
         nonce_b64 = base64.b64encode(nonce).decode("utf-8")
+
         upsert_dataset_key(
             session=session,
             listing_id=listing_id,
@@ -264,8 +265,8 @@ async def _process_embedding_job(
         )
 
         # Create item on-chain after uploads
-        contract_service.create_item(
-            id=listing_id,
+        create_item(
+            listing_id=listing_id,
             title=title,
             description=description,
             seller=seller,

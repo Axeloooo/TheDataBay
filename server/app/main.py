@@ -3,7 +3,7 @@ BridgeMart FastAPI backend service.
 """
 
 from contextlib import asynccontextmanager
-from typing import Any, Generator
+from typing import Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.params import Depends
@@ -24,11 +24,8 @@ async def lifespan(app: FastAPI):
     Yields:
         Generator[None, Any, None]: Generator that yields None
     """
-    try:
-        create_db_and_tables()
-        yield
-    except Exception as e:
-        raise e
+    create_db_and_tables()
+    yield
 
 
 app = FastAPI(

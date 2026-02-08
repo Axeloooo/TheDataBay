@@ -2,9 +2,7 @@
 SQLModel for dataset encryption keys.
 """
 
-from datetime import datetime
-from time import timezone
-from typing import Optional
+from datetime import datetime, timezone
 import uuid
 
 from sqlmodel import SQLModel, Field

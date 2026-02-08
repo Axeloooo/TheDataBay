@@ -1,3 +1,5 @@
+from web3 import Web3
+
 from app.services import contract_service
 
 
@@ -14,3 +16,15 @@ def test_wallet_id_evm(settings):
     )
     assert isinstance(wid, bytes)
     assert len(wid) == 32
+
+
+def test_wallet_id_evm_matches_solidity_payload_format(settings):
+    address = "0xAbCDEFabcdefABCDEFabcdefABCDEFabcdefABCD"
+    wid = contract_service.wallet_id("evm", address, settings)
+
+    normalized_addr = Web3.to_hex(
+        Web3.to_bytes(hexstr=Web3.to_checksum_address(address))
+    )
+    expected = Web3.keccak(text=f"eip155:{settings.chain_id}:{normalized_addr}")
+
+    assert wid == expected

@@ -122,7 +122,8 @@ def test_enqueue_batch_job_too_many_rows(settings, job_manager):
 
 def test_get_job_status_completed(settings, job_manager):
     job_id = job_manager.create_job(
-        filename="data.csv", metadata={"listing_id": "123e4567-e89b-12d3-a456-426614174000"}
+        filename="data.csv",
+        metadata={"listing_id": "123e4567-e89b-12d3-a456-426614174000"},
     )
     job_manager.set_result(
         job_id,
@@ -156,7 +157,7 @@ def test_get_job_status_completed(settings, job_manager):
 def test_process_embedding_job_success(monkeypatch, settings, job_manager):
     job_id = job_manager.create_job(filename="data.csv")
 
-    def fake_parse_dataset_file(content, filename):
+    def fake_parse_dataset_file(content):
         return [["1", "2"]], ["col1", "col2"], True, 0
 
     def fake_record_to_text(record, columns):
@@ -193,7 +194,7 @@ def test_process_embedding_job_success(monkeypatch, settings, job_manager):
     monkeypatch.setattr(llm_job_service, "upload_bytes", fake_upload_bytes)
     monkeypatch.setattr(llm_job_service, "upload_signature", fake_upload_signature)
     monkeypatch.setattr(llm_job_service, "upsert_dataset_key", fake_upsert_dataset_key)
-    monkeypatch.setattr(llm_job_service.contract_service, "create_item", fake_create_item)
+    monkeypatch.setattr(llm_job_service, "create_item", fake_create_item)
 
     asyncio.run(
         llm_job_service._process_embedding_job(
@@ -219,7 +220,7 @@ def test_process_embedding_job_success(monkeypatch, settings, job_manager):
 def test_process_embedding_job_failure(monkeypatch, settings, job_manager):
     job_id = job_manager.create_job(filename="data.csv")
 
-    def fake_parse_dataset_file(content, filename):
+    def fake_parse_dataset_file(content):
         return [["1", "2"]], ["col1", "col2"], True, 0
 
     async def fake_generate_embeddings_chunked(texts, settings):

@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 
 def generate_key() -> bytes:
-    """ "Generate a 256-bit AES key.
+    """Generate a 256-bit AES key.
 
     Returns:
         bytes: The generated key

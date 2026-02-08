@@ -20,7 +20,7 @@ def _get_credentials(settings: Settings) -> Tuple[str | None, str | None]:
         settings (Settings): Application settings instance
 
     Returns:
-        tuple[str | None, str | None]: API key and secret key, or (None, None) if not configured
+        Tuple[str | None, str | None]: API key and secret key, or (None, None) if not configured
     """
     api_key = (
         settings.pinata_api_key.get_secret_value()

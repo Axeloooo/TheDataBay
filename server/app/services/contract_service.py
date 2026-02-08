@@ -3,6 +3,7 @@ Marketplace smart contract service.
 """
 
 import json
+import logging
 import uuid
 from functools import lru_cache
 from pathlib import Path
@@ -15,6 +16,8 @@ from web3 import Web3
 from web3.contract import Contract
 
 from ..config.settings import Settings
+
+logger = logging.getLogger(__name__)
 
 
 def uuid_to_bytes32(id: Union[str, uuid.UUID]) -> bytes:
@@ -56,13 +59,14 @@ def wallet_id(
         if isinstance(wallet_type, WalletType)
         else str(wallet_type).lower()
     )
-    if wallet_type_str == WalletType.EVM:
+    if wallet_type_str == WalletType.EVM.value:
         chain = f"eip155:{settings.chain_id}"
-        addr = Web3.to_checksum_address(address).lower()
+        checksum_address = Web3.to_checksum_address(address)
+        addr = Web3.to_hex(Web3.to_bytes(hexstr=checksum_address))
         payload = f"{chain}:{addr}"
-    elif wallet_type_str == WalletType.SOLANA:
+    elif wallet_type_str == WalletType.SOLANA.value:
         payload = f"solana:{address}"
-    elif wallet_type_str == WalletType.BTC:
+    elif wallet_type_str == WalletType.BTC.value:
         payload = f"bitcoin:{address}"
     else:
         payload = f"{wallet_type_str}:{address}"
@@ -190,7 +194,15 @@ def _send_tx(function, settings: Settings, value: int = 0) -> str:
     )
     try:
         tx["gas"] = w3.eth.estimate_gas(tx)
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "Gas estimation failed; using fallback gas limit 1000000. "
+            "from=%s nonce=%s value=%s error=%s",
+            account.address,
+            tx.get("nonce"),
+            value,
+            str(exc),
+        )
         tx["gas"] = 1_000_000
     tx["gasPrice"] = w3.eth.gas_price
 
@@ -316,7 +328,7 @@ def has_access(id: str, wallet_id_bytes: bytes, settings: Settings) -> bool:
 
 
 def create_item(
-    id: str,
+    listing_id: str,
     title: str,
     description: str,
     seller: str,

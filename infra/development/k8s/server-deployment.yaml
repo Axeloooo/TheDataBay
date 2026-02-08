@@ -65,6 +65,8 @@ spec:
                 secretKeyRef:
                   name: bridgemart-secrets
                   key: EMBEDDING_MODEL
+            - name: OLLAMA_HOST
+              value: "http://host.docker.internal:11434"
 
             # Embedding job settings
             - name: MAX_FILE_SIZE_MB

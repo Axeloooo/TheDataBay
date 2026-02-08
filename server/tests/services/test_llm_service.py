@@ -37,9 +37,7 @@ def test_warmup_model_failure(monkeypatch, settings):
 
 def test_parse_dataset_file_with_header():
     content = "col1,col2\n1,2\n3,4\n"
-    rows, cols, has_header, skipped = llm_service.parse_dataset_file(
-        content, "data.csv"
-    )
+    rows, cols, has_header, skipped = llm_service.parse_dataset_file(content)
 
     assert has_header is True
     assert cols == ["col1", "col2"]
@@ -49,9 +47,7 @@ def test_parse_dataset_file_with_header():
 
 def test_parse_dataset_file_without_header():
     content = "1,2\n3,4\n"
-    rows, cols, has_header, skipped = llm_service.parse_dataset_file(
-        content, "data.csv"
-    )
+    rows, cols, has_header, skipped = llm_service.parse_dataset_file(content)
 
     assert has_header is False
     assert cols == ["feature_0", "feature_1"]
@@ -61,7 +57,7 @@ def test_parse_dataset_file_without_header():
 
 def test_parse_dataset_file_empty():
     with pytest.raises(HTTPException):
-        llm_service.parse_dataset_file("", "data.csv")
+        llm_service.parse_dataset_file("")
 
 
 def test_record_to_text_extends_columns():
@@ -90,7 +86,9 @@ def test_generate_embeddings_chunked(monkeypatch, settings):
         return None
 
     def fake_embed(model, input):
-        return DummyEmbedResponse([[float(i), float(i) + 1.0] for i in range(len(input))])
+        return DummyEmbedResponse(
+            [[float(i), float(i) + 1.0] for i in range(len(input))]
+        )
 
     monkeypatch.setattr(llm_service.asyncio, "sleep", fake_sleep)
     monkeypatch.setattr(llm_service.ollama, "embed", fake_embed)
