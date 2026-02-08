@@ -126,6 +126,8 @@ async def upload_signature(
         raise HTTPException(
             status_code=500, detail=f"Network error uploading to Pinata: {str(exc)}"
         ) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=500, detail=f"Error uploading to IPFS: {str(exc)}"
@@ -188,6 +190,8 @@ async def upload_bytes(
         raise HTTPException(
             status_code=500, detail=f"Network error uploading to Pinata: {str(exc)}"
         ) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(
             status_code=500, detail=f"Error uploading to IPFS: {str(exc)}"

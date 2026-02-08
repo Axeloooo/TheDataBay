@@ -4,7 +4,7 @@ Configuration management using pydantic-settings for environment-based configura
 
 from functools import lru_cache
 from pathlib import Path
-from pydantic import AliasChoices, Field, SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]

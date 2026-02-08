@@ -37,7 +37,7 @@ async def similarity_search(
         SimilaritySearchResponse: Response containing ranked datasets based on similarity search
     """
 
-    datasets: List[MarketplaceDataItem] = await get_all_items(settings)
+    datasets: List[MarketplaceDataItem] = get_all_items(settings)
     if not datasets:
         return SimilaritySearchResponse(query=request.query, results=[], count=0)
 
