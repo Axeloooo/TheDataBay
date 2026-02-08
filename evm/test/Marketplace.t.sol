@@ -40,9 +40,7 @@ contract MarketplaceTest is Test {
         itemId = bytes32(idCounter);
         idCounter += 1;
         vm.prank(owner);
-        marketplace.createItem(
-            itemId, TITLE, DESC, seller, PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
-        );
+        marketplace.createItem(itemId, TITLE, DESC, seller, PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH);
     }
 
     function _buy(bytes32 itemId, address _buyer, uint256 value) internal {
