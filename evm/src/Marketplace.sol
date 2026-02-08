@@ -113,6 +113,11 @@ contract Marketplace is Ownable, ReentrancyGuard {
         _;
     }
 
+    modifier onlySeller(bytes32 itemId) {
+        if (items[itemId].seller != msg.sender) revert Marketplace__SellerRequired();
+        _;
+    }
+
     // ========= Constructor =========
     /**
      *
@@ -175,14 +180,14 @@ contract Marketplace is Ownable, ReentrancyGuard {
         bytes32 datasetHash,
         string calldata signatureUrl,
         bytes32 signatureHash
-    ) external onlyOwner returns (bytes32 createdItemId) {
+    ) external returns (bytes32 createdItemId) {
         if (bytes(title).length == 0) revert Marketplace__TitleRequired();
         if (bytes(description).length == 0) revert Marketplace__DescriptionRequired();
         if (price == 0) revert Marketplace__PriceMustBeGreaterThanZero();
         if (price > MAX_PRICE) revert Marketplace__PriceExceedsMaximum(price, MAX_PRICE);
         if (bytes(datasetUrl).length == 0) revert Marketplace__DatasetUrlRequired();
         if (bytes(signatureUrl).length == 0) revert Marketplace__SignatureUrlRequired();
-        if (seller == address(0)) revert Marketplace__SellerRequired();
+        if (seller == address(0) || seller != msg.sender) revert Marketplace__SellerRequired();
         if (items[itemId].exists) revert Marketplace__ItemAlreadyExists(itemId);
 
         DataItem storage it = items[itemId];
@@ -211,7 +216,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      */
     function updateDatasetUrl(bytes32 itemId, string calldata newDatasetUrl)
         external
-        onlyOwner
+        onlySeller(itemId)
         onlyExistingItem(itemId)
         onlyIfNotFrozen(itemId)
     {
@@ -232,7 +237,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      */
     function updateSignature(bytes32 itemId, string calldata newSignatureUrl, bytes32 newSignatureHash)
         external
-        onlyOwner
+        onlySeller(itemId)
         onlyExistingItem(itemId)
         onlyIfNotFrozen(itemId)
     {
@@ -257,7 +262,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      */
     function updatePrice(bytes32 itemId, uint256 newPrice)
         external
-        onlyOwner
+        onlySeller(itemId)
         onlyExistingItem(itemId)
         onlyIfNotFrozen(itemId)
     {

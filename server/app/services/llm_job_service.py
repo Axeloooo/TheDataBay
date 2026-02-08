@@ -13,7 +13,6 @@ from web3 import Web3
 from ..config.settings import Settings
 from ..schemas.job_schema import JobResponse, JobStatus, JobStatusResponse
 from ..schemas.llm_schema import DatasetStats, SignatureInfo, VectorSpec
-from ..services.contract_service import create_item
 from .dataset_key_repo import upsert_dataset_key
 from ..services.encryption_service import encrypt_bytes, generate_key
 from ..services.job_manager import JobManager
@@ -262,20 +261,6 @@ async def _process_embedding_job(
             nonce_b64=nonce_b64,
             dataset_url=dataset_url,
             dataset_hash=dataset_hash,
-        )
-
-        # Create item on-chain after uploads
-        create_item(
-            listing_id=listing_id,
-            title=title,
-            description=description,
-            seller=seller,
-            price=price,
-            dataset_url=dataset_url,
-            dataset_hash=dataset_hash,
-            signature_url=ipfs_url,
-            signature_hash=signature_hash,
-            settings=settings,
         )
 
         # Build result

@@ -4,7 +4,7 @@ Router exposing Marketplace smart contract operations.
 
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from ..config.settings import Settings, get_settings
 from ..schemas.contract_schema import (
@@ -139,6 +139,19 @@ def create_item(
     Returns:
         TxHashResponse: Transaction hash response
     """
+    raise HTTPException(
+        status_code=400,
+        detail="Direct wallet transaction required for createItem.",
+    )
+    """Create a marketplace item on-chain.
+
+    Args:
+        request (CreateItemRequest): Create item request model
+        settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
+
+    Returns:
+        TxHashResponse: Transaction hash response
+    """
     tx_hash = contract_service.create_item(
         listing_id=request.listing_id,
         title=request.title,
@@ -160,6 +173,20 @@ def buy_item(
     request: BuyItemRequest,
     settings: Settings = Depends(get_settings),
 ) -> TxHashResponse:
+    """Purchase an item on-chain.
+
+    Args:
+        listing_id (str): Listing UUID string
+        request (BuyItemRequest): Buy item request model
+        settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
+
+    Returns:
+        TxHashResponse: Transaction hash response
+    """
+    raise HTTPException(
+        status_code=400,
+        detail="Direct wallet transaction required for buyItem.",
+    )
     """Purchase an item on-chain.
 
     Args:
