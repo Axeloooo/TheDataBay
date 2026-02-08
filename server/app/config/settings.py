@@ -4,7 +4,7 @@ Configuration management using pydantic-settings for environment-based configura
 
 from functools import lru_cache
 from pathlib import Path
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     server_private_key: SecretStr = Field(alias="SERVER_PRIVATE_KEY")
 
     # Database settings
-    database_url: SecretStr = Field(alias="DATABASE_URL")
+    database_url: SecretStr = Field(alias="POSTGRES_URL")
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

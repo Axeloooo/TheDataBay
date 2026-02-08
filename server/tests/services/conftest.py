@@ -28,7 +28,7 @@ def make_settings(**overrides) -> Settings:
         "CHAIN_ID": 31337,
         "RPC_URL": "http://127.0.0.1:8545",
         "SERVER_PRIVATE_KEY": "0x" + "11" * 32,
-        "DATABASE_URL": "mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4",
+        "POSTGRES_URL": "postgresql://user:password@localhost:5432/bridgemart",
     }
     data.update(overrides)
     return Settings(_env_file=None, **data)

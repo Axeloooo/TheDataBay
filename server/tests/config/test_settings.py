@@ -31,7 +31,7 @@ CONTRACT_ABI_PATH="/tmp/Marketplace.json"
 CHAIN_ID=31337
 RPC_URL="http://127.0.0.1:8545"
 SERVER_PRIVATE_KEY="0x1111111111111111111111111111111111111111111111111111111111111111"
-DATABASE_URL="mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4"
+POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/bridgemart"
 """
 
 
@@ -66,7 +66,7 @@ def clear_relevant_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "CHAIN_ID",
         "RPC_URL",
         "SERVER_PRIVATE_KEY",
-        "DATABASE_URL",
+        "POSTGRES_URL",
     ]
     for k in keys:
         monkeypatch.delenv(k, raising=False)
@@ -111,7 +111,7 @@ def test_settings_loads_from_env_file(tmp_path, monkeypatch):
     assert isinstance(s.database_url, SecretStr)
     assert (
         s.database_url.get_secret_value()
-        == "mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4"
+        == "postgresql+psycopg://user:password@localhost:5432/bridgemart"
     )
 
 
@@ -142,7 +142,7 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
         CHAIN_ID="31337"
         RPC_URL="http://127.0.0.1:8545"
         SERVER_PRIVATE_KEY="0x1111111111111111111111111111111111111111111111111111111111111111"
-        DATABASE_URL="mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4"
+        POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/bridgemart"
         """,
     )
 
@@ -205,7 +205,7 @@ def test_missing_required_vars_raises_validation_error(tmp_path, monkeypatch):
     assert "CONTRACT_ADDRESS" in msg or "contract_address" in msg
     assert "RPC_URL" in msg or "rpc_url" in msg
     assert "SERVER_PRIVATE_KEY" in msg or "server_private_key" in msg
-    assert "DATABASE_URL" in msg or "database_url" in msg
+    assert "DATABASE_URL" in msg or "POSTGRES_URL" in msg or "database_url" in msg
 
 
 def test_invalid_cors_origins_format_raises(tmp_path, monkeypatch):
@@ -237,7 +237,7 @@ def test_invalid_cors_origins_format_raises(tmp_path, monkeypatch):
         CHAIN_ID=31337
         RPC_URL="http://127.0.0.1:8545"
         SERVER_PRIVATE_KEY="0x1111111111111111111111111111111111111111111111111111111111111111"
-        DATABASE_URL="mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4"
+        POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/bridgemart"
         """,
     )
 
@@ -279,8 +279,8 @@ def test_get_settings_cache_behavior(monkeypatch, tmp_path):
         "0x1111111111111111111111111111111111111111111111111111111111111111",
     )
     monkeypatch.setenv(
-        "DATABASE_URL",
-        "mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4",
+        "POSTGRES_URL",
+        "postgresql+psycopg://user:password@localhost:5432/bridgemart",
     )
 
     get_settings.cache_clear()

@@ -17,11 +17,11 @@ spec:
           image: bridgemart/server
           env:
             # Database settings
-            - name: DATABASE_URL
+            - name: POSTGRES_URL
               valueFrom:
                 secretKeyRef:
                   name: bridgemart-secrets
-                  key: DATABASE_URL
+                  key: POSTGRES_URL
 
             # App settings
             - name: APP_NAME
@@ -170,4 +170,4 @@ spec:
   ports:
     - port: 8080
       targetPort: 8080
-  type: LoadBalancer
+  type: ClusterIP

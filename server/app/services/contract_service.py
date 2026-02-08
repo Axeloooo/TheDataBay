@@ -20,6 +20,21 @@ from ..config.settings import Settings
 logger = logging.getLogger(__name__)
 
 
+def _raise_bad_request(detail: str, exc: Exception) -> None:
+    logger.warning("%s: %s", detail, str(exc))
+    raise HTTPException(status_code=400, detail=detail) from exc
+
+
+def _raise_internal_config(detail: str, exc: Exception) -> None:
+    logger.exception("%s", detail)
+    raise HTTPException(status_code=500, detail=detail) from exc
+
+
+def _raise_upstream(detail: str, exc: Exception) -> None:
+    logger.exception("%s", detail)
+    raise HTTPException(status_code=502, detail=f"{detail}: {str(exc)}") from exc
+
+
 def uuid_to_bytes32(id: Union[str, uuid.UUID]) -> bytes:
     """Convert listing UUID string to bytes32 format.
 
@@ -61,7 +76,10 @@ def wallet_id(
     )
     if wallet_type_str == WalletType.EVM.value:
         chain = f"eip155:{settings.chain_id}"
-        checksum_address = Web3.to_checksum_address(address)
+        try:
+            checksum_address = Web3.to_checksum_address(address)
+        except ValueError as exc:
+            _raise_bad_request("Invalid EVM address provided", exc)
         addr = Web3.to_hex(Web3.to_bytes(hexstr=checksum_address))
         payload = f"{chain}:{addr}"
     elif wallet_type_str == WalletType.SOLANA.value:
@@ -84,7 +102,18 @@ def _load_abi(abi_path: str) -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Contract ABI
     """
 
-    return json.loads(Path(abi_path).read_text())
+    try:
+        return json.loads(Path(abi_path).read_text())
+    except FileNotFoundError as exc:
+        _raise_internal_config(
+            f"Contract ABI file not found at path: {abi_path}",
+            exc,
+        )
+    except json.JSONDecodeError as exc:
+        _raise_internal_config(
+            f"Contract ABI file is not valid JSON: {abi_path}",
+            exc,
+        )
 
 
 def _get_web3(settings: Settings) -> Web3:
@@ -97,7 +126,14 @@ def _get_web3(settings: Settings) -> Web3:
         Web3: Web3 instance
     """
 
-    return Web3(Web3.HTTPProvider(settings.rpc_url))
+    w3 = Web3(Web3.HTTPProvider(settings.rpc_url))
+    if not w3.is_connected():
+        logger.error("RPC node is unreachable at %s", settings.rpc_url)
+        raise HTTPException(
+            status_code=502,
+            detail=f"RPC node unreachable at {settings.rpc_url}",
+        )
+    return w3
 
 
 def _get_contract(settings: Settings) -> Contract:
@@ -112,9 +148,14 @@ def _get_contract(settings: Settings) -> Contract:
 
     w3 = _get_web3(settings)
     abi = _load_abi(settings.contract_abi_path)
-    return w3.eth.contract(
-        address=Web3.to_checksum_address(settings.contract_address), abi=abi
-    )
+    try:
+        checksum_address = Web3.to_checksum_address(settings.contract_address)
+    except ValueError as exc:
+        _raise_internal_config("Invalid CONTRACT_ADDRESS configuration", exc)
+    try:
+        return w3.eth.contract(address=checksum_address, abi=abi)
+    except Exception as exc:
+        _raise_internal_config("Failed to initialize contract client", exc)
 
 
 def _to_hex(value: Any) -> str:
@@ -183,15 +224,40 @@ def _send_tx(function, settings: Settings, value: int = 0) -> str:
     """
 
     w3 = _get_web3(settings)
-    account = w3.eth.account.from_key(settings.server_private_key.get_secret_value())
-    tx = function.build_transaction(
-        {
-            "from": account.address,
-            "nonce": w3.eth.get_transaction_count(account.address),
-            "chainId": settings.chain_id,
-            "value": value,
-        }
-    )
+    try:
+        rpc_chain_id = w3.eth.chain_id
+    except Exception as exc:
+        _raise_upstream("Failed to fetch chain id from RPC", exc)
+    if rpc_chain_id != settings.chain_id:
+        logger.error(
+            "Chain ID mismatch. settings.chain_id=%s rpc.chain_id=%s",
+            settings.chain_id,
+            rpc_chain_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Chain ID mismatch: settings={settings.chain_id}, rpc={rpc_chain_id}. "
+                "Update CHAIN_ID or RPC_URL."
+            ),
+        )
+    try:
+        account = w3.eth.account.from_key(
+            settings.server_private_key.get_secret_value()
+        )
+    except Exception as exc:
+        _raise_internal_config("Invalid SERVER_PRIVATE_KEY configuration", exc)
+    try:
+        tx = function.build_transaction(
+            {
+                "from": account.address,
+                "nonce": w3.eth.get_transaction_count(account.address, "pending"),
+                "chainId": settings.chain_id,
+                "value": value,
+            }
+        )
+    except Exception as exc:
+        _raise_upstream("Failed to build contract transaction", exc)
     try:
         tx["gas"] = w3.eth.estimate_gas(tx)
     except Exception as exc:
@@ -204,14 +270,51 @@ def _send_tx(function, settings: Settings, value: int = 0) -> str:
             str(exc),
         )
         tx["gas"] = 1_000_000
-    tx["gasPrice"] = w3.eth.gas_price
-
-    signed = account.sign_transaction(tx)
-    tx_hash = w3.eth.send_raw_transaction(signed.rawTransaction)
-    receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+    try:
+        latest_block = w3.eth.get_block("latest")
+        base_fee = latest_block.get("baseFeePerGas", 0)
+        priority_fee = w3.to_wei(1, "gwei")
+        tx["maxPriorityFeePerGas"] = priority_fee
+        tx["maxFeePerGas"] = int(base_fee) * 2 + priority_fee
+        tx["type"] = "0x2"
+        tx.pop("gasPrice", None)
+    except Exception as exc:
+        _raise_upstream("Failed to configure transaction fee fields from RPC", exc)
+    try:
+        signed = account.sign_transaction(tx)
+        raw_tx = getattr(signed, "raw_transaction", None) or getattr(
+            signed, "rawTransaction", None
+        )
+        if raw_tx is None:
+            raise RuntimeError("Signed transaction payload is missing")
+        tx_hash = w3.eth.send_raw_transaction(raw_tx)
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+    except Exception as exc:
+        logger.exception(
+            "Failed to submit tx. from=%s to=%s nonce=%s chainId=%s value=%s",
+            account.address,
+            tx.get("to"),
+            tx.get("nonce"),
+            tx.get("chainId"),
+            value,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to submit transaction to RPC: {str(exc)}",
+        ) from exc
     if receipt.status != 1:
+        logger.error("Contract transaction reverted. tx_hash=%s", tx_hash.hex())
         raise HTTPException(status_code=502, detail="Transaction failed")
     return tx_hash.hex()
+
+
+def _call_contract_read(callable_obj, operation: str):
+    try:
+        return callable_obj.call()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _raise_upstream(f"Contract read failed: {operation}", exc)
 
 
 def max_price(settings: Settings) -> int:
@@ -224,7 +327,10 @@ def max_price(settings: Settings) -> int:
         int: Maximum price allowed for listings
     """
 
-    return _get_contract(settings).functions.MAX_PRICE().call()
+    return _call_contract_read(
+        _get_contract(settings).functions.MAX_PRICE(),
+        "MAX_PRICE",
+    )
 
 
 def fee_bps(settings: Settings) -> int:
@@ -237,7 +343,10 @@ def fee_bps(settings: Settings) -> int:
         int: Fee basis points configured in the contract
     """
 
-    return _get_contract(settings).functions.feeBps().call()
+    return _call_contract_read(
+        _get_contract(settings).functions.feeBps(),
+        "feeBps",
+    )
 
 
 def fee_recipient(settings: Settings) -> str:
@@ -250,7 +359,10 @@ def fee_recipient(settings: Settings) -> str:
         str: Fee recipient address configured in the contract
     """
 
-    return _get_contract(settings).functions.feeRecipient().call()
+    return _call_contract_read(
+        _get_contract(settings).functions.feeRecipient(),
+        "feeRecipient",
+    )
 
 
 def owner(settings: Settings) -> str:
@@ -263,7 +375,10 @@ def owner(settings: Settings) -> str:
         str: Owner address of the contract
     """
 
-    return _get_contract(settings).functions.owner().call()
+    return _call_contract_read(
+        _get_contract(settings).functions.owner(),
+        "owner",
+    )
 
 
 def get_item_view(listing_id: str, settings: Settings) -> MarketplaceDataItem:
@@ -278,7 +393,10 @@ def get_item_view(listing_id: str, settings: Settings) -> MarketplaceDataItem:
     """
 
     item_id = uuid_to_bytes32(listing_id)
-    raw = _get_contract(settings).functions.getItemView(item_id).call()
+    raw = _call_contract_read(
+        _get_contract(settings).functions.getItemView(item_id),
+        "getItemView",
+    )
     return _item_view_to_schema(raw)
 
 
@@ -293,7 +411,10 @@ def get_items(start: int, count: int, settings: Settings) -> List[MarketplaceDat
     Returns:
         List[MarketplaceDataItem]: List of item views
     """
-    raw_items = _get_contract(settings).functions.getItems(start, count).call()
+    raw_items = _call_contract_read(
+        _get_contract(settings).functions.getItems(start, count),
+        "getItems",
+    )
     return [_item_view_to_schema(item) for item in raw_items]
 
 
@@ -307,7 +428,10 @@ def get_all_items(settings: Settings) -> List[MarketplaceDataItem]:
         List[MarketplaceDataItem]: List of all item views
     """
 
-    raw_items = _get_contract(settings).functions.getAllItems().call()
+    raw_items = _call_contract_read(
+        _get_contract(settings).functions.getAllItems(),
+        "getAllItems",
+    )
     return [_item_view_to_schema(item) for item in raw_items]
 
 
@@ -324,7 +448,10 @@ def has_access(id: str, wallet_id_bytes: bytes, settings: Settings) -> bool:
     """
 
     item_id = uuid_to_bytes32(id)
-    return _get_contract(settings).functions.hasAccess(item_id, wallet_id_bytes).call()
+    return _call_contract_read(
+        _get_contract(settings).functions.hasAccess(item_id, wallet_id_bytes),
+        "hasAccess",
+    )
 
 
 def create_item(
@@ -358,17 +485,26 @@ def create_item(
     """
 
     contract = _get_contract(settings)
-    item_id = uuid_to_bytes32(id)
+    item_id = uuid_to_bytes32(listing_id)
+    try:
+        seller_address = Web3.to_checksum_address(seller)
+    except ValueError as exc:
+        _raise_bad_request("Invalid seller EVM address", exc)
+    try:
+        dataset_hash_bytes = Web3.to_bytes(hexstr=dataset_hash)
+        signature_hash_bytes = Web3.to_bytes(hexstr=signature_hash)
+    except Exception as exc:
+        _raise_bad_request("Invalid dataset/signature hash format", exc)
     tx = contract.functions.createItem(
         item_id,
         title,
         description,
-        Web3.to_checksum_address(seller),
+        seller_address,
         price,
         dataset_url,
-        Web3.to_bytes(hexstr=dataset_hash),
+        dataset_hash_bytes,
         signature_url,
-        Web3.to_bytes(hexstr=signature_hash),
+        signature_hash_bytes,
     )
     return _send_tx(tx, settings)
 
@@ -387,6 +523,22 @@ def buy_item(listing_id: str, value_wei: int, settings: Settings) -> str:
 
     contract = _get_contract(settings)
     item_id = uuid_to_bytes32(listing_id)
+
+    # Pre-check payment so we can return a clean 400 instead of a low-level revert.
+    item = _call_contract_read(contract.functions.getItemView(item_id), "getItemView")
+    price_wei = int(item[4])
+    fee_bps_value = int(_call_contract_read(contract.functions.feeBps(), "feeBps"))
+    fee_wei = (price_wei * fee_bps_value) // 10_000
+    required_wei = price_wei + fee_wei
+    if value_wei < required_wei:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Insufficient payment. required={required_wei} provided={value_wei} "
+                f"(price={price_wei}, fee_bps={fee_bps_value})"
+            ),
+        )
+
     tx = contract.functions.buyItem(item_id)
     return _send_tx(tx, settings, value=value_wei)
 
@@ -426,9 +578,11 @@ def update_signature(
 
     contract = _get_contract(settings)
     item_id = uuid_to_bytes32(listing_id)
-    tx = contract.functions.updateSignature(
-        item_id, new_url, Web3.to_bytes(hexstr=new_hash)
-    )
+    try:
+        new_hash_bytes = Web3.to_bytes(hexstr=new_hash)
+    except Exception as exc:
+        _raise_bad_request("Invalid signature hash format", exc)
+    tx = contract.functions.updateSignature(item_id, new_url, new_hash_bytes)
     return _send_tx(tx, settings)
 
 
@@ -465,9 +619,11 @@ def set_fee_config(
     """
 
     contract = _get_contract(settings)
-    tx = contract.functions.setFeeConfig(
-        Web3.to_checksum_address(fee_recipient_addr), fee_bps_value
-    )
+    try:
+        recipient = Web3.to_checksum_address(fee_recipient_addr)
+    except ValueError as exc:
+        _raise_bad_request("Invalid fee recipient EVM address", exc)
+    tx = contract.functions.setFeeConfig(recipient, fee_bps_value)
     return _send_tx(tx, settings)
 
 
@@ -483,7 +639,11 @@ def transfer_ownership(new_owner: str, settings: Settings) -> str:
     """
 
     contract = _get_contract(settings)
-    tx = contract.functions.transferOwnership(Web3.to_checksum_address(new_owner))
+    try:
+        owner_address = Web3.to_checksum_address(new_owner)
+    except ValueError as exc:
+        _raise_bad_request("Invalid new owner EVM address", exc)
+    tx = contract.functions.transferOwnership(owner_address)
     return _send_tx(tx, settings)
 
 
