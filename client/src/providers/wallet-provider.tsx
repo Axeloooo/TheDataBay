@@ -17,7 +17,10 @@ type WalletState = {
 const WalletContext = createContext<WalletState | null>(null);
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
-  const [address, setAddress] = useState<string | null>(null);
+  const [address, setAddress] = useState<string | null>(() => {
+    const saved = localStorage.getItem("bridgemart_wallet_address");
+    return saved || null;
+  });
 
   const isConnected = !!address;
 
@@ -29,16 +32,29 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       );
       return;
     }
+    try {
+      await window.ethereum.request({
+        method: "wallet_requestPermissions",
+        params: [{ eth_accounts: {} }],
+      });
+    } catch {
+      // Fallback for wallets that do not support permissions API.
+    }
     const accounts: string[] = await window.ethereum.request({
       method: "eth_requestAccounts",
     });
-    setAddress(accounts?.[0] ?? null);
+    const next = accounts?.[0] ?? null;
+    setAddress(next);
+    if (next) {
+      localStorage.setItem("bridgemart_wallet_address", next);
+    }
   }, []);
 
   const disconnect = useCallback(() => {
     // NOTE: Most injected wallets don't support programmatic "disconnect".
     // We just clear app state.
     setAddress(null);
+    localStorage.removeItem("bridgemart_wallet_address");
   }, []);
 
   // Keep state in sync if user switches accounts in wallet UI
@@ -46,7 +62,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (!window.ethereum?.on) return;
 
     const handleAccountsChanged = (accounts: string[]) => {
-      setAddress(accounts?.[0] ?? null);
+      if (!accounts?.length) {
+        return;
+      }
+      setAddress(accounts[0]);
+      localStorage.setItem("bridgemart_wallet_address", accounts[0]);
     };
 
     const handleChainChanged = () => {

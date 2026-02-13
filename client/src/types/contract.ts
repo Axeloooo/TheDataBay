@@ -5,7 +5,7 @@ export type MarketplaceDataItem = {
   title: string;
   description: string;
   seller: string;
-  price: number;
+  price: string;
   dataset_url: string;
   dataset_hash: string;
   signature_url: string;
@@ -21,4 +21,19 @@ export type WalletAccessRequest = {
 
 export type AccessCheckResponse = {
   has_access: boolean;
+};
+
+export type PurchasedItemsRequest = {
+  wallet_type: WalletType;
+  address: string;
+  start_block?: number | null;
+  end_block?: number | null;
+  limit?: number;
+  offset?: number;
+};
+
+export type PurchasedItemsResponse = {
+  wallet_id: string;
+  items: MarketplaceDataItem[];
+  count: number;
 };

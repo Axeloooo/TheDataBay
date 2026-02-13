@@ -7,46 +7,58 @@ import Home from "@/pages/Home";
 import HowItWorks from "@/pages/HowItWorks";
 import Upload from "@/pages/Upload";
 import DatasetDetail from "@/pages/DatasetDetail";
+import NotFound from "@/pages/NotFound";
+import { CurrencyProvider } from "@/context/currency-context";
 
 function App() {
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <Layout>
-                <Home />
-              </Layout>
-            }
-          />
-          <Route
-            path="/how-it-works"
-            element={
-              <Layout>
-                <HowItWorks />
-              </Layout>
-            }
-          />
-          <Route
-            path="/upload"
-            element={
-              <Layout>
-                <Upload />
-              </Layout>
-            }
-          />
-          <Route
-            path="/dataset/:id"
-            element={
-              <Layout>
-                <DatasetDetail />
-              </Layout>
-            }
-          />
-        </Routes>
-      </BrowserRouter>
+      <CurrencyProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <Layout>
+                  <Home />
+                </Layout>
+              }
+            />
+            <Route
+              path="/how-it-works"
+              element={
+                <Layout>
+                  <HowItWorks />
+                </Layout>
+              }
+            />
+            <Route
+              path="/upload"
+              element={
+                <Layout>
+                  <Upload />
+                </Layout>
+              }
+            />
+            <Route
+              path="/dataset/:id"
+              element={
+                <Layout>
+                  <DatasetDetail />
+                </Layout>
+              }
+            />
+            <Route
+              path="*"
+              element={
+                <Layout>
+                  <NotFound />
+                </Layout>
+              }
+            />
+          </Routes>
+        </BrowserRouter>
+      </CurrencyProvider>
       <Toaster position="top-center" />
     </ThemeProvider>
   );

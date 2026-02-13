@@ -1,4 +1,4 @@
-export type WalletType = "evm" | "solana" | "btc" | string;
+export type WalletType = "evm" | "solana" | string;
 
 export type KeyReleaseRequest = {
   wallet_type: WalletType;
