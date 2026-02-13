@@ -2,7 +2,7 @@
 Pydantic schemas for Marketplace endpoints.
 """
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 
 class MarketplaceDataItem(BaseModel):
@@ -27,11 +27,3 @@ class MarketplaceDataItem(BaseModel):
     purchase_count: int = Field(
         ..., description="Number of purchases recorded for the item"
     )
-
-    @field_validator("price", mode="before")
-    @classmethod
-    def coerce_price_to_string(cls, value):
-        """Accept numeric price inputs and normalize to string wei."""
-        if value is None:
-            raise ValueError("price is required")
-        return str(value)
