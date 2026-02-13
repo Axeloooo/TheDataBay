@@ -84,15 +84,7 @@ contract SeedMarketplace is Script {
         bytes32 itemId = bytes32(uuidPrefix);
 
         marketplace.createItem(
-            itemId,
-            title,
-            description,
-            seller,
-            price,
-            datasetUrl,
-            datasetHash,
-            signatureUrl,
-            signatureHash
+            itemId, title, description, seller, price, datasetUrl, datasetHash, signatureUrl, signatureHash
         );
 
         console2.log("Created item:");
