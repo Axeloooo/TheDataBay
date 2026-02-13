@@ -261,7 +261,7 @@ def _item_view_to_schema(raw: Any) -> MarketplaceDataItem:
         title=title,
         description=description,
         seller=seller,
-        price=str(price),
+        price=int(price),
         dataset_url=dataset_url,
         dataset_hash=_to_hex(dataset_hash),
         signature_url=signature_url,

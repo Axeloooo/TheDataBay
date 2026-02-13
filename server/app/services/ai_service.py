@@ -190,11 +190,11 @@ class AIService:
 def get_ai_service(
     settings: Settings = Depends(get_settings),
 ) -> AIService:
-    """Get singleton AIService instance.
+    """Get AIService instance.
 
     Args:
         settings (Settings, optional): Application settings instance. Defaults to Depends(get_settings).
     Returns:
-        AIService: Singleton AIService instance with persistent LRU cache
+        AIService: AIService instance with persistent LRU cache
     """
     return AIService(settings)
