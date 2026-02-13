@@ -157,7 +157,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
 
     /**
      *
-     * @notice Create a new dataset listing. For now onlyOwner (marketplace admin) creates items.
+     * @notice Create a new dataset listing.
      *
      * @param title The title of the dataset
      * @param description The description of the dataset

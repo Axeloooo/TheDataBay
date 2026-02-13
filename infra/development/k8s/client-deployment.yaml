@@ -17,9 +17,10 @@ spec:
           image: bridgemart/client
           env:
             - name: VITE_API_URL
-              secretKeyRef:
-                name: bridgemart-secrets
-                key: API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: bridgemart-secrets
+                  key: API_URL
             - name: VITE_CONTRACT_ADDRESS
               valueFrom:
                 secretKeyRef:

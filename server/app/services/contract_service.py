@@ -547,10 +547,14 @@ def get_purchased_items_by_wallet(
         raise
 
     latest_block = w3.eth.block_number
-    from_block = start_block if start_block is not None else max(0, latest_block - 50_000)
+    from_block = (
+        start_block if start_block is not None else max(0, latest_block - 50_000)
+    )
     to_block = end_block if end_block is not None else latest_block
     if from_block > to_block:
-        raise HTTPException(status_code=400, detail="start_block cannot be greater than end_block")
+        raise HTTPException(
+            status_code=400, detail="start_block cannot be greater than end_block"
+        )
 
     logger.info(
         "Fetching ItemPurchased events buyer=%s from=%s to=%s limit=%s offset=%s",
@@ -587,7 +591,9 @@ def get_purchased_items_by_wallet(
     paged_item_ids = unique_item_ids[offset : offset + limit]
     items: List[MarketplaceDataItem] = []
     for item_id in paged_item_ids:
-        raw = _call_contract_read(contract.functions.getItemView(item_id), "getItemView")
+        raw = _call_contract_read(
+            contract.functions.getItemView(item_id), "getItemView"
+        )
         items.append(_item_view_to_schema(raw))
 
     wallet_id_hex = Web3.to_hex(wallet_id(wallet_type_str, address, settings))

@@ -19,7 +19,7 @@ help:
 	@echo "  fee           - call fee config getters"
 	@echo "  getall        - call getAllItems()"
 	@echo "  seed-anvil    - seed deterministic sample items for UI testing"
-	@echo "  create-item   - create a sample item (owner-only)"
+	@echo "  create-item   - create a sample item"
 	@echo "  buy-item      - buy itemId=0 with msg.value=PRICE_WEI"
 	@echo ""
 	@echo "Env in .env:"
