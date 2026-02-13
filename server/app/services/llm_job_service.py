@@ -4,6 +4,7 @@ LLM job orchestration functions for async embedding workflows.
 
 import base64
 import csv
+import logging
 import uuid
 
 from fastapi import BackgroundTasks, HTTPException, UploadFile
@@ -13,7 +14,6 @@ from web3 import Web3
 from ..config.settings import Settings
 from ..schemas.job_schema import JobResponse, JobStatus, JobStatusResponse
 from ..schemas.llm_schema import DatasetStats, SignatureInfo, VectorSpec
-from ..services.contract_service import create_item
 from .dataset_key_repo import upsert_dataset_key
 from ..services.encryption_service import encrypt_bytes, generate_key
 from ..services.job_manager import JobManager
@@ -23,6 +23,8 @@ from ..services.llm_service import (
     record_to_text,
 )
 from ..services.pinata_service import upload_signature, upload_bytes
+
+logger = logging.getLogger(__name__)
 
 
 async def enqueue_batch_job(
@@ -56,6 +58,12 @@ async def enqueue_batch_job(
     """
 
     normalized_wallet_type = seller_wallet_type.strip().lower()
+    logger.info(
+        "llm_job.enqueue called filename=%s seller=%s wallet_type=%s",
+        file.filename,
+        seller,
+        normalized_wallet_type,
+    )
     if normalized_wallet_type != "evm":
         raise HTTPException(
             status_code=400,
@@ -218,6 +226,7 @@ async def _process_embedding_job(
         price (int): Price in wei
         session (Session): Database session
     """
+    logger.info("llm_job.process start job_id=%s listing_id=%s", job_id, listing_id)
 
     try:
         # Update job status to running
@@ -264,20 +273,6 @@ async def _process_embedding_job(
             dataset_hash=dataset_hash,
         )
 
-        # Create item on-chain after uploads
-        create_item(
-            listing_id=listing_id,
-            title=title,
-            description=description,
-            seller=seller,
-            price=price,
-            dataset_url=dataset_url,
-            dataset_hash=dataset_hash,
-            signature_url=ipfs_url,
-            signature_hash=signature_hash,
-            settings=settings,
-        )
-
         # Build result
         result = {
             "listing_id": listing_id,
@@ -304,7 +299,18 @@ async def _process_embedding_job(
         # Mark job as completed
         job_manager.set_result(job_id, result)
         job_manager.update_status(job_id, JobStatus.COMPLETED)
+        logger.info(
+            "llm_job.process completed job_id=%s listing_id=%s rows=%s",
+            job_id,
+            listing_id,
+            len(data_rows),
+        )
 
     except Exception as exc:
         # Mark job as failed
         job_manager.set_error(job_id, str(exc))
+        logger.exception(
+            "llm_job.process failed job_id=%s listing_id=%s",
+            job_id,
+            listing_id,
+        )

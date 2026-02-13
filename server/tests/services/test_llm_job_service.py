@@ -181,9 +181,6 @@ def test_process_embedding_job_success(monkeypatch, settings, job_manager):
     def fake_upsert_dataset_key(**kwargs):
         return None
 
-    def fake_create_item(**kwargs):
-        return "0xtx"
-
     monkeypatch.setattr(llm_job_service, "parse_dataset_file", fake_parse_dataset_file)
     monkeypatch.setattr(llm_job_service, "record_to_text", fake_record_to_text)
     monkeypatch.setattr(
@@ -194,7 +191,6 @@ def test_process_embedding_job_success(monkeypatch, settings, job_manager):
     monkeypatch.setattr(llm_job_service, "upload_bytes", fake_upload_bytes)
     monkeypatch.setattr(llm_job_service, "upload_signature", fake_upload_signature)
     monkeypatch.setattr(llm_job_service, "upsert_dataset_key", fake_upsert_dataset_key)
-    monkeypatch.setattr(llm_job_service, "create_item", fake_create_item)
 
     asyncio.run(
         llm_job_service._process_embedding_job(

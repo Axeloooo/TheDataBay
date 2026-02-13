@@ -121,3 +121,33 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes beta-marquee-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.beta-marquee {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.beta-marquee-track {
+  display: inline-flex;
+  min-width: max-content;
+  animation: beta-marquee-scroll 28s linear infinite;
+  gap: 2rem;
+}
+
+.beta-marquee-item {
+  flex: 0 0 auto;
+  padding: 0.35rem 1rem;
+  text-align: left;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}

@@ -152,10 +152,10 @@ spec:
                   key: SERVER_PRIVATE_KEY
           resources:
             requests:
-              memory: "64Mi"
+              memory: "512Mi"
               cpu: "250m"
             limits:
-              memory: "768Mi"
+              memory: "1Gi"
               cpu: "500m"
           ports:
             - containerPort: 8080

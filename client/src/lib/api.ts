@@ -4,7 +4,7 @@
 // const data = await api.get<{ message: string }>('/api/hello');
 // console.log(data.message);
 
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
 
 export interface ApiError {
   detail?: string;
@@ -13,14 +13,15 @@ export interface ApiError {
 
 export async function apiRequest<T>(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit,
 ): Promise<T> {
   const url = `${API_URL}${endpoint}`;
+  const isFormData = options?.body instanceof FormData;
 
   const response = await fetch(url, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...options?.headers,
     },
   });

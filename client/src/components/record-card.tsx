@@ -6,18 +6,20 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Database, Table2 } from "lucide-react";
+import { Coins, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useCurrency } from "@/context/currency-context";
+import {
+  convertEthToCurrency,
+  formatCurrencyAmount,
+} from "@/lib/fx";
 
 interface RecordCardProps {
   id: string;
   title: string;
   description: string;
-  priceEth: number;
-  rows: number;
-  columns: number;
-  dimension: number;
-  verified: boolean;
+  priceEth: string;
+  purchaseCount: number;
 }
 
 function RecordCard({
@@ -25,12 +27,14 @@ function RecordCard({
   title,
   description,
   priceEth,
-  rows,
-  columns,
-  dimension,
-  verified,
+  purchaseCount,
 }: RecordCardProps) {
   const navigate = useNavigate();
+  const { preferredCurrency, rates } = useCurrency();
+  const equivalent =
+    preferredCurrency !== "ETH"
+      ? convertEthToCurrency(Number(priceEth), preferredCurrency, rates)
+      : null;
 
   return (
     <Card
@@ -40,9 +44,6 @@ function RecordCard({
       <CardHeader>
         <div className="flex items-start justify-between">
           <CardTitle className="text-base line-clamp-2">{title}</CardTitle>
-          {verified && (
-            <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0 ml-2" />
-          )}
         </div>
         <CardDescription className="line-clamp-2">
           {description}
@@ -51,20 +52,22 @@ function RecordCard({
       <CardContent className="space-y-3">
         <div className="flex items-center gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-1">
-            <Table2 className="h-4 w-4" />
-            <span>
-              {rows.toLocaleString()} × {columns}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <Database className="h-4 w-4" />
-            <span>{dimension}d</span>
+            <Users className="h-4 w-4" />
+            <span>{purchaseCount.toLocaleString()} purchases</span>
           </div>
         </div>
         <div className="flex items-center justify-between">
           <Badge variant="secondary" className="text-xs font-mono">
-            {priceEth} ETH
+            <span className="inline-flex items-center gap-1">
+              <Coins className="h-3 w-3" />
+              {priceEth} ETH
+            </span>
           </Badge>
+          {equivalent !== null && (
+            <span className="text-xs text-muted-foreground">
+              ~ {formatCurrencyAmount(equivalent, preferredCurrency)}
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>

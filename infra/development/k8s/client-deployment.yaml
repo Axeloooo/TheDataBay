@@ -15,13 +15,29 @@ spec:
       containers:
         - name: client
           image: bridgemart/client
+          env:
+            - name: VITE_API_URL
+              valueFrom:
+                secretKeyRef:
+                  name: bridgemart-secrets
+                  key: API_URL
+            - name: VITE_CONTRACT_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: bridgemart-secrets
+                  key: CONTRACT_ADDRESS
+            - name: VITE_PINATA_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: bridgemart-secrets
+                  key: PINATA_GATEWAY_URL
           resources:
             requests:
-              memory: "64Mi"
-              cpu: "250m"
+              memory: "384Mi"
+              cpu: "25m"
             limits:
-              memory: "768Mi"
-              cpu: "500m"
+              memory: "512Mi"
+              cpu: "200m"
           ports:
             - containerPort: 5173
 ---

@@ -5,30 +5,39 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import {
-  CheckCircle2,
-  Download,
   Copy,
   FileText,
-  CalendarDays,
   User,
   Shield,
-  Layers,
+  Link2,
+  Users,
+  Hexagon,
+  Orbit,
+  Coins,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
-import type { DatasetRecord } from "@/types/dataset";
+import type { MarketplaceDataItem } from "@/types/contract";
+import { Badge } from "@/components/ui/badge";
+import { weiToEth } from "@/lib/marketplace";
+import { useCurrency } from "@/context/currency-context";
+import { convertEthToCurrency, formatCurrencyAmount } from "@/lib/fx";
 
 interface RecordCardDetailsProps {
-  dataset: DatasetRecord;
+  dataset: MarketplaceDataItem;
   isPurchased?: boolean;
+  integrityStatus?: "verifying" | "verified" | "failed" | "unavailable";
+  integrityDetail?: string;
 }
 
 function RecordCardDetails({
   dataset,
   isPurchased = false,
+  integrityStatus = "unavailable",
+  integrityDetail,
 }: RecordCardDetailsProps) {
   const copyToClipboard = async (text: string, label: string) => {
     try {
@@ -41,13 +50,14 @@ function RecordCardDetails({
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  const priceEth = weiToEth(dataset.price);
+  const { preferredCurrency, rates } = useCurrency();
+  const equivalent =
+    preferredCurrency !== "ETH"
+      ? convertEthToCurrency(Number(priceEth), preferredCurrency, rates)
+      : null;
+  const sellerIsEvm = /^0x[a-fA-F0-9]{40}$/.test(dataset.seller);
+  const sellerIsSolana = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(dataset.seller);
 
   return (
     <div className="space-y-6">
@@ -55,21 +65,49 @@ function RecordCardDetails({
       <div>
         <div className="flex items-start justify-between mb-2">
           <h1 className="text-3xl font-bold">{dataset.title}</h1>
-          {dataset.verified && (
-            <Badge variant="default" className="gap-1">
-              <CheckCircle2 className="h-3 w-3" />
-              Verified
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="outline"
+              className={
+                isPurchased
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                  : "border-amber-300 bg-amber-50 text-amber-700"
+              }
+            >
+              {isPurchased ? "Access Granted" : "No Access"}
             </Badge>
-          )}
+            <Badge
+              variant="outline"
+              className={
+                integrityStatus === "verified"
+                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                  : integrityStatus === "failed"
+                    ? "border-red-300 bg-red-50 text-red-700"
+                    : "border-slate-300 bg-slate-50 text-slate-700"
+              }
+            >
+              {integrityStatus === "verified" ? (
+                <>
+                  <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                  Verified
+                </>
+              ) : integrityStatus === "failed" ? (
+                <>
+                  <AlertCircle className="mr-1 h-3.5 w-3.5" />
+                  Verification Failed
+                </>
+              ) : integrityStatus === "verifying" ? (
+                "Verifying..."
+              ) : (
+                "Not Verified"
+              )}
+            </Badge>
+          </div>
         </div>
         <p className="text-muted-foreground">{dataset.description}</p>
-        <div className="flex flex-wrap gap-2 mt-4">
-          {dataset.tags.map((tag) => (
-            <Badge key={tag} variant="outline">
-              {tag}
-            </Badge>
-          ))}
-        </div>
+        {integrityDetail && integrityStatus !== "verified" && (
+          <p className="mt-2 text-xs text-muted-foreground">{integrityDetail}</p>
+        )}
       </div>
 
       {/* Price & Actions */}
@@ -79,128 +117,98 @@ function RecordCardDetails({
             <div>
               <p className="text-sm text-muted-foreground">Price</p>
               <p className="text-3xl font-bold font-mono">
-                {dataset.priceEth} ETH
+                <span className="inline-flex items-center gap-1">
+                  <Coins className="h-6 w-6" />
+                  {priceEth} ETH
+                </span>
               </p>
-              <p className="text-sm text-muted-foreground mt-1">
-                {dataset.downloads} downloads
-              </p>
+              {equivalent !== null && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  ~ {formatCurrencyAmount(equivalent, preferredCurrency)}
+                </p>
+              )}
+              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
+                <Users className="h-4 w-4" />
+                <span>{dataset.purchase_count} purchases</span>
+              </div>
             </div>
-            {!isPurchased && (
-              <Button size="lg" className="gap-2">
-                <Download className="h-4 w-4" />
-                Purchase & Download
-              </Button>
-            )}
+            <div className="text-sm text-muted-foreground">
+              {isPurchased ? "Access granted" : "Purchase to unlock"}
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Metadata Summary */}
+      {/* Listing Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Metadata Summary
+            Listing Summary
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Rows</p>
-              <p className="text-lg font-semibold">
-                {dataset.rows.toLocaleString()}
-              </p>
+              <p className="text-sm text-muted-foreground">Listing ID</p>
+              <p className="font-mono text-xs break-all">{dataset.id}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Columns</p>
-              <p className="text-lg font-semibold">{dataset.columns}</p>
+              <p className="text-sm text-muted-foreground">Price (wei)</p>
+              <p className="font-mono text-xs break-all">{dataset.price}</p>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">File Size</p>
-              <p className="text-lg font-semibold">{dataset.fileSizeMB} MB</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Format</p>
-              <p className="text-lg font-semibold uppercase">
-                {dataset.format}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Domain</p>
-              <p className="text-lg font-semibold">{dataset.domain}</p>
-            </div>
-            {dataset.target && (
-              <div>
-                <p className="text-sm text-muted-foreground">Target Type</p>
-                <p className="text-lg font-semibold capitalize">
-                  {dataset.target.type}
-                </p>
-              </div>
-            )}
           </div>
-          {dataset.target && (
-            <>
-              <Separator />
-              <div>
-                <p className="text-sm text-muted-foreground">Target Variable</p>
-                <p className="font-mono text-sm bg-muted px-2 py-1 rounded mt-1">
-                  {dataset.target.name}
-                </p>
-              </div>
-            </>
-          )}
         </CardContent>
       </Card>
 
-      {/* Vector Spec Panel */}
+      {/* URLs */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Layers className="h-5 w-5" />
-            Vector Specification
+            <Link2 className="h-5 w-5" />
+            URLs
           </CardTitle>
           <CardDescription>
-            Embedding model and vector configuration
+            Encrypted dataset and signature locations
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Embedding Model</p>
-              <p className="font-mono text-sm font-semibold">
-                {dataset.vectorSpec.embeddingModel}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Dimension</p>
-              <p className="text-lg font-semibold">
-                {dataset.vectorSpec.dimension}d
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Distance Metric</p>
-              <p className="text-lg font-semibold capitalize">
-                {dataset.vectorSpec.distanceMetric}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Normalized</p>
-              <p className="text-lg font-semibold">
-                {dataset.vectorSpec.normalized ? "Yes" : "No"}
-              </p>
+          <div>
+            <p className="text-sm text-muted-foreground">Dataset URL</p>
+            <div className="flex items-center gap-2">
+              <p className="flex-1 font-mono text-xs break-all">{dataset.dataset_url}</p>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() =>
+                  copyToClipboard(dataset.dataset_url, "Dataset URL")
+                }
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          <Separator />
           <div>
-            <p className="text-sm text-muted-foreground">Template Version</p>
-            <Badge variant="secondary" className="mt-1 font-mono">
-              {dataset.vectorSpec.templateVersion}
-            </Badge>
+            <p className="text-sm text-muted-foreground">Signature URL</p>
+            <div className="flex items-center gap-2">
+              <p className="flex-1 font-mono text-xs break-all">
+                {dataset.signature_url}
+              </p>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() =>
+                  copyToClipboard(dataset.signature_url, "Signature URL")
+                }
+              >
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Seller & Created Date */}
+      {/* Seller */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -211,6 +219,23 @@ function RecordCardDetails({
         <CardContent className="space-y-4">
           <div>
             <p className="text-sm text-muted-foreground mb-2">Seller Address</p>
+            <div className="mb-2">
+              <Badge variant="outline">
+                {sellerIsEvm ? (
+                  <>
+                    <Hexagon className="mr-1 h-3.5 w-3.5" />
+                    Ethereum
+                  </>
+                ) : sellerIsSolana ? (
+                  <>
+                    <Orbit className="mr-1 h-3.5 w-3.5" />
+                    Solana
+                  </>
+                ) : (
+                  "Unknown Chain"
+                )}
+              </Badge>
+            </div>
             <div className="flex items-center gap-2">
               <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-sm">
                 {dataset.seller}
@@ -225,10 +250,6 @@ function RecordCardDetails({
                 <Copy className="h-4 w-4" />
               </Button>
             </div>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <CalendarDays className="h-4 w-4" />
-            <span>Listed on {formatDate(dataset.createdAt)}</span>
           </div>
         </CardContent>
       </Card>
@@ -246,18 +267,16 @@ function RecordCardDetails({
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <p className="text-sm text-muted-foreground mb-2">
-              Access Data Hash
-            </p>
+            <p className="text-sm text-muted-foreground mb-2">Dataset Hash</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-xs break-all">
-                {dataset.accessSha256}
+                {dataset.dataset_hash}
               </code>
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() =>
-                  copyToClipboard(dataset.accessSha256, "Access hash")
+                  copyToClipboard(dataset.dataset_hash, "Dataset hash")
                 }
               >
                 <Copy className="h-4 w-4" />
@@ -265,18 +284,16 @@ function RecordCardDetails({
             </div>
           </div>
           <div>
-            <p className="text-sm text-muted-foreground mb-2">
-              Vector Data Hash
-            </p>
+            <p className="text-sm text-muted-foreground mb-2">Signature Hash</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-xs break-all">
-                {dataset.vectorSha256}
+                {dataset.signature_hash}
               </code>
               <Button
                 variant="outline"
                 size="icon"
                 onClick={() =>
-                  copyToClipboard(dataset.vectorSha256, "Vector hash")
+                  copyToClipboard(dataset.signature_hash, "Signature hash")
                 }
               >
                 <Copy className="h-4 w-4" />
@@ -286,48 +303,6 @@ function RecordCardDetails({
         </CardContent>
       </Card>
 
-      {/* Download Actions */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Download Data</CardTitle>
-          <CardDescription>
-            {isPurchased
-              ? "Your purchased datasets are available for download"
-              : "Purchase this dataset to unlock downloads"}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            disabled={!isPurchased}
-          >
-            <Download className="h-4 w-4" />
-            Download CSV ({dataset.fileSizeMB} MB)
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            disabled={!isPurchased}
-          >
-            <Download className="h-4 w-4" />
-            Download Vectors
-          </Button>
-          <Button
-            variant="outline"
-            className="w-full gap-2"
-            disabled={!isPurchased}
-          >
-            <Download className="h-4 w-4" />
-            Download Metadata
-          </Button>
-          {!isPurchased && (
-            <p className="text-xs text-center text-muted-foreground mt-2">
-              Downloads will be enabled after purchase
-            </p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

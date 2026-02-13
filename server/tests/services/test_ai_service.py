@@ -10,7 +10,7 @@ def make_item(item_id: str, sig_url: str, sig_hash: str):
         title=f"Dataset {item_id}",
         description="desc",
         seller="0xSeller",
-        price=10,
+        price="10",
         dataset_url="ipfs://dataset",
         dataset_hash="0xhash",
         signature_url=sig_url,

@@ -3,7 +3,7 @@ AI Service for ranking datasets based on query embeddings.
 """
 
 from typing import List, OrderedDict
-from functools import lru_cache
+import logging
 import torch
 import torch.nn.functional as F
 from fastapi import Depends
@@ -15,6 +15,8 @@ from ..schemas.marketplace_schema import MarketplaceDataItem
 from ..schemas.ai_schema import RankedDataset, ScoreExplanation
 from ..services.llm_service import generate_single_embedding
 from ..services.pinata_service import download_signature_embeddings
+
+logger = logging.getLogger(__name__)
 
 
 class AIService:
@@ -111,6 +113,11 @@ class AIService:
         Returns:
             List[RankedDataset]: List of ranked dataset results with scores and metadata
         """
+        logger.info(
+            "ai_service.rank_datasets start query_len=%s datasets=%s",
+            len(query),
+            len(datasets),
+        )
         q_list, dim = generate_single_embedding(query, self.settings)
         q: torch.Tensor = torch.tensor(q_list, dtype=torch.float32)
         q: torch.Tensor = F.normalize(q, p=2, dim=0)
@@ -175,18 +182,19 @@ class AIService:
             )
 
         results.sort(key=lambda r: r.score, reverse=True)
-        return results[: self.settings.top_k]
+        ranked = results[: self.settings.top_k]
+        logger.info("ai_service.rank_datasets done results=%s", len(ranked))
+        return ranked
 
 
-@lru_cache(maxsize=1)
 def get_ai_service(
     settings: Settings = Depends(get_settings),
 ) -> AIService:
-    """Get singleton AIService instance.
+    """Get AIService instance.
 
     Args:
         settings (Settings, optional): Application settings instance. Defaults to Depends(get_settings).
     Returns:
-        AIService: Singleton AIService instance with persistent LRU cache
+        AIService: AIService instance with persistent LRU cache
     """
     return AIService(settings)

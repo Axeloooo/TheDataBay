@@ -50,7 +50,7 @@ function HowItWorks() {
       icon: ArrowLeftRight,
       title: "Cross-Chain Compatible",
       description:
-        "Future support for multiple blockchains including Solana and Bitcoin networks for broader accessibility.",
+        "Future support for multiple blockchains including Solana and EVM networks for broader accessibility.",
     },
   ];
 

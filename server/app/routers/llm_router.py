@@ -2,6 +2,7 @@
 LLM router for embedding generation using Ollama.
 """
 
+import logging
 from fastapi import APIRouter, File, UploadFile, BackgroundTasks, status, Depends, Form
 
 from ..database.engine import get_session
@@ -23,6 +24,7 @@ router = APIRouter(
     prefix="/api/v1/llm",
     tags=["llm"],
 )
+logger = logging.getLogger(__name__)
 
 
 @router.post(
@@ -66,6 +68,11 @@ async def create_batch_embeddings(
         JobResponse: Job submission response with job ID
     """
 
+    logger.info(
+        "llm.create_batch_embeddings called filename=%s seller=%s",
+        file.filename,
+        seller,
+    )
     return await enqueue_batch_job(
         file=file,
         background_tasks=background_tasks,
@@ -94,6 +101,7 @@ async def embed_query(
     Returns:
         QueryEmbeddingResponse: Complete response with embedding, and vectorSpec
     """
+    logger.info("llm.embed_query called query_len=%s", len(request.query))
     query_embedding, dimension = generate_single_embedding(request.query, settings)
 
     vector_spec = VectorSpec(
@@ -121,4 +129,5 @@ async def get_job_status(
     Returns:
         JobStatusResponse: Job status and result details
     """
+    logger.info("llm.get_job_status called job_id=%s", job_id)
     return get_job_status_service(job_id, job_manager)

@@ -2,9 +2,10 @@
 Router exposing Marketplace smart contract operations.
 """
 
+import logging
 from typing import List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from ..config.settings import Settings, get_settings
 from ..schemas.contract_schema import (
@@ -16,6 +17,8 @@ from ..schemas.contract_schema import (
     TransferOwnershipRequest,
     TxHashResponse,
     UpdateDatasetUrlRequest,
+    PurchasedItemsRequest,
+    PurchasedItemsResponse,
     UpdatePriceRequest,
     UpdateSignatureRequest,
     WalletAccessRequest,
@@ -24,6 +27,7 @@ from ..schemas.marketplace_schema import MarketplaceDataItem
 from ..services import contract_service
 
 router = APIRouter(prefix="/api/v1/contract", tags=["contract"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/max-price", response_model=int)
@@ -88,6 +92,7 @@ def get_all_items(settings: Settings = Depends(get_settings)) -> List[Marketplac
     Returns:
         List[MarketplaceDataItem]: Full list of marketplace items
     """
+    logger.info("contract.get_all_items called")
     return contract_service.get_all_items(settings)
 
 
@@ -107,6 +112,7 @@ def get_items(
     Returns:
         List[MarketplaceDataItem]: Paginated list of marketplace items
     """
+    logger.info("contract.get_items called start=%s count=%s", start, count)
     return contract_service.get_items(start, count, settings)
 
 
@@ -123,13 +129,58 @@ def get_item_view(
     Returns:
         MarketplaceDataItem: Item view returned by the contract
     """
+    logger.info("contract.get_item_view called listing_id=%s", listing_id)
     return contract_service.get_item_view(listing_id, settings)
+
+
+@router.post("/purchases/by-wallet", response_model=PurchasedItemsResponse)
+def get_purchases_by_wallet(
+    request: PurchasedItemsRequest,
+    settings: Settings = Depends(get_settings),
+) -> PurchasedItemsResponse:
+    """Get purchased marketplace items for a wallet via ItemPurchased event indexing.
+
+    Args:
+        request (PurchasedItemsRequest): Purchased items query payload.
+        settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
+
+    Returns:
+        PurchasedItemsResponse: Purchased items and derived wallet id.
+    """
+    logger.info(
+        "contract.get_purchases_by_wallet called wallet_type=%s address=%s",
+        request.wallet_type,
+        request.address,
+    )
+    wallet_id_hex, items = contract_service.get_purchased_items_by_wallet(
+        wallet_type=request.wallet_type,
+        address=request.address,
+        settings=settings,
+        start_block=request.start_block,
+        end_block=request.end_block,
+        limit=request.limit,
+        offset=request.offset,
+    )
+    return PurchasedItemsResponse(wallet_id=wallet_id_hex, items=items, count=len(items))
 
 
 @router.post("/items", response_model=TxHashResponse)
 def create_item(
     request: CreateItemRequest, settings: Settings = Depends(get_settings)
 ) -> TxHashResponse:
+    """Create a marketplace item on-chain.
+
+    Args:
+        request (CreateItemRequest): Create item request model
+        settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
+
+    Returns:
+        TxHashResponse: Transaction hash response
+    """
+    raise HTTPException(
+        status_code=400,
+        detail="Direct wallet transaction required for createItem.",
+    )
     """Create a marketplace item on-chain.
 
     Args:
@@ -160,6 +211,20 @@ def buy_item(
     request: BuyItemRequest,
     settings: Settings = Depends(get_settings),
 ) -> TxHashResponse:
+    """Purchase an item on-chain.
+
+    Args:
+        listing_id (str): Listing UUID string
+        request (BuyItemRequest): Buy item request model
+        settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
+
+    Returns:
+        TxHashResponse: Transaction hash response
+    """
+    raise HTTPException(
+        status_code=400,
+        detail="Direct wallet transaction required for buyItem.",
+    )
     """Purchase an item on-chain.
 
     Args:
@@ -252,6 +317,11 @@ def check_access(
     Returns:
         AccessCheckResponse: Access check result
     """
+    logger.info(
+        "contract.check_access called listing_id=%s wallet_type=%s",
+        listing_id,
+        request.wallet_type,
+    )
     wallet_id_bytes = contract_service.wallet_id(
         request.wallet_type, request.address, settings
     )

@@ -8,11 +8,20 @@ import {
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
 import { ModeToggle } from "./mode-toggle";
-import { Link, NavLink } from "react-router-dom";
-import { Search, ArrowLeftRight, Wallet, Upload } from "lucide-react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import {
+  Search,
+  ArrowLeftRight,
+  Wallet,
+  Upload,
+  X,
+  Hexagon,
+  Orbit,
+} from "lucide-react";
 import { Button } from "./ui/button";
 import { useWallet } from "@/providers/wallet-provider";
 import { toast } from "sonner";
@@ -22,6 +31,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { useSearch } from "@/context/search-context";
+import { useCurrency } from "@/context/currency-context";
+import type { DisplayCurrency } from "@/lib/fx";
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
@@ -29,6 +41,26 @@ function shortAddress(addr: string) {
 
 function Navbar() {
   const { address, isConnected, connect, disconnect } = useWallet();
+  const { preferredCurrency, setPreferredCurrency, ratesUnavailable } =
+    useCurrency();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const {
+    query,
+    setQuery,
+    submitSearch,
+    clearSearch,
+    resultCount,
+    isSearching,
+    submittedQuery,
+  } = useSearch();
+
+  const executeSearch = () => {
+    submitSearch();
+    if (location.pathname !== "/") {
+      navigate("/");
+    }
+  };
 
   const copyAddress = async () => {
     if (!address) return;
@@ -66,31 +98,68 @@ function Navbar() {
               <InputGroupAddon>
                 <Search className="h-4 w-4" />
               </InputGroupAddon>
-              <InputGroupInput placeholder="Search" />
+              <InputGroupInput
+                placeholder="Search datasets by meaning..."
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    executeSearch();
+                  }
+                }}
+              />
+              {query && (
+                <InputGroupAddon align="inline-end">
+                  <InputGroupButton
+                    aria-label="Clear search"
+                    onClick={() => clearSearch()}
+                    size="icon-xs"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </InputGroupButton>
+                </InputGroupAddon>
+              )}
               <InputGroupAddon align="inline-end" className="text-xs">
-                0 results
+                {submittedQuery
+                  ? isSearching
+                    ? "Searching..."
+                    : `${resultCount ?? 0} results`
+                  : "Browse all"}
+              </InputGroupAddon>
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton onClick={() => executeSearch()}>
+                  Search
+                </InputGroupButton>
               </InputGroupAddon>
             </InputGroup>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          <select
+            aria-label="Preferred currency"
+            className="h-9 rounded-md border bg-background px-2 text-xs"
+            value={preferredCurrency}
+            onChange={(event) =>
+              setPreferredCurrency(event.target.value as DisplayCurrency)
+            }
+            title="Display currency (payments remain ETH on-chain)"
+          >
+            <option value="ETH">ETH</option>
+            <option value="CAD">CAD</option>
+            <option value="USD">USD</option>
+            <option value="EUR">EUR</option>
+            <option value="USDC">USDC</option>
+            <option value="SOL">SOL</option>
+          </select>
+          {ratesUnavailable && (
+            <span className="text-xs text-muted-foreground">
+              FX unavailable
+            </span>
+          )}
           <NavigationMenu>
             <NavigationMenuList className="flex items-center gap-1">
-              {/* <NavigationMenuItem>
-                <NavLink to="/">
-                  {({ isActive }) => (
-                    <NavigationMenuLink
-                      className={`${navigationMenuTriggerStyle()} ${
-                        isActive ? "font-semibold" : ""
-                      }`}
-                    >
-                      Marketplace
-                    </NavigationMenuLink>
-                  )}
-                </NavLink>
-              </NavigationMenuItem> */}
-
               <NavigationMenuItem>
                 <NavLink to="/how-it-works">
                   {({ isActive }) => (
@@ -128,9 +197,14 @@ function Navbar() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={connect}>EVM</DropdownMenuItem>
-                <DropdownMenuItem disabled>Solana</DropdownMenuItem>
-                <DropdownMenuItem disabled>Bitcoin</DropdownMenuItem>
+                <DropdownMenuItem onClick={connect} className="gap-2">
+                  <Hexagon className="h-4 w-4" />
+                  Ethereum
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled className="gap-2">
+                  <Orbit className="h-4 w-4" />
+                  Solana (Coming soon)
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
