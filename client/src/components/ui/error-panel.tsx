@@ -20,7 +20,7 @@ function ErrorPanel({
         <AlertTriangle className="mt-0.5 h-5 w-5" />
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold">{title}</h3>
-          <p className="mt-1 text-sm text-red-800 break-words">{message}</p>
+          <p className="mt-1 text-sm text-red-800 wrap-break-word">{message}</p>
           {onRetry && (
             <Button
               variant="outline"
