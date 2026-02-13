@@ -5,6 +5,7 @@ Pydantic schemas for contract router endpoints.
 from pydantic import BaseModel, Field
 
 from .dataset_schema import WalletType
+from .marketplace_schema import MarketplaceDataItem
 
 
 class TxHashResponse(BaseModel):
@@ -83,3 +84,30 @@ class CreateItemRequest(BaseModel):
     dataset_hash: str = Field(..., min_length=1, description="Dataset sha256 hash (0x...)")
     signature_url: str = Field(..., min_length=1, description="Signature IPFS URL")
     signature_hash: str = Field(..., min_length=1, description="Signature sha256 hash (0x...)")
+
+
+class PurchasedItemsRequest(BaseModel):
+    """Purchased items request schema."""
+
+    wallet_type: WalletType = Field(..., description="Wallet type")
+    address: str = Field(..., description="Wallet address/public key")
+    start_block: int | None = Field(
+        default=None,
+        ge=0,
+        description="Start block (inclusive). Defaults to latest - 50k.",
+    )
+    end_block: int | None = Field(
+        default=None,
+        ge=0,
+        description="End block (inclusive). Defaults to latest.",
+    )
+    limit: int = Field(default=50, ge=1, le=500, description="Maximum rows to return")
+    offset: int = Field(default=0, ge=0, description="Pagination offset")
+
+
+class PurchasedItemsResponse(BaseModel):
+    """Purchased items response schema."""
+
+    wallet_id: str = Field(..., description="Derived wallet id bytes32 as hex")
+    items: list[MarketplaceDataItem] = Field(..., description="Purchased items list")
+    count: int = Field(..., description="Number of returned items")

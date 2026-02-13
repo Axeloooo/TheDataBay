@@ -9,7 +9,7 @@ DEPLOY_SCRIPT := script/DeployMarketplace.s.sol:DeployMarketplace
 DEPLOYMENTS_DIR := deployments
 ANVIL_ADDR_FILE := $(DEPLOYMENTS_DIR)/anvil_marketplace.addr
 
-.PHONY: help anvil stop-anvil clean deploy-anvil addr fee getall create-item buy-item
+.PHONY: help anvil stop-anvil clean deploy-anvil addr fee getall create-item buy-item seed-anvil
 
 help:
 	@echo "Targets:"
@@ -18,6 +18,7 @@ help:
 	@echo "  addr          - print deployed Marketplace address"
 	@echo "  fee           - call fee config getters"
 	@echo "  getall        - call getAllItems()"
+	@echo "  seed-anvil    - seed deterministic sample items for UI testing"
 	@echo "  create-item   - create a sample item (owner-only)"
 	@echo "  buy-item      - buy itemId=0 with msg.value=PRICE_WEI"
 	@echo ""
@@ -105,3 +106,12 @@ buy-item:
 	echo "Buying item $$ITEM_ID..."; \
 	cast send $$ADDR "buyItem(bytes32)" $$ITEM_ID \
 	  --rpc-url $(ANVIL_RPC_URL) --private-key $$BUYER_PK --value $$TOTAL_PRICE
+
+seed-anvil:
+	@ADDR=$$(cat $(ANVIL_ADDR_FILE)); \
+	echo "Seeding Marketplace at $$ADDR..."; \
+	forge script script/SeedMarketplace.s.sol:SeedMarketplace \
+	  --sig "run(address)" $$ADDR \
+	  --rpc-url $(ANVIL_RPC_URL) \
+	  --broadcast \
+	  --private-key $(ANVIL_PRIVATE_KEY)

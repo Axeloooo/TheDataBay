@@ -2,6 +2,7 @@
 Dataset key release router.
 """
 
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
@@ -13,6 +14,7 @@ from ..services import contract_service, dataset_key_repo
 
 
 router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/{id}/key", response_model=KeyReleaseResponse)
@@ -38,6 +40,11 @@ def release_key(
         KeyReleaseResponse: Dataset key release response
     """
 
+    logger.info(
+        "datasets.release_key called listing_id=%s wallet_type=%s",
+        id,
+        request.wallet_type,
+    )
     wallet_id_bytes = contract_service.wallet_id(
         request.wallet_type, request.address, settings
     )
@@ -45,12 +52,16 @@ def release_key(
     authorized = contract_service.has_access(id, wallet_id_bytes, settings)
 
     if not authorized:
+        logger.warning("datasets.release_key unauthorized listing_id=%s", id)
         raise HTTPException(status_code=403, detail="Access not authorized")
 
     record = dataset_key_repo.get_dataset_key(session, id)
 
     if not record:
+        logger.warning("datasets.release_key missing_key listing_id=%s", id)
         raise HTTPException(status_code=404, detail="Key not found for listing")
+
+    logger.info("datasets.release_key success listing_id=%s", id)
 
     return KeyReleaseResponse(
         id=id,

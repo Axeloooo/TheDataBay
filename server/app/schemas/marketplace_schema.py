@@ -12,7 +12,7 @@ class MarketplaceDataItem(BaseModel):
     title: str = Field(..., description="Title of the data item")
     description: str = Field(..., description="Description of the data item")
     seller: str = Field(..., description="Seller address")
-    price: int = Field(..., description="Price in wei")
+    price: str = Field(..., description="Price in wei")
     dataset_url: str = Field(..., description="URL to the dataset")
     dataset_hash: str = Field(
         ..., description="Hash of the dataset for integrity verification"

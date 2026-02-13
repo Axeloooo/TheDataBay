@@ -4,6 +4,7 @@ Marketplace smart contract service.
 
 import json
 import logging
+import re
 import uuid
 from functools import lru_cache
 from pathlib import Path
@@ -18,6 +19,60 @@ from web3.contract import Contract
 from ..config.settings import Settings
 
 logger = logging.getLogger(__name__)
+
+
+CUSTOM_ERROR_MAP = {
+    "0x1a16f5f1": (400, "Initial owner required."),
+    "0xb3be6278": (404, "Item does not exist."),
+    "0xa03a0beb": (409, "Item already exists."),
+    "0xedac3342": (400, "Price must be greater than zero."),
+    "0xac30c3e9": (400, "Price exceeds maximum."),
+    "0xfa52fef7": (400, "Title is required."),
+    "0x714224a9": (400, "Description is required."),
+    "0xa36746a8": (400, "Dataset URL is required."),
+    "0x9cb0e89c": (400, "Signature URL is required."),
+    "0x9b9f01b2": (400, "Invalid payment amount."),
+    "0xfecaeeb9": (400, "Already has access."),
+    "0x3a06d369": (500, "Transfer failed."),
+    "0x2f71df15": (400, "Invalid fee bps."),
+    "0xecc6ecf4": (400, "Fee recipient required."),
+    "0x2f82c416": (403, "Seller required for this action."),
+    "0x59efb1b4": (400, "Item is frozen after purchase."),
+}
+
+CUSTOM_ERROR_REGEX = re.compile(r"custom error (0x[0-9a-fA-F]{8})")
+
+
+def _extract_selector_from_args(args: Any) -> str | None:
+    if not args:
+        return None
+    for arg in args:
+        if isinstance(arg, str):
+            if arg.startswith("0x") and len(arg) >= 10:
+                return arg[:10].lower()
+            match = CUSTOM_ERROR_REGEX.search(arg)
+            if match:
+                return match.group(1).lower()
+        elif isinstance(arg, (list, tuple)):
+            selector = _extract_selector_from_args(arg)
+            if selector:
+                return selector
+    return None
+
+
+def _maybe_raise_custom_error(exc: Exception, operation: str | None = None) -> None:
+    selector = _extract_selector_from_args(getattr(exc, "args", None))
+    if not selector:
+        selector = _extract_selector_from_args([str(exc)])
+    if not selector:
+        return
+    status, message = CUSTOM_ERROR_MAP.get(
+        selector, (400, f"Contract reverted ({selector}).")
+    )
+    detail = f"{message}"
+    if operation:
+        detail = f"{detail} operation={operation}"
+    raise HTTPException(status_code=status, detail=detail) from exc
 
 
 def _raise_bad_request(detail: str, exc: Exception) -> None:
@@ -80,6 +135,7 @@ def wallet_id(
             checksum_address = Web3.to_checksum_address(address)
         except ValueError as exc:
             _raise_bad_request("Invalid EVM address provided", exc)
+            raise
         addr = Web3.to_hex(Web3.to_bytes(hexstr=checksum_address))
         payload = f"{chain}:{addr}"
     elif wallet_type_str == WalletType.SOLANA.value:
@@ -109,11 +165,13 @@ def _load_abi(abi_path: str) -> List[Dict[str, Any]]:
             f"Contract ABI file not found at path: {abi_path}",
             exc,
         )
+        raise
     except json.JSONDecodeError as exc:
         _raise_internal_config(
             f"Contract ABI file is not valid JSON: {abi_path}",
             exc,
         )
+        raise
 
 
 def _get_web3(settings: Settings) -> Web3:
@@ -152,10 +210,12 @@ def _get_contract(settings: Settings) -> Contract:
         checksum_address = Web3.to_checksum_address(settings.contract_address)
     except ValueError as exc:
         _raise_internal_config("Invalid CONTRACT_ADDRESS configuration", exc)
+        raise
     try:
         return w3.eth.contract(address=checksum_address, abi=abi)
     except Exception as exc:
         _raise_internal_config("Failed to initialize contract client", exc)
+        raise
 
 
 def _to_hex(value: Any) -> str:
@@ -201,7 +261,7 @@ def _item_view_to_schema(raw: Any) -> MarketplaceDataItem:
         title=title,
         description=description,
         seller=seller,
-        price=price,
+        price=str(price),
         dataset_url=dataset_url,
         dataset_hash=_to_hex(dataset_hash),
         signature_url=signature_url,
@@ -257,10 +317,12 @@ def _send_tx(function, settings: Settings, value: int = 0) -> str:
             }
         )
     except Exception as exc:
+        _maybe_raise_custom_error(exc, "build_transaction")
         _raise_upstream("Failed to build contract transaction", exc)
     try:
         tx["gas"] = w3.eth.estimate_gas(tx)
     except Exception as exc:
+        _maybe_raise_custom_error(exc, "estimate_gas")
         logger.warning(
             "Gas estimation failed; using fallback gas limit 1000000. "
             "from=%s nonce=%s value=%s error=%s",
@@ -290,6 +352,7 @@ def _send_tx(function, settings: Settings, value: int = 0) -> str:
         tx_hash = w3.eth.send_raw_transaction(raw_tx)
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
     except Exception as exc:
+        _maybe_raise_custom_error(exc, "send_raw_transaction")
         logger.exception(
             "Failed to submit tx. from=%s to=%s nonce=%s chainId=%s value=%s",
             account.address,
@@ -314,6 +377,7 @@ def _call_contract_read(callable_obj, operation: str):
     except HTTPException:
         raise
     except Exception as exc:
+        _maybe_raise_custom_error(exc, operation)
         _raise_upstream(f"Contract read failed: {operation}", exc)
 
 
@@ -392,6 +456,7 @@ def get_item_view(listing_id: str, settings: Settings) -> MarketplaceDataItem:
         MarketplaceDataItem: Item view data
     """
 
+    logger.info("contract_service.get_item_view listing_id=%s", listing_id)
     item_id = uuid_to_bytes32(listing_id)
     raw = _call_contract_read(
         _get_contract(settings).functions.getItemView(item_id),
@@ -411,6 +476,7 @@ def get_items(start: int, count: int, settings: Settings) -> List[MarketplaceDat
     Returns:
         List[MarketplaceDataItem]: List of item views
     """
+    logger.info("contract_service.get_items start=%s count=%s", start, count)
     raw_items = _call_contract_read(
         _get_contract(settings).functions.getItems(start, count),
         "getItems",
@@ -428,11 +494,110 @@ def get_all_items(settings: Settings) -> List[MarketplaceDataItem]:
         List[MarketplaceDataItem]: List of all item views
     """
 
+    logger.info("contract_service.get_all_items")
     raw_items = _call_contract_read(
         _get_contract(settings).functions.getAllItems(),
         "getAllItems",
     )
     return [_item_view_to_schema(item) for item in raw_items]
+
+
+def get_purchased_items_by_wallet(
+    wallet_type: Union[WalletType, str],
+    address: str,
+    settings: Settings,
+    start_block: int | None = None,
+    end_block: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[str, List[MarketplaceDataItem]]:
+    """Get purchased items by wallet using ItemPurchased events.
+
+    Args:
+        wallet_type (Union[WalletType, str]): Wallet type.
+        address (str): Wallet address/public key.
+        settings (Settings): Application settings.
+        start_block (int | None, optional): Start block inclusive.
+        end_block (int | None, optional): End block inclusive.
+        limit (int, optional): Max number of items.
+        offset (int, optional): Pagination offset.
+
+    Returns:
+        tuple[str, List[MarketplaceDataItem]]: WalletId hex and purchased items.
+    """
+
+    wallet_type_str = (
+        wallet_type.value.lower()
+        if isinstance(wallet_type, WalletType)
+        else str(wallet_type).lower()
+    )
+    if wallet_type_str != WalletType.EVM.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Purchased-items query currently supports only EVM wallets.",
+        )
+
+    contract = _get_contract(settings)
+    w3 = _get_web3(settings)
+
+    try:
+        buyer = Web3.to_checksum_address(address)
+    except ValueError as exc:
+        _raise_bad_request("Invalid EVM address provided", exc)
+        raise
+
+    latest_block = w3.eth.block_number
+    from_block = start_block if start_block is not None else max(0, latest_block - 50_000)
+    to_block = end_block if end_block is not None else latest_block
+    if from_block > to_block:
+        raise HTTPException(status_code=400, detail="start_block cannot be greater than end_block")
+
+    logger.info(
+        "Fetching ItemPurchased events buyer=%s from=%s to=%s limit=%s offset=%s",
+        buyer,
+        from_block,
+        to_block,
+        limit,
+        offset,
+    )
+
+    try:
+        events = contract.events.ItemPurchased().get_logs(
+            from_block=from_block,
+            to_block=to_block,
+            argument_filters={"buyer": buyer},
+        )
+    except Exception as exc:
+        _raise_upstream("Failed to query ItemPurchased logs", exc)
+        raise
+
+    # newest first for UX
+    events = list(reversed(events))
+    unique_item_ids: list[bytes] = []
+    seen: set[str] = set()
+    for event in events:
+        args = getattr(event, "args", {})
+        item_id = args.get("itemId")
+        item_id_hex = _to_hex(item_id).lower()
+        if item_id_hex in seen:
+            continue
+        seen.add(item_id_hex)
+        unique_item_ids.append(item_id)
+
+    paged_item_ids = unique_item_ids[offset : offset + limit]
+    items: List[MarketplaceDataItem] = []
+    for item_id in paged_item_ids:
+        raw = _call_contract_read(contract.functions.getItemView(item_id), "getItemView")
+        items.append(_item_view_to_schema(raw))
+
+    wallet_id_hex = Web3.to_hex(wallet_id(wallet_type_str, address, settings))
+    logger.info(
+        "Fetched purchased items buyer=%s wallet_id=%s count=%s",
+        buyer,
+        wallet_id_hex,
+        len(items),
+    )
+    return wallet_id_hex, items
 
 
 def has_access(id: str, wallet_id_bytes: bytes, settings: Settings) -> bool:
@@ -447,6 +612,7 @@ def has_access(id: str, wallet_id_bytes: bytes, settings: Settings) -> bool:
         bool: True if the wallet has access, False otherwise
     """
 
+    logger.info("contract_service.has_access listing_id=%s", id)
     item_id = uuid_to_bytes32(id)
     return _call_contract_read(
         _get_contract(settings).functions.hasAccess(item_id, wallet_id_bytes),
@@ -484,6 +650,12 @@ def create_item(
         str: Transaction hash
     """
 
+    logger.info(
+        "contract_service.create_item listing_id=%s seller=%s price=%s",
+        listing_id,
+        seller,
+        price,
+    )
     contract = _get_contract(settings)
     item_id = uuid_to_bytes32(listing_id)
     try:
@@ -521,6 +693,11 @@ def buy_item(listing_id: str, value_wei: int, settings: Settings) -> str:
         str: Transaction hash
     """
 
+    logger.info(
+        "contract_service.buy_item listing_id=%s value_wei=%s",
+        listing_id,
+        value_wei,
+    )
     contract = _get_contract(settings)
     item_id = uuid_to_bytes32(listing_id)
 
