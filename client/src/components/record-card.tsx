@@ -8,8 +8,8 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Coins, Users, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useCurrency } from "@/context/currency-context";
 import { convertEthToCurrency, formatCurrencyAmount } from "@/lib/fx";
+import { useCurrencyStore } from "@/stores/currency-store";
 
 interface RecordCardProps {
   id: string;
@@ -27,7 +27,10 @@ function RecordCard({
   purchaseCount,
 }: RecordCardProps) {
   const navigate = useNavigate();
-  const { preferredCurrency, rates } = useCurrency();
+  const preferredCurrency = useCurrencyStore(
+    (state) => state.preferredCurrency,
+  );
+  const rates = useCurrencyStore((state) => state.rates);
   const equivalent =
     preferredCurrency !== "ETH"
       ? convertEthToCurrency(Number(priceEth), preferredCurrency, rates)
@@ -59,7 +62,10 @@ function RecordCard({
         </div>
 
         <div className="flex items-end justify-between gap-2">
-          <Badge variant="secondary" className="rounded-full px-2.5 py-1 font-mono text-xs">
+          <Badge
+            variant="secondary"
+            className="rounded-full px-2.5 py-1 font-mono text-xs"
+          >
             <span className="inline-flex items-center gap-1">
               <Coins className="h-3 w-3" />
               {priceEth} ETH

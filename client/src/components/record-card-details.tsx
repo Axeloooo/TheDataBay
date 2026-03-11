@@ -23,8 +23,8 @@ import { toast } from "sonner";
 import type { MarketplaceDataItem } from "@/types/contract";
 import { Badge } from "@/components/ui/badge";
 import { weiToEth } from "@/lib/marketplace";
-import { useCurrency } from "@/context/currency-context";
 import { convertEthToCurrency, formatCurrencyAmount } from "@/lib/fx";
+import { useCurrencyStore } from "@/stores/currency-store";
 
 interface RecordCardDetailsProps {
   dataset: MarketplaceDataItem;
@@ -51,7 +51,10 @@ function RecordCardDetails({
   };
 
   const priceEth = weiToEth(dataset.price);
-  const { preferredCurrency, rates } = useCurrency();
+  const preferredCurrency = useCurrencyStore(
+    (state) => state.preferredCurrency,
+  );
+  const rates = useCurrencyStore((state) => state.rates);
   const equivalent =
     preferredCurrency !== "ETH"
       ? convertEthToCurrency(Number(priceEth), preferredCurrency, rates)
@@ -106,7 +109,9 @@ function RecordCardDetails({
         </div>
         <p className="text-muted-foreground">{dataset.description}</p>
         {integrityDetail && integrityStatus !== "verified" && (
-          <p className="mt-2 text-xs text-muted-foreground">{integrityDetail}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {integrityDetail}
+          </p>
         )}
       </div>
 
@@ -176,7 +181,9 @@ function RecordCardDetails({
           <div>
             <p className="text-sm text-muted-foreground">Dataset URL</p>
             <div className="flex items-center gap-2">
-              <p className="flex-1 font-mono text-xs break-all">{dataset.dataset_url}</p>
+              <p className="flex-1 font-mono text-xs break-all">
+                {dataset.dataset_url}
+              </p>
               <Button
                 variant="outline"
                 size="icon"
@@ -302,7 +309,6 @@ function RecordCardDetails({
           </div>
         </CardContent>
       </Card>
-
     </div>
   );
 }

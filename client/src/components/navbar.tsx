@@ -18,7 +18,6 @@ import {
   CircleHelp,
 } from "lucide-react";
 import { Button } from "./ui/button";
-import { useWallet } from "@/providers/wallet-provider";
 import { toast } from "sonner";
 import {
   DropdownMenu,
@@ -26,8 +25,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { useSearch } from "@/context/search-context";
-import { useCurrency } from "@/context/currency-context";
+import { useSearchStore } from "@/stores/search-store";
+import { useCurrencyStore } from "@/stores/currency-store";
+import { useWalletStore } from "@/stores/wallet-store";
 import type { DisplayCurrency } from "@/lib/fx";
 
 function shortAddress(addr: string) {
@@ -35,20 +35,26 @@ function shortAddress(addr: string) {
 }
 
 function Navbar() {
-  const { address, isConnected, connect, disconnect } = useWallet();
-  const { preferredCurrency, setPreferredCurrency, ratesUnavailable } =
-    useCurrency();
+  const address = useWalletStore((state) => state.address);
+  const isConnected = useWalletStore((state) => state.isConnected);
+  const connect = useWalletStore((state) => state.connect);
+  const disconnect = useWalletStore((state) => state.disconnect);
+  const preferredCurrency = useCurrencyStore(
+    (state) => state.preferredCurrency,
+  );
+  const setPreferredCurrency = useCurrencyStore(
+    (state) => state.setPreferredCurrency,
+  );
+  const ratesUnavailable = useCurrencyStore((state) => state.ratesUnavailable);
   const navigate = useNavigate();
   const location = useLocation();
-  const {
-    query,
-    setQuery,
-    submitSearch,
-    clearSearch,
-    resultCount,
-    isSearching,
-    submittedQuery,
-  } = useSearch();
+  const query = useSearchStore((state) => state.query);
+  const setQuery = useSearchStore((state) => state.setQuery);
+  const submitSearch = useSearchStore((state) => state.submitSearch);
+  const clearSearch = useSearchStore((state) => state.clearSearch);
+  const resultCount = useSearchStore((state) => state.resultCount);
+  const isSearching = useSearchStore((state) => state.isSearching);
+  const submittedQuery = useSearchStore((state) => state.submittedQuery);
 
   const executeSearch = () => {
     submitSearch();
@@ -83,7 +89,9 @@ function Navbar() {
             <ArrowLeftRight className="h-4 w-4" />
           </div>
           <div className="min-w-0 leading-tight">
-            <div className="font-display truncate text-base font-semibold">BridgeMart</div>
+            <div className="font-display truncate text-base font-semibold">
+              BridgeMart
+            </div>
             <div className="truncate text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               Cross-chain dataset exchange
             </div>
@@ -118,7 +126,10 @@ function Navbar() {
                 </InputGroupButton>
               </InputGroupAddon>
             )}
-            <InputGroupAddon align="inline-end" className="hidden text-xs sm:flex">
+            <InputGroupAddon
+              align="inline-end"
+              className="hidden text-xs sm:flex"
+            >
               {submittedQuery
                 ? isSearching
                   ? "Searching"
@@ -225,7 +236,8 @@ function Navbar() {
       </div>
       {ratesUnavailable && (
         <p className="mt-2 text-right text-[11px] font-medium text-muted-foreground">
-          Live FX feed unavailable; prices shown in ETH remain accurate on-chain.
+          Live FX feed unavailable; prices shown in ETH remain accurate
+          on-chain.
         </p>
       )}
     </div>

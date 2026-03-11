@@ -10,25 +10,29 @@ import {
 import RecordCard from "@/components/record-card";
 import { backend } from "@/lib/backend";
 import type { MarketplaceDataItem } from "@/types/contract";
-import { useSearch } from "@/context/search-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import ErrorPanel from "@/components/ui/error-panel";
-import { useWallet } from "@/providers/wallet-provider";
 import { weiToEth } from "@/lib/marketplace";
+import { useSearchStore } from "@/stores/search-store";
+import { useWalletStore } from "@/stores/wallet-store";
 
 function Home() {
   const [items, setItems] = useState<MarketplaceDataItem[]>([]);
-  const [purchasedItems, setPurchasedItems] = useState<MarketplaceDataItem[]>([]);
+  const [purchasedItems, setPurchasedItems] = useState<MarketplaceDataItem[]>(
+    [],
+  );
   const [error, setError] = useState<string | null>(null);
   const [purchasesError, setPurchasesError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingPurchases, setLoadingPurchases] = useState(false);
   const requestIdRef = useRef(0);
-  const { address } = useWallet();
+  const address = useWalletStore((state) => state.address);
 
-  const { submittedQuery, setResultCount, setIsSearching, clearSearch } =
-    useSearch();
+  const submittedQuery = useSearchStore((state) => state.submittedQuery);
+  const setResultCount = useSearchStore((state) => state.setResultCount);
+  const setIsSearching = useSearchStore((state) => state.setIsSearching);
+  const clearSearch = useSearchStore((state) => state.clearSearch);
 
   const loadItems = useCallback(async () => {
     const currentRequestId = ++requestIdRef.current;
@@ -38,7 +42,9 @@ function Home() {
     try {
       if (submittedQuery) {
         setIsSearching(true);
-        const response = await backend.similaritySearch({ query: submittedQuery });
+        const response = await backend.similaritySearch({
+          query: submittedQuery,
+        });
         if (currentRequestId !== requestIdRef.current) return;
         setItems(response.results.map((result) => result.item));
         setResultCount(response.count);
@@ -135,14 +141,20 @@ function Home() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Visible listings
               </p>
-              <p className="mt-1 text-2xl font-semibold">{loading ? "..." : items.length}</p>
+              <p className="mt-1 text-2xl font-semibold">
+                {loading ? "..." : items.length}
+              </p>
             </div>
             <div className="rounded-2xl border border-border/70 bg-background/75 p-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Purchased
               </p>
               <p className="mt-1 text-2xl font-semibold">
-                {address ? (loadingPurchases ? "..." : purchasedItems.length) : "-"}
+                {address
+                  ? loadingPurchases
+                    ? "..."
+                    : purchasedItems.length
+                  : "-"}
               </p>
             </div>
             <div className="rounded-2xl border border-border/70 bg-background/75 p-3">
@@ -157,8 +169,12 @@ function Home() {
         {submittedQuery && !loading && !error && (
           <div className="relative mt-5 flex flex-wrap items-center gap-2 rounded-2xl border border-primary/30 bg-primary/8 px-4 py-3 text-sm">
             <Database className="h-4 w-4 text-primary" />
-            <span className="text-muted-foreground">Showing semantic matches for</span>
-            <span className="font-semibold text-foreground">"{submittedQuery}"</span>
+            <span className="text-muted-foreground">
+              Showing semantic matches for
+            </span>
+            <span className="font-semibold text-foreground">
+              "{submittedQuery}"
+            </span>
             <Button
               variant="ghost"
               className="ml-auto h-8 px-2 text-xs"
@@ -178,7 +194,9 @@ function Home() {
               My Purchases
             </h2>
             <span className="text-xs text-muted-foreground">
-              {loadingPurchases ? "Loading..." : `${purchasedItems.length} items`}
+              {loadingPurchases
+                ? "Loading..."
+                : `${purchasedItems.length} items`}
             </span>
           </div>
 
@@ -203,7 +221,9 @@ function Home() {
                   className="group rounded-xl border border-border/75 bg-background/70 p-3 text-xs transition hover:border-primary/50 hover:bg-background"
                 >
                   <p className="font-semibold line-clamp-1">{item.title}</p>
-                  <p className="mt-1 text-muted-foreground">{weiToEth(item.price)} ETH</p>
+                  <p className="mt-1 text-muted-foreground">
+                    {weiToEth(item.price)} ETH
+                  </p>
                   <p className="mt-2 inline-flex items-center gap-1 text-primary">
                     Open listing
                     <ArrowUpRight className="h-3.5 w-3.5" />
@@ -246,7 +266,9 @@ function Home() {
           />
         ) : items.length === 0 ? (
           <div className="rounded-2xl border border-border/75 bg-card/60 p-8 text-center space-y-3">
-            <h2 className="text-2xl font-semibold">No datasets available yet</h2>
+            <h2 className="text-2xl font-semibold">
+              No datasets available yet
+            </h2>
             <p className="mx-auto max-w-lg text-sm text-muted-foreground">
               {submittedQuery
                 ? "No semantic matches found. Try broader keywords or clear search."
