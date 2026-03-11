@@ -45,7 +45,7 @@ function RecordCardDetails({
       toast(`${label} copied to clipboard`, {
         description: text,
       });
-    } catch (error) {
+    } catch {
       toast.error("Failed to copy to clipboard");
     }
   };

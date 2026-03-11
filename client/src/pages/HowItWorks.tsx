@@ -12,122 +12,145 @@ import {
   Download,
   Search,
   Upload,
+  Sparkles,
+  Lock,
+  Database,
+  Network,
 } from "lucide-react";
 
 function HowItWorks() {
   const steps = [
     {
       icon: Search,
-      title: "Browse Datasets",
+      title: "Discover by Semantics",
       description:
-        "Explore our marketplace of high-quality datasets with embeddings. Filter by domain, size, and vector specifications.",
+        "Search by intent and meaning to surface datasets that match model tasks, not just keyword tags.",
     },
     {
       icon: Shield,
-      title: "Verify Integrity",
+      title: "Verify Before Purchase",
       description:
-        "Check SHA-256 hashes and vector specifications. All datasets are cryptographically verifiable before purchase.",
+        "Inspect SHA-256 integrity proofs, metadata, and signatures before spending any funds.",
     },
     {
       icon: Coins,
-      title: "Purchase with Crypto",
+      title: "Settle On-Chain",
       description:
-        "Pay securely with ETH on multiple chains. Smart contracts ensure trustless transactions between buyers and sellers.",
+        "Pay with ETH and receive deterministic access permissions via smart contracts.",
     },
     {
       icon: Download,
-      title: "Download & Use",
+      title: "Decrypt and Download",
       description:
-        "Access your purchased datasets via IPFS. Download CSV data, vector embeddings, and metadata instantly.",
+        "Authorized buyers unlock encrypted payloads and download from IPFS with verification details.",
     },
     {
       icon: Upload,
-      title: "Sell Your Data",
+      title: "List and Monetize",
       description:
-        "List your own datasets with embeddings. Set your price, upload to IPFS, and earn ETH from sales.",
+        "Sellers publish encrypted datasets, define price, and earn from every on-chain purchase.",
     },
     {
       icon: ArrowLeftRight,
-      title: "Cross-Chain Compatible",
+      title: "Expand Cross-Chain",
       description:
-        "Future support for multiple blockchains including Solana and EVM networks for broader accessibility.",
+        "BridgeMart is being prepared for broader interoperability with EVM and Solana ecosystems.",
     },
   ];
 
   return (
-    <div className="min-h-screen">
-      <div className="mx-auto w-full max-w-6xl px-4 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">How It Works</h1>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            BridgeMart is a decentralized marketplace for AI-ready datasets with
-            vector embeddings. Buy and sell data securely across multiple
-            blockchains.
-          </p>
-        </div>
+    <div className="space-y-6 pb-6">
+      <section className="relative overflow-hidden rounded-3xl border border-border/75 bg-card/75 p-7 shadow-[0_24px_60px_-40px_rgba(15,24,47,0.8)] md:p-9">
+        <div className="pointer-events-none absolute -right-12 top-0 h-44 w-44 rounded-full bg-primary/22 blur-3xl" />
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 mb-12">
-          {steps.map((step, index) => {
-            const Icon = step.icon;
-            return (
-              <Card key={index}>
-                <CardHeader>
-                  <div className="flex items-center gap-3 mb-2">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg border bg-primary/10">
-                      <Icon className="h-5 w-5 text-primary" />
-                    </div>
-                    <span className="text-sm font-semibold text-muted-foreground">
-                      Step {index + 1}
-                    </span>
+        <p className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.11em] text-muted-foreground">
+          <Sparkles className="h-3.5 w-3.5" />
+          Process walkthrough
+        </p>
+        <h1 className="mt-4 text-balance text-3xl font-semibold leading-tight md:text-4xl">
+          How BridgeMart moves data from listing to authorized access.
+        </h1>
+        <p className="mt-3 max-w-3xl text-sm text-muted-foreground md:text-base">
+          The platform joins semantic discovery, cryptographic verification,
+          and on-chain settlement into one buyer flow for AI-ready datasets.
+        </p>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {steps.map((step, index) => {
+          const Icon = step.icon;
+          return (
+            <Card
+              key={index}
+              className="group border-border/75 bg-card/65 transition hover:-translate-y-1 hover:border-primary/45"
+            >
+              <CardHeader>
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-border/80 bg-background/75 text-primary">
+                    <Icon className="h-5 w-5" />
                   </div>
-                  <CardTitle>{step.title}</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <CardDescription>{step.description}</CardDescription>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                    Step {index + 1}
+                  </span>
+                </div>
+                <CardTitle className="text-xl">{step.title}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CardDescription className="text-sm leading-relaxed">
+                  {step.description}
+                </CardDescription>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </section>
 
-        <Card className="bg-muted/50">
+      <section className="grid gap-4 lg:grid-cols-3">
+        <Card className="border-border/75 bg-card/65">
           <CardHeader>
-            <CardTitle>Why Use BridgeMart?</CardTitle>
+            <CardTitle className="inline-flex items-center gap-2">
+              <Lock className="h-5 w-5 text-primary" />
+              Trust by Design
+            </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <h3 className="font-semibold mb-2">
-                🔒 Decentralized & Trustless
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                No intermediaries. Smart contracts handle all transactions
-                securely without requiring trust in a central authority.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">🎯 AI-Ready Data</h3>
-              <p className="text-sm text-muted-foreground">
-                All datasets include vector embeddings for semantic search, RAG,
-                and ML applications. Ready to use with your AI pipelines.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">🌐 IPFS Storage</h3>
-              <p className="text-sm text-muted-foreground">
-                Permanent, distributed storage ensures your data is always
-                accessible and censorship-resistant.
-              </p>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-2">✅ Verified Quality</h3>
-              <p className="text-sm text-muted-foreground">
-                Cryptographic hashes guarantee data integrity. Verified sellers
-                maintain quality standards.
-              </p>
-            </div>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Dataset files are encrypted before listing. Keys are only released
+              after contract-level access checks succeed.
+            </p>
           </CardContent>
         </Card>
-      </div>
+
+        <Card className="border-border/75 bg-card/65">
+          <CardHeader>
+            <CardTitle className="inline-flex items-center gap-2">
+              <Database className="h-5 w-5 text-primary" />
+              AI-Ready Assets
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Listings include dataset metadata and embeddings that support RAG,
+              semantic retrieval, and model training workflows.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-border/75 bg-card/65">
+          <CardHeader>
+            <CardTitle className="inline-flex items-center gap-2">
+              <Network className="h-5 w-5 text-primary" />
+              Interoperable Roadmap
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Current execution settles on EVM with ETH. Multi-chain and
+              cross-ecosystem settlement paths are actively planned.
+            </p>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 }

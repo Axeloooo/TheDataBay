@@ -8,18 +8,24 @@ interface LayoutProps {
 
 function Layout({ children }: LayoutProps) {
   const messages = [
-    "⚠️ BridgeMart is in beta development — flows and APIs may evolve quickly.",
-    "🔐 Dataset files are encrypted; key release is gated by on-chain access.",
-    "🧪 Localnet tip: verify MetaMask chain + deployed contract address before signing.",
-    "🚧 Solana cross-chain support (CCIP roadmap) is coming soon.",
-    "⛽ Current settlement is ETH/wei on EVM; multi-asset UX is display-only for now.",
+    "BridgeMart is in beta development - flows and APIs may evolve quickly.",
+    "Dataset files are encrypted; key release is gated by on-chain access.",
+    "Localnet tip: verify MetaMask chain + deployed contract address before signing.",
+    "Solana cross-chain support (CCIP roadmap) is coming soon.",
+    "Current settlement is ETH/wei on EVM; multi-asset UX is display-only for now.",
   ];
 
   return (
     <SearchProvider>
-      <>
-        <div className="beta-marquee border-b bg-amber-100 text-amber-950">
-          <div className="beta-marquee-track">
+      <div className="relative min-h-screen overflow-x-clip">
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <div className="absolute -left-28 top-10 h-72 w-72 rounded-full bg-primary/20 blur-3xl" />
+          <div className="absolute right-0 top-64 h-64 w-64 rounded-full bg-chart-4/25 blur-3xl" />
+          <div className="absolute bottom-8 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-chart-2/12 blur-3xl" />
+        </div>
+
+        <div className="beta-marquee border-y border-border/70 bg-card/55 py-2 text-foreground/90 backdrop-blur">
+          <div className="beta-marquee-track px-4">
             {[...messages, ...messages].map((msg, idx) => (
               <span
                 key={`${idx}-${msg}`}
@@ -31,15 +37,17 @@ function Layout({ children }: LayoutProps) {
             ))}
           </div>
         </div>
-        <header className="sticky top-0 z-50 w-full border-b bg-background">
-          <div className="container mx-auto flex h-16 items-center px-4">
-            <Navbar></Navbar>
+
+        <div className="sticky top-2 z-50 px-2 md:px-4">
+          <div className="mx-auto w-full max-w-7xl rounded-2xl border border-border/80 bg-background/80 shadow-[0_18px_50px_-26px_rgba(15,24,47,0.45)] backdrop-blur-lg">
+            <Navbar />
           </div>
-        </header>
-        <main className="flex-1 w-full">
-          <div className="container mx-auto px-4 py-6">{children}</div>
+        </div>
+
+        <main className="w-full pb-12">
+          <div className="mx-auto w-full max-w-7xl px-4 pt-6 md:px-6">{children}</div>
         </main>
-      </>
+      </div>
     </SearchProvider>
   );
 }
