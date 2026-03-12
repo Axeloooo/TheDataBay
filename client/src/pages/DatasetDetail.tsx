@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Download, KeyRound, ShoppingCart, LoaderCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  KeyRound,
+  ShoppingCart,
+  LoaderCircle,
+} from "lucide-react";
 import RecordCardDetails from "@/components/record-card-details";
 import { backend } from "@/lib/backend";
 import type { MarketplaceDataItem } from "@/types/contract";
-import { useWallet } from "@/providers/wallet-provider";
 import { buyItemTx, isSameAddress, weiToEth } from "@/lib/marketplace";
 import { bytes32ToUuid } from "@/lib/ids";
 import { decodeBase64, decryptAesGcm, utf8Bytes } from "@/lib/crypto";
@@ -15,8 +20,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { fireConfettiBurst } from "@/lib/confetti";
 import { verifyDatasetIntegrity, type IntegrityStatus } from "@/lib/integrity";
-import { useCurrency } from "@/context/currency-context";
-import { convertEthToCurrency, formatCurrencyAmount, type DisplayCurrency } from "@/lib/fx";
+import {
+  convertEthToCurrency,
+  formatCurrencyAmount,
+  type DisplayCurrency,
+} from "@/lib/fx";
+import { useWalletStore } from "@/stores/wallet-store";
+import { useCurrencyStore } from "@/stores/currency-store";
 
 function mapDatasetError(raw: string | null, hasListingUuid: boolean) {
   if (!hasListingUuid) {
@@ -83,8 +93,11 @@ function mapActionError(raw: string | null) {
 function DatasetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { address } = useWallet();
-  const { rates, preferredCurrency } = useCurrency();
+  const address = useWalletStore((state) => state.address);
+  const rates = useCurrencyStore((state) => state.rates);
+  const preferredCurrency = useCurrencyStore(
+    (state) => state.preferredCurrency,
+  );
 
   const [dataset, setDataset] = useState<MarketplaceDataItem | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -93,9 +106,14 @@ function DatasetDetail() {
   const [isBuying, setIsBuying] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isPurchased, setIsPurchased] = useState(false);
-  const [downloadStep, setDownloadStep] = useState<"idle" | "authorizing" | "decrypting" | "downloading">("idle");
-  const [integrityStatus, setIntegrityStatus] = useState<IntegrityStatus>("verifying");
-  const [integrityDetail, setIntegrityDetail] = useState<string | undefined>(undefined);
+  const [downloadStep, setDownloadStep] = useState<
+    "idle" | "authorizing" | "decrypting" | "downloading"
+  >("idle");
+  const [integrityStatus, setIntegrityStatus] =
+    useState<IntegrityStatus>("verifying");
+  const [integrityDetail, setIntegrityDetail] = useState<string | undefined>(
+    undefined,
+  );
 
   const listingUuid = useMemo(() => {
     if (!id) return null;
@@ -180,7 +198,8 @@ function DatasetDetail() {
 
   const canBuy = dataset ? !isSameAddress(dataset.seller, address) : false;
   const priceEth = dataset ? weiToEth(dataset.price) : "0";
-  const [payCurrency, setPayCurrency] = useState<DisplayCurrency>(preferredCurrency);
+  const [payCurrency, setPayCurrency] =
+    useState<DisplayCurrency>(preferredCurrency);
   const equivalent =
     payCurrency !== "ETH"
       ? convertEthToCurrency(Number(priceEth), payCurrency, rates)
@@ -269,7 +288,9 @@ function DatasetDetail() {
               <select
                 id="pay-currency"
                 value={payCurrency}
-                onChange={(event) => setPayCurrency(event.target.value as DisplayCurrency)}
+                onChange={(event) =>
+                  setPayCurrency(event.target.value as DisplayCurrency)
+                }
                 className="h-7 rounded border bg-background px-1"
               >
                 <option value="ETH">ETH</option>
@@ -306,7 +327,9 @@ function DatasetDetail() {
                   });
                   fireConfettiBurst();
                 } catch (err) {
-                  setActionError(err instanceof Error ? err.message : "Purchase failed");
+                  setActionError(
+                    err instanceof Error ? err.message : "Purchase failed",
+                  );
                 } finally {
                   setIsBuying(false);
                 }
@@ -322,7 +345,9 @@ function DatasetDetail() {
                 <>
                   <ShoppingCart className="h-4 w-4" />
                   Buy Item ({priceEth} ETH
-                  {equivalent !== null ? ` • ~${formatCurrencyAmount(equivalent, payCurrency)}` : ""}
+                  {equivalent !== null
+                    ? ` • ~${formatCurrencyAmount(equivalent, payCurrency)}`
+                    : ""}
                   )
                 </>
               )}
@@ -344,10 +369,13 @@ function DatasetDetail() {
               setIsDownloading(true);
               setDownloadStep("authorizing");
               try {
-                const keyResponse = await backend.requestKeyRelease(listingUuid, {
-                  wallet_type: "evm",
-                  address,
-                });
+                const keyResponse = await backend.requestKeyRelease(
+                  listingUuid,
+                  {
+                    wallet_type: "evm",
+                    address,
+                  },
+                );
                 setDownloadStep("decrypting");
                 const datasetUrl = resolveIpfsUrl(dataset.dataset_url);
                 const res = await fetch(datasetUrl);
@@ -380,7 +408,9 @@ function DatasetDetail() {
                 });
                 fireConfettiBurst();
               } catch (err) {
-                setActionError(err instanceof Error ? err.message : "Download failed");
+                setActionError(
+                  err instanceof Error ? err.message : "Download failed",
+                );
               } finally {
                 setIsDownloading(false);
                 setDownloadStep("idle");
