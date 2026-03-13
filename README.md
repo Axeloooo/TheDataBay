@@ -128,15 +128,14 @@ npm run start
 
 ### 📱 Mobile (`mobile/`)
 
-| Command               | What it does                                    |
-| --------------------- | ----------------------------------------------- |
-| `npm run start`       | Start Expo dev server                           |
-| `npm run start:clean` | Reset watchman + clear Metro cache + start Expo |
-| `npm run ios`         | Launch iOS target                               |
-| `npm run android`     | Launch Android target                           |
-| `npm run web`         | Launch web target                               |
-| `npm run lint`        | Run Expo/ESLint checks                          |
-| `npm run test`        | Run mobile Jest tests                           |
+| Command         | What it does                  |
+| --------------- | ----------------------------- |
+| `npm run start` | Start Expo dev server         |
+| `npm run ios`   | Launch iOS target             |
+| `npm run android` | Launch Android target       |
+| `npm run web`   | Launch web target             |
+| `npm run lint`  | Run Expo/ESLint checks        |
+| `npm run test`  | Run mobile Jest tests         |
 
 ### ⛓️ EVM / Foundry (`evm/`)
 
