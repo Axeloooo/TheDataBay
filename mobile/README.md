@@ -84,12 +84,13 @@ npm run lint
 ### Navigation (Expo Router)
 
 ```
-app/
+src/app/
   _layout.tsx          Root stack + StoreBootstrap (FX polling, cache warm)
   (tabs)/
-    _layout.tsx        3 tabs: Marketplace, Search, Wallet
-    index.tsx          Marketplace feed (FlatList, pull-to-refresh)
+    _layout.tsx        4 tabs: Home, Search, Upload, Wallet
+    index.tsx          Home feed (featured & recent datasets, pull-to-refresh)
     search.tsx         Semantic search via AI similarity endpoint
+    upload.tsx         Dataset upload flow
     wallet.tsx         Wallet connection, purchases, currency picker
   dataset/
     [id].tsx           Dataset detail + integrity check + key release + download
