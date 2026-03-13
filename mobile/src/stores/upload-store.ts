@@ -246,6 +246,7 @@ export const useUploadStore = create<UploadStore>()(
 
           return true;
         } catch (error) {
+          get().stopPolling();
           set({
             error:
               error instanceof Error
