@@ -36,23 +36,20 @@ npm install
 
 ### Configure Environment
 
-Environment is configured in `app.json` under `expo.extra`. For development defaults work out of the box:
+Environment is configured via `mobile/app.config.ts` using the `expo.extra` keys that are read by `constants/env.ts`. For development, defaults should work out of the box:
 
-```json
-{
-  "expo": {
-    "extra": {
-      "apiUrl": "http://localhost:8080",
-      "pinataGatewayUrl": "https://gateway.pinata.cloud"
-    }
-  }
-}
+- `expo.extra.apiUrl` – backend API base URL (defaults to `http://localhost:8080`)
+- `expo.extra.pinataGatewayUrl` – IPFS gateway base URL (defaults to `https://gateway.pinata.cloud`)
+
+These values are typically sourced from `.env` / process environment in `app.config.ts`. Refer to that file if you need to see or change the defaults.
+
+To point to a different backend (e.g. when running on a physical device), update the `apiUrl` value (either in your `.env` file or directly in `app.config.ts`) to your machine's local IP, for example:
+
+```text
+API_URL=http://192.168.1.x:8080
 ```
 
-To point to a different backend (e.g. on a physical device), update `apiUrl` to your machine's local IP:
-
-```json
-"apiUrl": "http://192.168.1.x:8080"
+or the equivalent change to `expo.extra.apiUrl` in `mobile/app.config.ts`.
 ```
 
 ### Start the Dev Server
