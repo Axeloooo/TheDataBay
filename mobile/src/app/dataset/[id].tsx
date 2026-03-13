@@ -178,7 +178,14 @@ export default function DatasetDetailScreen() {
     beginMutation("buy");
 
     try {
-      const txHash = await buyItemTx(dataset.id, BigInt(dataset.price));
+      let listingPriceWei: bigint;
+      try {
+        listingPriceWei = BigInt(dataset.price);
+      } catch {
+        throw new Error("Invalid listing price from API.");
+      }
+
+      const txHash = await buyItemTx(dataset.id, listingPriceWei);
       completeMutation(txHash);
       await checkAccess();
       if (address) {
