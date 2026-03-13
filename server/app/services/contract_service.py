@@ -140,8 +140,6 @@ def wallet_id(
         payload = f"{chain}:{addr}"
     elif wallet_type_str == WalletType.SOLANA.value:
         payload = f"solana:{address}"
-    elif wallet_type_str == WalletType.BTC.value:
-        payload = f"bitcoin:{address}"
     else:
         payload = f"{wallet_type_str}:{address}"
     return Web3.keccak(text=payload)
