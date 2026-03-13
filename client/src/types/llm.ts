@@ -19,13 +19,13 @@ export type SignatureInfo = {
 
 export type JobResponse = {
   job_id: string;
-  status: JobLifecycleStatus | string;
+  status: JobLifecycleStatus;
   listing_id: string;
 };
 
 export type JobStatusResponse = {
   job_id: string;
-  status: JobLifecycleStatus | string;
+  status: JobLifecycleStatus;
   listing_id?: string | null;
   created_at: string;
   started_at?: string | null;
