@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import * as FileSystem from "expo-file-system/legacy";
+import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { Stack, useLocalSearchParams } from "expo-router";
 import {
@@ -229,24 +229,22 @@ export default function DatasetDetailScreen() {
       });
 
       setDownloadStep("saving");
-      const filePath = `${FileSystem.documentDirectory}${uuid}.csv`;
-      await FileSystem.writeAsStringAsync(
-        filePath,
-        arrayBufferToBase64(plaintext),
-        {
-          encoding: FileSystem.EncodingType.Base64,
-        },
+      const file = new FileSystem.File(
+        FileSystem.Paths.document,
+        `${uuid}.csv`,
       );
+      file.create({ intermediates: true, overwrite: true });
+      file.write(arrayBufferToBase64(plaintext), { encoding: "base64" });
 
       setDownloadStep("idle");
 
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(filePath, {
+        await Sharing.shareAsync(file.uri, {
           mimeType: "text/csv",
           dialogTitle: `Open ${dataset.title}`,
         });
       } else {
-        Alert.alert("Downloaded", `Saved to ${filePath}`);
+        Alert.alert("Downloaded", `Saved to ${file.uri}`);
       }
     } catch (nextError) {
       setDownloadStep("idle");
