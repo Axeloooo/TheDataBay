@@ -9,13 +9,10 @@ from pydantic import BaseModel, Field
 class WalletType(str, Enum):
     EVM = "evm"
     SOLANA = "solana"
-    BTC = "btc"
 
 
 class KeyReleaseRequest(BaseModel):
-    wallet_type: WalletType = Field(
-        ..., description="Wallet type (evm, solana, btc, etc.)"
-    )
+    wallet_type: WalletType = Field(..., description="Wallet type (evm, solana)")
     address: str = Field(..., description="Wallet address or public key")
 
 
