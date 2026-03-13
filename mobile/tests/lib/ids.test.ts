@@ -37,7 +37,7 @@ describe("ids", () => {
 
     it("throws on wrong length", () => {
       expect(() => bytes32ToUuid("0xABCD")).toThrow(
-        "Invalid bytes32 hex length",
+        "Invalid bytes32 hex format",
       );
     });
   });
