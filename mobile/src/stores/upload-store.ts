@@ -49,12 +49,22 @@ type UploadStore = {
 const STORAGE_KEY = "bridgemart_upload_store_v1";
 
 function parsePriceWei(priceEth: string): string | null {
-  if (!priceEth) {
+  const normalized = priceEth.trim();
+  if (!normalized) {
     return null;
   }
 
-  const [whole, fraction = ""] = priceEth.split(".");
-  const fracPadded = `${fraction}${"0".repeat(18)}`.slice(0, 18);
+  // Accept only non-negative decimal numbers (e.g., 1, 0.5, 10.0001).
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) {
+    return null;
+  }
+
+  const [whole, fraction = ""] = normalized.split(".");
+  if (fraction.length > 18) {
+    return null;
+  }
+
+  const fracPadded = fraction.padEnd(18, "0");
 
   try {
     return (
