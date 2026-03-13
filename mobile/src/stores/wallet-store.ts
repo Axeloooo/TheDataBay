@@ -89,9 +89,8 @@ export const useWalletStore = create<WalletStore>()(
         } finally {
           set({
             ...initialConnection,
+            ...initialMutation,
             configError: getWalletConfigError(),
-            activeMutation: null,
-            transactionHash: null,
           });
         }
       },
