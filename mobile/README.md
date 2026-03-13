@@ -1,50 +1,159 @@
-# Welcome to your Expo app 👋
+# BridgeMart Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Expo + React Native mobile app for the BridgeMart decentralized dataset marketplace.
 
-## Get started
+## Features
 
-1. Install dependencies
+| Feature | Status |
+|---------|--------|
+| Marketplace feed (browse datasets) | ✅ Implemented |
+| Dataset detail view | ✅ Implemented |
+| Semantic search | ✅ Implemented |
+| Wallet / Account screen | ✅ Implemented |
+| Purchased datasets list | ✅ Implemented |
+| Key release + CSV download | ✅ Implemented |
+| Dataset integrity verification | ✅ Implemented |
+| FX rate display (ETH/USD/CAD/EUR) | ✅ Implemented |
+| Deep linking (`mobile://dataset/:id`) | ✅ Implemented |
+| On-chain buy transaction | ⏳ Deferred (requires WalletConnect) |
+| Dataset upload flow | ⏳ Deferred (use web app) |
 
-   ```bash
-   npm install
-   ```
+## Running the App
 
-2. Start the app
+### Prerequisites
 
-   ```bash
-   npx expo start
-   ```
+- Node.js 20+
+- Expo CLI (`npm install -g expo-cli`)
+- Expo Go app on your device, or an iOS/Android simulator
+- The BridgeMart backend running at `http://localhost:8080`
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+### Install Dependencies
 
 ```bash
-npm run reset-project
+cd mobile
+npm install
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+### Configure Environment
 
-## Learn more
+Environment is configured in `app.json` under `expo.extra`. For development defaults work out of the box:
 
-To learn more about developing your project with Expo, look at the following resources:
+```json
+{
+  "expo": {
+    "extra": {
+      "apiUrl": "http://localhost:8080",
+      "pinataGatewayUrl": "https://gateway.pinata.cloud"
+    }
+  }
+}
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+To point to a different backend (e.g. on a physical device), update `apiUrl` to your machine's local IP:
 
-## Join the community
+```json
+"apiUrl": "http://192.168.1.x:8080"
+```
 
-Join our community of developers creating universal apps.
+### Start the Dev Server
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```bash
+# Start Expo dev server
+npx expo start
+
+# Then press:
+# i  → open in iOS Simulator
+# a  → open in Android Emulator
+# Scan QR → open in Expo Go on device
+```
+
+### Run Tests
+
+```bash
+npm test
+```
+
+### Lint
+
+```bash
+npm run lint
+```
+
+## Architecture
+
+### Navigation (Expo Router)
+
+```
+app/
+  _layout.tsx          Root stack + StoreBootstrap (FX polling, cache warm)
+  (tabs)/
+    _layout.tsx        3 tabs: Marketplace, Search, Wallet
+    index.tsx          Marketplace feed (FlatList, pull-to-refresh)
+    search.tsx         Semantic search via AI similarity endpoint
+    wallet.tsx         Wallet connection, purchases, currency picker
+  dataset/
+    [id].tsx           Dataset detail + integrity check + key release + download
+  +not-found.tsx       404 fallback
+```
+
+### State Management (Zustand)
+
+All global state is in `stores/`:
+
+| Store | Persisted | Description |
+|-------|-----------|-------------|
+| `wallet-store.ts` | AsyncStorage | Wallet address, connection state |
+| `marketplace-store.ts` | No | Items list with 60s TTL cache |
+| `search-store.ts` | No | Query and results state |
+| `currency-store.ts` | AsyncStorage | Preferred display currency, FX rates |
+
+### API Integration
+
+`lib/backend.ts` wraps all backend endpoints. Base URL is configured via `constants/env.ts` from `app.json`.
+
+Key endpoints used:
+- `GET /api/v1/contract/items/all` — marketplace feed
+- `GET /api/v1/contract/items/:id` — dataset detail
+- `POST /api/v1/ai/similarity-search` — semantic search
+- `POST /api/v1/contract/access/:id/check` — access verification
+- `POST /api/v1/contract/purchases/by-wallet` — purchased datasets
+- `POST /api/v1/datasets/:id/key` — key release for download
+
+### Wallet Layer
+
+The wallet uses a pluggable adapter pattern (`wallet/adapter.ts`). Currently uses `StubAdapter` which accepts a manually entered EVM address.
+
+To add WalletConnect:
+1. Install `@reown/appkit-react-native`
+2. Implement `WalletAdapter` in `wallet/walletconnect-adapter.ts`
+3. Replace `stubAdapter` import in screens
+
+### Deep Links
+
+Scheme: `mobile://` (configured in `app.json`)
+
+```bash
+# Test deep link to dataset detail
+npx uri-scheme open "mobile://dataset/0xABCD..." --ios
+```
+
+## Directory Structure
+
+```
+mobile/
+  app/              Expo Router screens
+  components/       Reusable UI components
+  constants/        App constants (theme, env config)
+  hooks/            Custom React hooks
+  lib/              Pure utilities (API, crypto, FX, IDs, IPFS)
+  stores/           Zustand state stores
+  types/            TypeScript type definitions
+  wallet/           Wallet adapter interface and stub implementation
+  __tests__/        Unit and store tests
+```
+
+## Intentionally Deferred
+
+- **On-chain buy transactions** — Requires WalletConnect v2. The Buy button shows an informational alert.
+- **Dataset upload** — Requires `expo-document-picker` + real wallet. Use the web app (`client/`).
+- **AES-GCM decryption on old Android** — Uses `crypto.subtle` (Hermes). Fallback seam documented in `lib/crypto.ts`.

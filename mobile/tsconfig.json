@@ -3,8 +3,11 @@
   "compilerOptions": {
     "strict": true,
     "paths": {
+      "@/src/*": [
+        "./src/*"
+      ],
       "@/*": [
-        "./*"
+        "./src/*"
       ]
     }
   },
@@ -13,5 +16,8 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "_screens_disabled/**"
   ]
 }

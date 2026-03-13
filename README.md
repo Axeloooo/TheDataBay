@@ -1,17 +1,20 @@
 # BridgeMart
 
-![Status](https://img.shields.io/badge/status-beta-orange)
-![License](https://img.shields.io/badge/license-Apache--2.0-blue)
-![Node](https://img.shields.io/badge/node-20.x-339933)
-![Python](https://img.shields.io/badge/python-3.11%2B-3776AB)
-![Foundry](https://img.shields.io/badge/foundry-forge%2Fanvil-black)
-![Kubernetes](https://img.shields.io/badge/k8s-minikube-326CE5)
+[![CI](https://github.com/Axeloooo/BridgeMart/actions/workflows/test.yml/badge.svg)](https://github.com/Axeloooo/BridgeMart/actions/workflows/test.yml)
+[![Release](https://github.com/Axeloooo/BridgeMart/actions/workflows/release.yml/badge.svg)](https://github.com/Axeloooo/BridgeMart/actions/workflows/release.yml)
+[![Tag](https://img.shields.io/github/v/tag/Axeloooo/BridgeMart?label=tag)](https://github.com/Axeloooo/BridgeMart/tags)
+[![License](https://img.shields.io/github/license/Axeloooo/BridgeMart)](https://github.com/Axeloooo/BridgeMart/blob/main/LICENSE)
+[![Issues](https://img.shields.io/github/issues/Axeloooo/BridgeMart)](https://github.com/Axeloooo/BridgeMart/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/Axeloooo/BridgeMart)](https://github.com/Axeloooo/BridgeMart/pulls)
+[![Contributors](https://img.shields.io/github/contributors/Axeloooo/BridgeMart)](https://github.com/Axeloooo/BridgeMart/graphs/contributors)
+[![Repo Size](https://img.shields.io/github/repo-size/Axeloooo/BridgeMart)](https://github.com/Axeloooo/BridgeMart)
 
 Decentralized dataset marketplace with encrypted dataset delivery, on-chain listing/payment, and semantic discovery.
 
 ## 📚 Table of Contents
 
 - [Overview](#-overview)
+- [Tech Stack](#-tech-stack)
 - [Architecture](#-architecture)
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
@@ -23,10 +26,22 @@ Decentralized dataset marketplace with encrypted dataset delivery, on-chain list
 ## 🔭 Overview
 
 BridgeMart includes:
+
 - `client/`: React + Vite frontend
+- `mobile/`: Expo React Native app (wallet, search, upload, purchases)
 - `server/`: FastAPI backend (LLM jobs, key release, contract reads)
 - `evm/`: Foundry smart contracts/scripts/tests
 - `infra/development/`: Kubernetes manifests and Dockerfiles used in local dev
+
+## 🧩 Tech Stack
+
+| Layer           | Stack                                                             | Paths                            |
+| --------------- | ----------------------------------------------------------------- | -------------------------------- |
+| Web app         | React, TypeScript, Vite, Zustand, Ethers.js                       | `client/`                        |
+| Mobile app      | Expo, React Native, Expo Router, Zustand, Reown AppKit, Ethers.js | `mobile/`                        |
+| Backend API     | FastAPI, SQLModel, Pydantic, pytest                               | `server/`                        |
+| Smart contracts | Solidity, Foundry (forge/anvil/cast), OpenZeppelin                | `evm/`                           |
+| Dev infra       | Docker, Kubernetes (Minikube), Tilt                               | `infra/development/`, `tiltfile` |
 
 ## 🧱 Architecture
 
@@ -83,110 +98,130 @@ VITE_CONTRACT_ADDRESS=<deployed_marketplace_address>
 VITE_PINATA_GATEWAY_URL=https://gateway.pinata.cloud
 ```
 
+### 4) Run mobile app
+
+```bash
+cd mobile
+npm install
+npm run start
+```
+
 ## 🛠️ Command Catalog
 
 ### 🖥️ Frontend (`client/`)
 
-| Command | What it does |
-|---|---|
-| `npm run dev` | Start Vite dev server |
-| `npm run build` | Type-check and production build |
-| `npm run lint` | Run ESLint |
-| `npm run preview` | Serve built app locally |
+| Command           | What it does                    |
+| ----------------- | ------------------------------- |
+| `npm run dev`     | Start Vite dev server           |
+| `npm run build`   | Type-check and production build |
+| `npm run lint`    | Run ESLint                      |
+| `npm run preview` | Serve built app locally         |
 
 ### ⚙️ Backend (`server/`)
 
-| Command | What it does |
-|---|---|
-| `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` | Run API locally with reload |
-| `pytest` | Run all tests |
-| `pytest tests/services -q` | Run service-level tests only |
-| `pytest tests/services/test_contract_service.py -q` | Focus contract service tests |
+| Command                                                    | What it does                 |
+| ---------------------------------------------------------- | ---------------------------- |
+| `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` | Run API locally with reload  |
+| `pytest`                                                   | Run all tests                |
+| `pytest tests/services -q`                                 | Run service-level tests only |
+| `pytest tests/services/test_contract_service.py -q`        | Focus contract service tests |
+
+### 📱 Mobile (`mobile/`)
+
+| Command               | What it does                                    |
+| --------------------- | ----------------------------------------------- |
+| `npm run start`       | Start Expo dev server                           |
+| `npm run start:clean` | Reset watchman + clear Metro cache + start Expo |
+| `npm run ios`         | Launch iOS target                               |
+| `npm run android`     | Launch Android target                           |
+| `npm run web`         | Launch web target                               |
+| `npm run lint`        | Run Expo/ESLint checks                          |
+| `npm run test`        | Run mobile Jest tests                           |
 
 ### ⛓️ EVM / Foundry (`evm/`)
 
-| Command | What it does |
-|---|---|
-| `forge build` | Compile contracts |
-| `forge test` | Run solidity test suite |
-| `make anvil` | Start local anvil node |
-| `make deploy-anvil` | Deploy `Marketplace` to local anvil |
-| `make seed-anvil` | Seed deterministic demo listings on-chain |
-| `make getall` | Read all on-chain items with `cast` |
-| `make buy-item ITEM_ID=<bytes32> PRICE_WEI=<wei>` | Buy seeded item from CLI |
+| Command                                           | What it does                              |
+| ------------------------------------------------- | ----------------------------------------- |
+| `forge build`                                     | Compile contracts                         |
+| `forge test`                                      | Run solidity test suite                   |
+| `make anvil`                                      | Start local anvil node                    |
+| `make deploy-anvil`                               | Deploy `Marketplace` to local anvil       |
+| `make seed-anvil`                                 | Seed deterministic demo listings on-chain |
+| `make getall`                                     | Read all on-chain items with `cast`       |
+| `make buy-item ITEM_ID=<bytes32> PRICE_WEI=<wei>` | Buy seeded item from CLI                  |
 
 ### 🐳 Docker
 
-| Command | What it does |
-|---|---|
+| Command                                                                             | What it does         |
+| ----------------------------------------------------------------------------------- | -------------------- |
 | `docker build -f infra/development/docker/client.Dockerfile -t bridgemart/client .` | Build frontend image |
-| `docker build -f infra/development/docker/server.Dockerfile -t bridgemart/server .` | Build backend image |
-| `docker images \| grep bridgemart` | Verify built images |
+| `docker build -f infra/development/docker/server.Dockerfile -t bridgemart/server .` | Build backend image  |
+| `docker images \| grep bridgemart`                                                  | Verify built images  |
 
 ### ☸️ Minikube / Kubernetes / Tilt
 
-| Command | What it does |
-|---|---|
-| `minikube start` | Start local Kubernetes cluster |
-| `minikube status` | Check cluster health |
-| `tilt up` | Build and deploy local development stack |
-| `tilt down` | Stop Tilt session |
-| `kubectl get pods -A` | Inspect all pods |
-| `kubectl get svc -A` | Inspect services |
-| `kubectl logs deployment/server -n default` | View server logs |
-| `kubectl logs deployment/client -n default` | View client logs |
-| `kubectl logs statefulset/postgres -n default` | View postgres logs |
-| `kubectl port-forward svc/server-svc 8080:8080` | Expose backend locally |
-| `kubectl port-forward svc/client-svc 5173:5173` | Expose frontend locally |
+| Command                                         | What it does                             |
+| ----------------------------------------------- | ---------------------------------------- |
+| `minikube start`                                | Start local Kubernetes cluster           |
+| `minikube status`                               | Check cluster health                     |
+| `tilt up`                                       | Build and deploy local development stack |
+| `tilt down`                                     | Stop Tilt session                        |
+| `kubectl get pods -A`                           | Inspect all pods                         |
+| `kubectl get svc -A`                            | Inspect services                         |
+| `kubectl logs deployment/server -n default`     | View server logs                         |
+| `kubectl logs deployment/client -n default`     | View client logs                         |
+| `kubectl logs statefulset/postgres -n default`  | View postgres logs                       |
+| `kubectl port-forward svc/server-svc 8080:8080` | Expose backend locally                   |
+| `kubectl port-forward svc/client-svc 5173:5173` | Expose frontend locally                  |
 
 ## 🔌 API Endpoints
 
 ### Health
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `GET` | `/health/` | Basic service health |
-| `GET` | `/health/ready` | Readiness/dependency status |
+| Method | Endpoint        | Purpose                     |
+| ------ | --------------- | --------------------------- |
+| `GET`  | `/health/`      | Basic service health        |
+| `GET`  | `/health/ready` | Readiness/dependency status |
 
 ### LLM / Jobs
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `POST` | `/api/v1/llm/embed/batch` | Upload CSV, enqueue embedding/encryption job |
-| `GET` | `/api/v1/llm/jobs/{job_id}` | Poll job status |
-| `POST` | `/api/v1/llm/embed/query` | Query embedding generation |
+| Method | Endpoint                    | Purpose                                      |
+| ------ | --------------------------- | -------------------------------------------- |
+| `POST` | `/api/v1/llm/embed/batch`   | Upload CSV, enqueue embedding/encryption job |
+| `GET`  | `/api/v1/llm/jobs/{job_id}` | Poll job status                              |
+| `POST` | `/api/v1/llm/embed/query`   | Query embedding generation                   |
 
 ### Similarity Search
 
-| Method | Endpoint | Purpose |
-|---|---|---|
+| Method | Endpoint                       | Purpose                                  |
+| ------ | ------------------------------ | ---------------------------------------- |
 | `POST` | `/api/v1/ai/similarity-search` | Semantic ranking of marketplace datasets |
 
 ### Datasets / Key Release
 
-| Method | Endpoint | Purpose |
-|---|---|---|
+| Method | Endpoint                            | Purpose                                             |
+| ------ | ----------------------------------- | --------------------------------------------------- |
 | `POST` | `/api/v1/datasets/{listing_id}/key` | Release AES key/nonce if wallet has on-chain access |
 
 ### Contract Read/Utility
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `GET` | `/api/v1/contract/items/all` | Get all listings |
-| `GET` | `/api/v1/contract/items/{listing_id}` | Get single listing |
-| `POST` | `/api/v1/contract/access/{listing_id}/check` | Check wallet access |
-| `GET` | `/api/v1/contract/fee-bps` | Current marketplace fee |
-| `GET` | `/api/v1/contract/owner` | Contract owner |
+| Method | Endpoint                                     | Purpose                 |
+| ------ | -------------------------------------------- | ----------------------- |
+| `GET`  | `/api/v1/contract/items/all`                 | Get all listings        |
+| `GET`  | `/api/v1/contract/items/{listing_id}`        | Get single listing      |
+| `POST` | `/api/v1/contract/access/{listing_id}/check` | Check wallet access     |
+| `GET`  | `/api/v1/contract/fee-bps`                   | Current marketplace fee |
+| `GET`  | `/api/v1/contract/owner`                     | Contract owner          |
 
 ### Contract Write/Admin (server-signed where enabled)
 
-| Method | Endpoint | Purpose |
-|---|---|---|
-| `PATCH` | `/api/v1/contract/items/{listing_id}/dataset-url` | Update dataset URL |
-| `PATCH` | `/api/v1/contract/items/{listing_id}/signature` | Update signature URL/hash |
-| `PATCH` | `/api/v1/contract/items/{listing_id}/price` | Update listing price |
-| `PATCH` | `/api/v1/contract/fee-config` | Update fee recipient/bps |
-| `POST` | `/api/v1/contract/items/{listing_id}/grant-access` | Grant access for walletId |
+| Method  | Endpoint                                           | Purpose                   |
+| ------- | -------------------------------------------------- | ------------------------- |
+| `PATCH` | `/api/v1/contract/items/{listing_id}/dataset-url`  | Update dataset URL        |
+| `PATCH` | `/api/v1/contract/items/{listing_id}/signature`    | Update signature URL/hash |
+| `PATCH` | `/api/v1/contract/items/{listing_id}/price`        | Update listing price      |
+| `PATCH` | `/api/v1/contract/fee-config`                      | Update fee recipient/bps  |
+| `POST`  | `/api/v1/contract/items/{listing_id}/grant-access` | Grant access for walletId |
 
 ## 🌱 Seed On-Chain Test Data
 
