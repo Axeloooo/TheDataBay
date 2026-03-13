@@ -119,12 +119,11 @@ Key endpoints used:
 
 ### Wallet Layer
 
-The wallet uses a pluggable adapter pattern (`wallet/adapter.ts`). Currently uses `StubAdapter` which accepts a manually entered EVM address.
+The wallet is integrated via Reown AppKit and a persisted Zustand wallet store.
 
-To add WalletConnect:
-1. Install `@reown/appkit-react-native`
-2. Implement `WalletAdapter` in `wallet/walletconnect-adapter.ts`
-3. Replace `stubAdapter` import in screens
+- Reown AppKit configuration lives in `src/lib/appkit.tsx`.
+- Wallet/account state is managed in a persisted Zustand store under `stores/`.
+- Screens read and update wallet state through this store rather than a manual stub adapter.
 
 ### Deep Links
 
@@ -143,10 +142,10 @@ mobile/
   components/       Reusable UI components
   constants/        App constants (theme, env config)
   hooks/            Custom React hooks
-  lib/              Pure utilities (API, crypto, FX, IDs, IPFS)
-  stores/           Zustand state stores
+  lib/              Pure utilities (API, crypto, FX, IDs, IPFS, AppKit integration)
+  stores/           Zustand state stores (including persisted wallet state)
   types/            TypeScript type definitions
-  wallet/           Wallet adapter interface and stub implementation
+  wallet/           Wallet-related utilities (if present)
   __tests__/        Unit and store tests
 ```
 
