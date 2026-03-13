@@ -51,8 +51,6 @@ API_URL=http://192.168.1.x:8080
 
 or the equivalent change to `expo.extra.apiUrl` in `mobile/app.config.ts`.
 
-````
-
 ### Start the Dev Server
 
 ```bash
@@ -63,7 +61,7 @@ npx expo start
 # i  → open in iOS Simulator
 # a  → open in Android Emulator
 # Scan QR → open in Expo Go on device
-````
+```
 
 ### Run Tests
 
@@ -147,7 +145,7 @@ mobile/
     stores/         Store behavior tests
 ```
 
-## Intentionally Deferred
+## Limitations and Caveats
 
 - **On-chain buy transactions** — Implemented via Reown AppKit + WalletConnect v2 (`buyItemTx`), but advanced wallet features (e.g. custom gas controls) are still easier to use in the web app.
 - **Dataset upload** — Implemented using `expo-document-picker` together with the connected wallet. For large files or advanced options, prefer the web app (`client/`).

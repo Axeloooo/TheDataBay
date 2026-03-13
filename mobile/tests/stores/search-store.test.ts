@@ -8,6 +8,8 @@ beforeEach(() => {
     submittedQuery: "",
     resultCount: null,
     isSearching: false,
+    error: null,
+    results: [],
   });
 });
 

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { Stack, useLocalSearchParams } from "expo-router";
 import {
@@ -236,22 +236,28 @@ export default function DatasetDetailScreen() {
       });
 
       setDownloadStep("saving");
-      const file = new FileSystem.File(
-        FileSystem.Paths.document,
-        `${uuid}.csv`,
+      if (!FileSystem.documentDirectory) {
+        throw new Error("Local storage directory is unavailable.");
+      }
+
+      const filePath = `${FileSystem.documentDirectory}${uuid}.csv`;
+      await FileSystem.writeAsStringAsync(
+        filePath,
+        arrayBufferToBase64(plaintext),
+        {
+          encoding: FileSystem.EncodingType.Base64,
+        },
       );
-      file.create({ intermediates: true, overwrite: true });
-      file.write(arrayBufferToBase64(plaintext), { encoding: "base64" });
 
       setDownloadStep("idle");
 
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(file.uri, {
+        await Sharing.shareAsync(filePath, {
           mimeType: "text/csv",
           dialogTitle: `Open ${dataset.title}`,
         });
       } else {
-        Alert.alert("Downloaded", `Saved to ${file.uri}`);
+        Alert.alert("Downloaded", `Saved to ${filePath}`);
       }
     } catch (nextError) {
       setDownloadStep("idle");
