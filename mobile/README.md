@@ -15,8 +15,8 @@ Expo + React Native mobile app for the BridgeMart decentralized dataset marketpl
 | Dataset integrity verification | ✅ Implemented |
 | FX rate display (ETH/USD/CAD/EUR) | ✅ Implemented |
 | Deep linking (`mobile://dataset/:id`) | ✅ Implemented |
-| On-chain buy transaction | ⏳ Deferred (requires WalletConnect) |
-| Dataset upload flow | ⏳ Deferred (use web app) |
+| On-chain buy transaction | ✅ Implemented (via `buyItemTx`; WalletConnect required) |
+| Dataset upload flow | ✅ Implemented |
 
 ## Running the App
 
