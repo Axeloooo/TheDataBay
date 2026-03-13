@@ -13,6 +13,7 @@ type MarketplaceStore = {
   purchasesError: string | null;
   lastFetchedAt: number | null;
   lastPurchasesFetchedAt: number | null;
+  lastPurchasesAddress: string | null;
   fetchItems: (force?: boolean) => Promise<void>;
   fetchPurchases: (address: string, force?: boolean) => Promise<void>;
   clearPurchases: () => void;
@@ -27,6 +28,7 @@ export const useMarketplaceStore = create<MarketplaceStore>()((set, get) => ({
   purchasesError: null,
   lastFetchedAt: null,
   lastPurchasesFetchedAt: null,
+  lastPurchasesAddress: null,
 
   fetchItems: async (force = false) => {
     const { lastFetchedAt, loading } = get();
@@ -49,48 +51,71 @@ export const useMarketplaceStore = create<MarketplaceStore>()((set, get) => ({
   },
 
   fetchPurchases: async (address, force = false) => {
-    const { purchasesLoading, lastPurchasesFetchedAt, purchases } = get();
+    const normalizedAddress = address.trim().toLowerCase();
+    const {
+      purchasesLoading,
+      lastPurchasesFetchedAt,
+      lastPurchasesAddress,
+      purchases,
+    } = get();
 
-    if (!address) {
+    if (!normalizedAddress) {
       set({
         purchases: [],
         purchasesLoading: false,
         purchasesError: null,
         lastPurchasesFetchedAt: null,
+        lastPurchasesAddress: null,
       });
       return;
     }
 
-    if (purchasesLoading) {
+    if (purchasesLoading && lastPurchasesAddress === normalizedAddress) {
       return;
     }
 
     if (
       !force &&
       purchases.length > 0 &&
+      lastPurchasesAddress === normalizedAddress &&
       lastPurchasesFetchedAt &&
       Date.now() - lastPurchasesFetchedAt < CACHE_TTL_MS
     ) {
       return;
     }
 
-    set({ purchasesLoading: true, purchasesError: null });
+    set({
+      purchasesLoading: true,
+      purchasesError: null,
+      purchases: lastPurchasesAddress === normalizedAddress ? purchases : [],
+      lastPurchasesAddress: normalizedAddress,
+    });
 
     try {
       const response = await backend.getPurchasedItemsByWallet({
         wallet_type: "evm",
-        address,
+        address: normalizedAddress,
         limit: 12,
         offset: 0,
       });
+
+      // Ignore stale responses from previous wallet requests.
+      if (get().lastPurchasesAddress !== normalizedAddress) {
+        return;
+      }
 
       set({
         purchases: response.items,
         purchasesLoading: false,
         purchasesError: null,
         lastPurchasesFetchedAt: Date.now(),
+        lastPurchasesAddress: normalizedAddress,
       });
     } catch (error) {
+      if (get().lastPurchasesAddress !== normalizedAddress) {
+        return;
+      }
+
       const message =
         error instanceof Error
           ? error.message
@@ -109,6 +134,7 @@ export const useMarketplaceStore = create<MarketplaceStore>()((set, get) => ({
       purchasesLoading: false,
       purchasesError: null,
       lastPurchasesFetchedAt: null,
+      lastPurchasesAddress: null,
     });
   },
 }));
