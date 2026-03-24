@@ -28,6 +28,7 @@ type AgentStore = {
   loadAgents: () => Promise<void>;
   loadAgent: (handle: string) => Promise<void>;
   loadPurchaseRequests: (status?: string) => Promise<void>;
+  clearSelectedAgent: () => void;
   setSearchFilter: (search: string) => void;
   setTagFilter: (tag: string) => void;
   setStatusFilter: (status: string) => void;
@@ -85,6 +86,8 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       set({ purchaseRequestError: err instanceof Error ? err.message : "Failed to load purchase requests", loadingPurchaseRequests: false });
     }
   },
+
+  clearSelectedAgent: () => set({ selectedAgent: null, recommendations: [] }),
 
   setSearchFilter: (search) => set((state) => ({ filters: { ...state.filters, search } })),
   setTagFilter: (tag) => set((state) => ({ filters: { ...state.filters, tag } })),
