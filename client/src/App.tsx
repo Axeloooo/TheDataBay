@@ -7,6 +7,9 @@ import HowItWorks from "@/pages/HowItWorks";
 import Upload from "@/pages/Upload";
 import DatasetDetail from "@/pages/DatasetDetail";
 import NotFound from "@/pages/NotFound";
+import Agents from "@/pages/Agents";
+import AgentProfile from "@/pages/AgentProfile";
+import PurchaseRequests from "@/pages/PurchaseRequests";
 import { AppBootstrap } from "@/bootstrap/app-bootstrap";
 
 function App() {
@@ -44,6 +47,30 @@ function App() {
             element={
               <Layout>
                 <DatasetDetail />
+              </Layout>
+            }
+          />
+          <Route
+            path="/agents"
+            element={
+              <Layout>
+                <Agents />
+              </Layout>
+            }
+          />
+          <Route
+            path="/agents/:handle"
+            element={
+              <Layout>
+                <AgentProfile />
+              </Layout>
+            }
+          />
+          <Route
+            path="/purchase-requests"
+            element={
+              <Layout>
+                <PurchaseRequests />
               </Layout>
             }
           />

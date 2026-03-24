@@ -12,7 +12,7 @@ interface DatasetRecommendationsProps {
 export function DatasetRecommendations({ listingId }: DatasetRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<AgentRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [, setError] = useState(false);
 
   useEffect(() => {
     let active = true;

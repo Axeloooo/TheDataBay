@@ -9,7 +9,7 @@ import type {
 import type { KeyReleaseRequest, KeyReleaseResponse } from "@/types/dataset";
 import type { JobResponse, JobStatusResponse } from "@/types/llm";
 import type { SimilaritySearchRequest, SimilaritySearchResponse } from "@/types/ai";
-import type { Agent, AgentListResponse, AgentRecommendation, RecommendationListResponse, PurchaseRequest, PurchaseRequestListResponse } from "@/types/agent";
+import type { Agent, AgentListResponse, RecommendationListResponse, PurchaseRequest, PurchaseRequestListResponse } from "@/types/agent";
 
 export const backend = {
   submitEmbedBatch: (formData: FormData) =>

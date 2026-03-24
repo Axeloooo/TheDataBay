@@ -17,6 +17,7 @@ import { decodeBase64, decryptAesGcm, utf8Bytes } from "@/lib/crypto";
 import { resolveIpfsUrl } from "@/lib/ipfs";
 import ErrorPanel from "@/components/ui/error-panel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DatasetRecommendations } from "@/components/dataset-recommendations";
 import { toast } from "sonner";
 import { fireConfettiBurst } from "@/lib/confetti";
 import { verifyDatasetIntegrity, type IntegrityStatus } from "@/lib/integrity";
@@ -271,6 +272,7 @@ function DatasetDetail() {
           integrityStatus={integrityStatus}
           integrityDetail={integrityDetail}
         />
+        {listingUuid && <DatasetRecommendations listingId={listingUuid} />}
         {actionError && (
           <div className="mt-4">
             <ErrorPanel
