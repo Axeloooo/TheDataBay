@@ -3,19 +3,21 @@ load("ext://restart_process", "docker_build_with_restart")
 
 ### K8s Config ###
 
-k8s_yaml("./infra/development/k8s/secrets.yaml")
+k8s_yaml("./infra/k8s/development/secrets.yaml")
 
 ### End of K8s Config ###
 ### PostgreSQL ###
 
-k8s_yaml("./infra/development/k8s/postgres.yaml")
+k8s_yaml("./infra/k8s/development/postgres.yaml")
 k8s_resource("postgres", port_forwards=5432, labels="database")
 
 ### End of PostgreSQL ###
 ### Adminer ###
 
-k8s_yaml("./infra/development/k8s/adminer.yaml")
-k8s_resource("adminer", port_forwards=8081, resource_deps=["postgres"], labels="adminer")
+k8s_yaml("./infra/k8s/development/adminer.yaml")
+k8s_resource(
+    "adminer", port_forwards=8081, resource_deps=["postgres"], labels="adminer"
+)
 
 ### End of Adminer ###
 ### UI ###
@@ -23,12 +25,12 @@ k8s_resource("adminer", port_forwards=8081, resource_deps=["postgres"], labels="
 docker_build_with_restart(
     "bridgemart/client",
     ".",
-    dockerfile="./infra/development/docker/client.Dockerfile",
+    dockerfile="./infra/docker/development/client.Dockerfile",
     entrypoint="npm run dev -- --host 0.0.0.0 --port 5173",
     live_update=[sync("./client", "/app")],
 )
 
-k8s_yaml("./infra/development/k8s/client-deployment.yaml")
+k8s_yaml("./infra/k8s/development/client-deployment.yaml")
 k8s_resource("client", port_forwards=5173, labels="client")
 
 ### End of UI ###
@@ -37,12 +39,12 @@ k8s_resource("client", port_forwards=5173, labels="client")
 docker_build_with_restart(
     "bridgemart/server",
     ".",
-    dockerfile="./infra/development/docker/server.Dockerfile",
+    dockerfile="./infra/docker/development/server.Dockerfile",
     entrypoint="fastapi dev app/main.py --host 0.0.0.0 --port 8080",
     live_update=[sync("./server", "/code")],
 )
 
-k8s_yaml("./infra/development/k8s/server-deployment.yaml")
+k8s_yaml("./infra/k8s/development/server-deployment.yaml")
 k8s_resource("server", port_forwards=8080, resource_deps=["postgres"], labels="server")
 
 ### End of API ###
