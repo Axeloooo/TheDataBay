@@ -121,18 +121,58 @@ Expo Router with file-based routing under `mobile/src/app/`.
 
 ## Agent Skills
 
-Skills are located under `.agents/skills/` (for all agents). Agents **must** load and follow the relevant skill(s) before starting any task in the corresponding area.
+Skills are located under `.agents/skills/` (shared across agents in this repo).  
+Agents **must read the selected skill's `SKILL.md` before implementation** and follow its workflow, constraints, and quality checks.
 
-| Skill                         | Path                                          | When to use                                                                         |
-| ----------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/` | Any `client/` React/Vite work — performance, data fetching, re-renders, bundle size |
-| `vercel-react-native-skills`  | `.agents/skills/vercel-react-native-skills/`  | Any `mobile/` Expo/React Native work                                                |
-| `react-state-management`      | `.agents/skills/react-state-management/`      | Zustand store additions or refactors in `client/` or `mobile/`                      |
-| `typescript-advanced-types`   | `.agents/skills/typescript-advanced-types/`   | Complex TypeScript types, generics, or utility types                                |
-| `shadcn`                      | `.agents/skills/shadcn/`                      | Adding or modifying shadcn/ui components in `client/`                               |
-| `frontend-design`             | `.agents/skills/frontend-design/`             | Building or redesigning UI pages and components                                     |
-| `api-design-principles`       | `.agents/skills/api-design-principles/`       | Adding or changing FastAPI routes in `server/`                                      |
-| `solskill`                    | `.agents/skills/solskill/`                    | Any Solidity / `evm/` smart contract work                                           |
-| `brainstorming`               | `.agents/skills/brainstorming/`               | Before implementing any new feature or significant change                           |
-| `systematic-debugging`        | `.agents/skills/systematic-debugging/`        | Diagnosing bugs or unexpected test failures                                         |
-| `subagent-driven-development` | `.agents/skills/subagent-driven-development/` | Executing multi-task implementation plans in parallel                               |
+### Skill Loading Protocol (Required)
+
+1. **Classify the request** by domain (`client/`, `mobile/`, `server/`, `evm/`, docs/copy, debugging, or orchestration).
+2. **Load mandatory foundation skills first**:
+   - `brainstorming` before creative feature work, behavior changes, or significant refactors.
+   - `systematic-debugging` before attempting fixes for bugs, flaky tests, or unknown failures.
+3. **Load one or more domain skills** based on touched code.
+4. **Compose skills when needed** (foundation + domain + specialist), avoiding conflicting instructions.
+5. **Execute and verify** using commands/tests defined in this document.
+6. **Report what was used** in the final response (which skills drove decisions and checks).
+
+### Skill Selection Matrix
+
+| Skill                         | Path                                          | Primary trigger                                                          |
+| ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------ |
+| `brainstorming`               | `.agents/skills/brainstorming/`               | Any new feature, behavior change, or non-trivial redesign before coding  |
+| `systematic-debugging`        | `.agents/skills/systematic-debugging/`        | Bug investigation, failing tests, regressions, or unclear root cause     |
+| `subagent-driven-development` | `.agents/skills/subagent-driven-development/` | Multi-track work that can be safely parallelized                         |
+| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/` | `client/` React/Vite changes, performance, rendering, data fetching      |
+| `frontend-design`             | `.agents/skills/frontend-design/`             | UI-heavy pages/components requiring high design quality                  |
+| `shadcn`                      | `.agents/skills/shadcn/`                      | Add/fix/style shadcn/ui components in `client/`                          |
+| `react-state-management`      | `.agents/skills/react-state-management/`      | Zustand/global state refactors in `client/` or `mobile/`                 |
+| `typescript-advanced-types`   | `.agents/skills/typescript-advanced-types/`   | Complex TS generics, utility types, or type-level constraints            |
+| `vercel-react-native-skills`  | `.agents/skills/vercel-react-native-skills/`  | `mobile/` Expo/React Native features, perf, platform APIs                |
+| `fastapi-templates`           | `.agents/skills/fastapi-templates/`           | FastAPI route/service scaffolding, dependency injection, API structure   |
+| `api-design-principles`       | `.agents/skills/api-design-principles/`       | API contract design, endpoint semantics, request/response consistency    |
+| `solskill`                    | `.agents/skills/solskill/`                    | Solidity/Foundry contract logic, testing, and security-sensitive changes |
+| `copywriting`                 | `.agents/skills/copywriting/`                 | Marketing/product copy improvements and messaging                        |
+| `skill-creator`               | `.agents/skills/skill-creator/`               | Create/update/evaluate repository skills                                 |
+
+### Recommended Skill Combinations
+
+- **New API endpoint**: `brainstorming` -> `api-design-principles` + `fastapi-templates`
+- **API bug/regression**: `systematic-debugging` -> `api-design-principles` (and `fastapi-templates` if structural)
+- **Client UI feature**: `brainstorming` -> `frontend-design` + `vercel-react-best-practices` (+ `shadcn` if used)
+- **State management changes**: `brainstorming` -> `react-state-management` (+ `typescript-advanced-types` if type-heavy)
+- **Mobile feature/perf issue**: `brainstorming` or `systematic-debugging` -> `vercel-react-native-skills`
+- **Contract feature/fix**: `brainstorming` or `systematic-debugging` -> `solskill`
+
+### Agent Optimization Rules
+
+- Prefer the **smallest correct skill set**; do not load unrelated skills.
+- If multiple skills apply, prioritize in this order: **safety/debugging -> architecture/design -> framework-specific -> type/perf polish**.
+- Re-check skill guidance when task scope expands (for example from UI tweak to state refactor).
+- Match verification depth to risk: contract and backend auth/payment paths require stronger validation.
+
+### Anti-Patterns (Do Not Do)
+
+- Starting implementation without reading the relevant `SKILL.md`.
+- Using only domain skills when debugging is required (skip-root-cause behavior).
+- Applying `frontend-design` for purely data/model/backend tasks.
+- Overusing `subagent-driven-development` for tightly coupled, sequential edits.
