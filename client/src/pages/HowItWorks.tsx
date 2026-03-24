@@ -22,39 +22,39 @@ function HowItWorks() {
   const steps = [
     {
       icon: Search,
-      title: "Discover by Semantics",
+      title: "Search by Meaning",
       description:
-        "Search by intent and meaning to surface datasets that match model tasks, not just keyword tags.",
+        "Describe what your model needs in plain language. BridgeMart ranks datasets by semantic similarity — so the right asset surfaces even when the listing uses different words.",
     },
     {
       icon: Shield,
-      title: "Verify Before Purchase",
+      title: "Verify Before You Spend",
       description:
-        "Inspect SHA-256 integrity proofs, metadata, and signatures before spending any funds.",
+        "Every listing exposes SHA-256 integrity proofs, seller signatures, and structured metadata. Read everything — commit nothing — until you're sure.",
     },
     {
       icon: Coins,
-      title: "Settle On-Chain",
+      title: "Pay On-Chain, Get Provable Access",
       description:
-        "Pay with ETH and receive deterministic access permissions via smart contracts.",
+        "A smart contract records your purchase on Ethereum. No approval queues, no invoices — your access rights are on-chain and verifiable by anyone, anytime.",
     },
     {
       icon: Download,
-      title: "Decrypt and Download",
+      title: "Your Key, Your Data",
       description:
-        "Authorized buyers unlock encrypted payloads and download from IPFS with verification details.",
+        "Once the contract confirms ownership, the decryption key is released. Download from IPFS and verify the payload against the listed hash before using it.",
     },
     {
       icon: Upload,
-      title: "List and Monetize",
+      title: "Publish Once, Earn Every Time",
       description:
-        "Sellers publish encrypted datasets, define price, and earn from every on-chain purchase.",
+        "Upload your dataset, set a price, and let the contract handle the rest. Every purchase settles automatically — no billing cycles, no chargebacks.",
     },
     {
       icon: ArrowLeftRight,
-      title: "Expand Cross-Chain",
+      title: "Built for What's Next",
       description:
-        "BridgeMart is being prepared for broader interoperability with EVM and Solana ecosystems.",
+        "Settlement runs on EVM with ETH today. Multi-chain support for Solana and additional EVM networks is actively in development.",
     },
   ];
 
@@ -65,14 +65,15 @@ function HowItWorks() {
 
         <p className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/65 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.11em] text-muted-foreground">
           <Sparkles className="h-3.5 w-3.5" />
-          Process walkthrough
+          How it works
         </p>
         <h1 className="mt-4 text-balance text-3xl font-semibold leading-tight md:text-4xl">
-          How BridgeMart moves data from listing to authorized access.
+          From encrypted listing to verified download — no middlemen, no guesswork.
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-muted-foreground md:text-base">
-          The platform joins semantic discovery, cryptographic verification,
-          and on-chain settlement into one buyer flow for AI-ready datasets.
+          Find the right dataset, confirm its integrity, pay on-chain, and
+          download — the entire flow runs without custodians or trust
+          assumptions.
         </p>
       </section>
 
@@ -115,8 +116,9 @@ function HowItWorks() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Dataset files are encrypted before listing. Keys are only released
-              after contract-level access checks succeed.
+              Every dataset is AES-encrypted before it reaches IPFS. The
+              decryption key is only released when on-chain ownership is
+              confirmed — the contract is the gatekeeper, not a person.
             </p>
           </CardContent>
         </Card>
@@ -130,8 +132,9 @@ function HowItWorks() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Listings include dataset metadata and embeddings that support RAG,
-              semantic retrieval, and model training workflows.
+              Every listing ships with embeddings and structured metadata. Drop
+              datasets directly into RAG pipelines, fine-tuning jobs, or
+              retrieval benchmarks — no reformatting required.
             </p>
           </CardContent>
         </Card>
@@ -145,8 +148,9 @@ function HowItWorks() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              Current execution settles on EVM with ETH. Multi-chain and
-              cross-ecosystem settlement paths are actively planned.
+              EVM + ETH settlement is live today. Solana and additional EVM
+              chains are on the roadmap — so the datasets you list now will
+              reach a broader buyer pool as the network grows.
             </p>
           </CardContent>
         </Card>
