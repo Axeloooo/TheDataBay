@@ -94,7 +94,7 @@ def list_agents(
         count_statement = count_statement.where(search_filter)
 
     if tag is not None:
-        tag_filter = col(Agent.capability_tags).contains(tag)
+        tag_filter = col(Agent.capability_tags).contains(f'"{tag}"')
         statement = statement.where(tag_filter)
         count_statement = count_statement.where(tag_filter)
 

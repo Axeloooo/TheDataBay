@@ -172,7 +172,10 @@ async def generate_recommendation_route(
     query = body.get("query", "").strip()
     if not query:
         raise HTTPException(status_code=422, detail="query is required")
-    return await generate_recommendation_service(agent.id, query, session, ai_service, settings)
+    result = await generate_recommendation_service(agent.id, query, session, ai_service, settings)
+    if result is None:
+        raise HTTPException(status_code=404, detail="No matching datasets found for query")
+    return result
 
 
 @router.get("/{handle}/recommendations", response_model=RecommendationListResponse)

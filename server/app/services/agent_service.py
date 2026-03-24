@@ -2,10 +2,10 @@
 Business logic service for agentic layer operations.
 """
 
+import asyncio
 import uuid
 from typing import Optional
 
-from fastapi import HTTPException
 from sqlmodel import Session
 
 from ..models.agent import AgentRecommendation
@@ -14,6 +14,8 @@ from ..services.ai_service import AIService
 from ..services.contract_service import get_all_items
 from ..config.settings import Settings
 
+MIN_SIMILARITY_SCORE = 0.1
+
 
 async def generate_recommendation(
     agent_id: uuid.UUID,
@@ -21,7 +23,7 @@ async def generate_recommendation(
     session: Session,
     ai_service: AIService,
     settings: Settings,
-) -> AgentRecommendation:
+) -> Optional[AgentRecommendation]:
     """Generate an agent recommendation for the best-matching dataset.
 
     Fetches all marketplace items from the smart contract, ranks them using
@@ -36,19 +38,21 @@ async def generate_recommendation(
         settings: Application settings (used by contract_service)
 
     Returns:
-        AgentRecommendation: The newly created recommendation record
-
-    Raises:
-        HTTPException: 404 if no matching datasets are found
+        Optional[AgentRecommendation]: The newly created recommendation record,
+        or None if no matching datasets are found or score is below threshold.
     """
-    datasets = get_all_items(settings)
+    loop = asyncio.get_event_loop()
+    datasets = await loop.run_in_executor(None, get_all_items, settings)
 
     results = await ai_service.rank_datasets(query, datasets)
 
     if not results:
-        raise HTTPException(status_code=404, detail="No matching datasets found")
+        return None
 
     top = results[0]
+
+    if top.score < MIN_SIMILARITY_SCORE:
+        return None
 
     raw_score = float(top.score)
     confidence = max(0.0, min(1.0, raw_score))
