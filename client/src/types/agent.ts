@@ -41,6 +41,7 @@ export type AgentRecommendation = {
 export type RecommendationListResponse = {
   recommendations: AgentRecommendation[];
   count: number;
+  total: number;
 };
 
 export type PurchaseRequest = {
@@ -59,4 +60,5 @@ export type PurchaseRequest = {
 export type PurchaseRequestListResponse = {
   requests: PurchaseRequest[];
   count: number;
+  total: number;
 };
