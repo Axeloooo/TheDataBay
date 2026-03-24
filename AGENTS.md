@@ -41,7 +41,7 @@ npm run test       # Jest tests
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 pytest                                                    # All tests
 pytest tests/services/test_contract_service.py -q        # Single test file
@@ -86,7 +86,7 @@ Layered FastAPI architecture: **Routers → Services → Models/Schemas**
 - `app/models/` — SQLModel database models (PostgreSQL)
 - `app/config/settings.py` — All config via Pydantic `BaseSettings` with env var aliases; copy `server/.env.example` → `server/.env`
 
-Key API endpoints (base: `http://localhost:8080`):
+Key API endpoints (base: `http://localhost:8000`):
 
 - `/api/v1/llm/embed/batch` — Batch embedding pipeline for datasets
 - `/api/v1/ai/similarity-search` — Semantic ranking against marketplace listings
@@ -118,3 +118,21 @@ Expo Router with file-based routing under `mobile/src/app/`.
 - **Server**: Python 3.11+; requires `.env` from `.env.example`
 - **EVM**: Foundry toolchain; requires `.env` from `.env.example` (Anvil RPC URL, private keys, fee config)
 - **Full stack**: Docker + Minikube for Tilt-based orchestration
+
+## Agent Skills
+
+Skills are located under `.agents/skills/` (for all agents). Agents **must** load and follow the relevant skill(s) before starting any task in the corresponding area.
+
+| Skill                         | Path                                          | When to use                                                                         |
+| ----------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/` | Any `client/` React/Vite work — performance, data fetching, re-renders, bundle size |
+| `vercel-react-native-skills`  | `.agents/skills/vercel-react-native-skills/`  | Any `mobile/` Expo/React Native work                                                |
+| `react-state-management`      | `.agents/skills/react-state-management/`      | Zustand store additions or refactors in `client/` or `mobile/`                      |
+| `typescript-advanced-types`   | `.agents/skills/typescript-advanced-types/`   | Complex TypeScript types, generics, or utility types                                |
+| `shadcn`                      | `.agents/skills/shadcn/`                      | Adding or modifying shadcn/ui components in `client/`                               |
+| `frontend-design`             | `.agents/skills/frontend-design/`             | Building or redesigning UI pages and components                                     |
+| `api-design-principles`       | `.agents/skills/api-design-principles/`       | Adding or changing FastAPI routes in `server/`                                      |
+| `solskill`                    | `.agents/skills/solskill/`                    | Any Solidity / `evm/` smart contract work                                           |
+| `brainstorming`               | `.agents/skills/brainstorming/`               | Before implementing any new feature or significant change                           |
+| `systematic-debugging`        | `.agents/skills/systematic-debugging/`        | Diagnosing bugs or unexpected test failures                                         |
+| `subagent-driven-development` | `.agents/skills/subagent-driven-development/` | Executing multi-task implementation plans in parallel                               |

@@ -118,3 +118,21 @@ Expo Router with file-based routing under `mobile/src/app/`.
 - **Server**: Python 3.11+; requires `.env` from `.env.example`
 - **EVM**: Foundry toolchain; requires `.env` from `.env.example` (Anvil RPC URL, private keys, fee config)
 - **Full stack**: Docker + Minikube for Tilt-based orchestration
+
+## Agent Skills
+
+Skills are located under `.claude/skills/` (for Claude Code). Agents **must** load and follow the relevant skill(s) before starting any task in the corresponding area.
+
+| Skill                         | Path                                          | When to use                                                                         |
+| ----------------------------- | --------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/` | Any `client/` React/Vite work — performance, data fetching, re-renders, bundle size |
+| `vercel-react-native-skills`  | `.agents/skills/vercel-react-native-skills/`  | Any `mobile/` Expo/React Native work                                                |
+| `react-state-management`      | `.agents/skills/react-state-management/`      | Zustand store additions or refactors in `client/` or `mobile/`                      |
+| `typescript-advanced-types`   | `.agents/skills/typescript-advanced-types/`   | Complex TypeScript types, generics, or utility types                                |
+| `shadcn`                      | `.agents/skills/shadcn/`                      | Adding or modifying shadcn/ui components in `client/`                               |
+| `frontend-design`             | `.agents/skills/frontend-design/`             | Building or redesigning UI pages and components                                     |
+| `api-design-principles`       | `.agents/skills/api-design-principles/`       | Adding or changing FastAPI routes in `server/`                                      |
+| `solskill`                    | `.agents/skills/solskill/`                    | Any Solidity / `evm/` smart contract work                                           |
+| `brainstorming`               | `.agents/skills/brainstorming/`               | Before implementing any new feature or significant change                           |
+| `systematic-debugging`        | `.agents/skills/systematic-debugging/`        | Diagnosing bugs or unexpected test failures                                         |
+| `subagent-driven-development` | `.agents/skills/subagent-driven-development/` | Executing multi-task implementation plans in parallel                               |
