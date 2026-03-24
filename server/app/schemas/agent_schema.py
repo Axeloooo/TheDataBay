@@ -3,10 +3,10 @@ Pydantic schemas for agentic layer endpoints.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class AgentCreateRequest(BaseModel):
@@ -54,6 +54,14 @@ class AgentResponse(BaseModel):
     created_at: datetime = Field(..., description="Timestamp when the agent was created")
     updated_at: datetime = Field(..., description="Timestamp when the agent was last updated")
 
+    @field_validator("capability_tags", mode="before")
+    @classmethod
+    def parse_capability_tags(cls, v):
+        if isinstance(v, str):
+            import json
+            return json.loads(v)
+        return v
+
 
 class AgentListResponse(BaseModel):
     """Response model for listing agents."""
@@ -85,12 +93,21 @@ class RecommendationResponse(BaseModel):
     created_at: datetime = Field(..., description="Timestamp when the recommendation was created")
     updated_at: datetime = Field(..., description="Timestamp when the recommendation was last updated")
 
+    @field_validator("pros", "cons", "suggested_use_cases", mode="before")
+    @classmethod
+    def parse_list_fields(cls, v):
+        if isinstance(v, str):
+            import json
+            return json.loads(v)
+        return v
+
 
 class RecommendationListResponse(BaseModel):
     """Response model for listing recommendations."""
 
     recommendations: List[RecommendationResponse] = Field(..., description="List of recommendations")
     count: int = Field(..., description="Number of recommendations in this response")
+    total: int = Field(..., description="Total number of recommendations available")
 
 
 class PurchaseRequestCreate(BaseModel):
@@ -119,7 +136,7 @@ class PurchaseRequestResponse(BaseModel):
     agent_id: UUID = Field(..., description="ID of the agent receiving the request")
     listing_id: str = Field(..., description="ID of the requested listing")
     requester_address: str = Field(..., description="Ethereum address of the requester")
-    status: str = Field(..., description="Status of the purchase request")
+    status: Literal["pending", "approved", "rejected"] = Field(..., description="Status of the purchase request")
     reason: str = Field(..., description="Reason for the purchase request")
     reviewed_at: Optional[datetime] = Field(None, description="Timestamp when the request was reviewed")
     reviewed_by: Optional[str] = Field(None, description="Ethereum address of the reviewer")
@@ -132,3 +149,4 @@ class PurchaseRequestListResponse(BaseModel):
 
     requests: List[PurchaseRequestResponse] = Field(..., description="List of purchase requests")
     count: int = Field(..., description="Number of requests in this response")
+    total: int = Field(..., description="Total number of purchase requests available")
