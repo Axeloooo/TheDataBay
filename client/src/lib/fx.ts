@@ -1,4 +1,4 @@
-export type DisplayCurrency = "ETH" | "CAD" | "USD" | "EUR" | "USDC" | "SOL";
+export type DisplayCurrency = "ETH" | "CAD" | "USD" | "EUR" | "USDC" | "SOL" | "YUAN" | "USDT";
 
 export type FxRates = {
   ethUsd: number;

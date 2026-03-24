@@ -16,6 +16,8 @@ import {
   Orbit,
   Sparkles,
   CircleHelp,
+  Bot,
+  ShoppingCart,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
@@ -25,6 +27,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { cn } from "@/lib/utils";
 import { useSearchStore } from "@/stores/search-store";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { useWalletStore } from "@/stores/wallet-store";
@@ -163,22 +166,43 @@ function Navbar() {
             )}
           </NavLink>
 
-          <select
-            aria-label="Preferred currency"
-            className="h-9 rounded-md border border-border/80 bg-background/75 px-2 text-xs font-medium"
-            value={preferredCurrency}
-            onChange={(event) =>
-              setPreferredCurrency(event.target.value as DisplayCurrency)
-            }
-            title="Display currency (payments remain ETH on-chain)"
-          >
-            <option value="ETH">ETH</option>
-            <option value="CAD">CAD</option>
-            <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
-            <option value="USDC">USDC</option>
-            <option value="SOL">SOL</option>
-          </select>
+          <NavLink to="/agents">
+            {({ isActive }) => (
+              <Button
+                variant="ghost"
+                className={`h-9 gap-1.5 px-2 text-xs md:px-3 md:text-sm ${
+                  isActive ? "bg-accent text-accent-foreground" : ""
+                }`}
+              >
+                <Bot className="h-4 w-4" />
+                <span className="hidden md:inline">Agents</span>
+              </Button>
+            )}
+          </NavLink>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-9 gap-1.5 border-border/80 bg-background/75 px-2 text-xs font-medium md:px-3"
+                title="Display currency (payments remain ETH on-chain)"
+              >
+                {preferredCurrency}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[120px]">
+              {(["ETH", "USD", "CAD", "EUR", "USDC", "SOL", "YUAN", "USDT"] as DisplayCurrency[]).map((c) => (
+                <DropdownMenuItem
+                  key={c}
+                  onClick={() => setPreferredCurrency(c)}
+                  className={cn("gap-2 text-xs", preferredCurrency === c ? "bg-accent" : "")}
+                >
+                  {c}
+                  {preferredCurrency === c && <span className="ml-auto text-xs">✓</span>}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {isConnected && (
             <Link to="/upload">
@@ -190,6 +214,22 @@ function Navbar() {
                 <span className="hidden md:inline">Sell Data</span>
               </Button>
             </Link>
+          )}
+
+          {isConnected && (
+            <NavLink to="/purchase-requests">
+              {({ isActive }) => (
+                <Button
+                  variant="ghost"
+                  className={`h-9 gap-1.5 px-2 text-xs md:px-3 md:text-sm ${
+                    isActive ? "bg-accent text-accent-foreground" : ""
+                  }`}
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  <span className="hidden md:inline">Requests</span>
+                </Button>
+              )}
+            </NavLink>
           )}
 
           {!isConnected ? (
