@@ -10,6 +10,7 @@ import uuid
 from typing import Any
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from .config.settings import Settings, get_settings
 from .routers import (
     health_router,
@@ -18,7 +19,9 @@ from .routers import (
     datasets_router,
     contract_router,
 )
+from .routers import agent_router
 from .database.engine import create_db_and_tables
+from .models import agent as _agent_models  # noqa: F401 — registers tables with SQLModel metadata
 
 settings: Settings = get_settings()
 
@@ -77,6 +80,9 @@ app.include_router(llm_router.router)
 app.include_router(ai_router.router)
 app.include_router(datasets_router.router)
 app.include_router(contract_router.router)
+app.include_router(agent_router.router)
+app.include_router(agent_router.purchase_router)
+app.include_router(agent_router.rec_router)
 
 
 @app.middleware("http")
@@ -109,6 +115,12 @@ async def request_logging_middleware(request: Request, call_next):
         elapsed_ms,
     )
     return response
+
+
+@app.get("/skill.md")
+async def serve_skill_md():
+    """Serve the skill.md file for agent discovery."""
+    return FileResponse("skill.md", media_type="text/markdown")
 
 
 @app.get("/")
