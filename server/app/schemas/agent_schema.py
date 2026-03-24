@@ -150,3 +150,9 @@ class PurchaseRequestListResponse(BaseModel):
     requests: List[PurchaseRequestResponse] = Field(..., description="List of purchase requests")
     count: int = Field(..., description="Number of requests in this response")
     total: int = Field(..., description="Total number of purchase requests available")
+
+
+class RecommendQueryRequest(BaseModel):
+    """Request body for generating a dataset recommendation."""
+
+    query: str = Field(..., description="Search query to find the best matching dataset")

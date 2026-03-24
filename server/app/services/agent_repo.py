@@ -244,6 +244,19 @@ def list_recommendations(
     return list(recs), total
 
 
+def get_recommendation_by_id(session: Session, rec_id: uuid.UUID) -> Optional[AgentRecommendation]:
+    """Get a recommendation by its primary key ID.
+
+    Args:
+        session: Database session
+        rec_id: UUID primary key of the recommendation
+
+    Returns:
+        Optional[AgentRecommendation]: Recommendation record or None if not found
+    """
+    return session.get(AgentRecommendation, rec_id)
+
+
 def retract_recommendation(
     session: Session, rec: AgentRecommendation
 ) -> AgentRecommendation:
@@ -346,6 +359,19 @@ def list_purchase_requests(
     total = session.exec(count_statement).one()
     reqs = session.exec(statement.offset(offset).limit(limit)).all()
     return list(reqs), total
+
+
+def get_purchase_request_by_id(session: Session, request_id: uuid.UUID) -> Optional[AgentPurchaseRequest]:
+    """Get a purchase request by its primary key ID.
+
+    Args:
+        session: Database session
+        request_id: UUID primary key of the purchase request
+
+    Returns:
+        Optional[AgentPurchaseRequest]: Purchase request record or None if not found
+    """
+    return session.get(AgentPurchaseRequest, request_id)
 
 
 def review_purchase_request(

@@ -7,6 +7,7 @@ import logging
 import os
 import time
 import uuid
+from pathlib import Path
 from typing import Any
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +25,8 @@ from .database.engine import create_db_and_tables
 from .models import agent as _agent_models  # noqa: F401 — registers tables with SQLModel metadata
 
 settings: Settings = get_settings()
+
+SKILL_MD_PATH = Path(__file__).resolve().parent.parent.parent / "skill.md"
 
 logging.basicConfig(
     level=getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO),
@@ -120,7 +123,7 @@ async def request_logging_middleware(request: Request, call_next):
 @app.get("/skill.md")
 async def serve_skill_md():
     """Serve the skill.md file for agent discovery."""
-    return FileResponse("skill.md", media_type="text/markdown")
+    return FileResponse(str(SKILL_MD_PATH), media_type="text/markdown")
 
 
 @app.get("/")

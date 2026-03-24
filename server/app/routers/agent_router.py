@@ -16,12 +16,13 @@ from ..services.agent_repo import (
     get_agent_by_handle,
     list_agents,
     update_agent,
-    deactivate_agent,
     create_recommendation,
     list_recommendations,
+    get_recommendation_by_id,
     retract_recommendation as retract_recommendation_repo,
     create_purchase_request,
     list_purchase_requests,
+    get_purchase_request_by_id,
     review_purchase_request as review_purchase_request_repo,
 )
 from ..services.agent_service import generate_recommendation as generate_recommendation_service
@@ -38,6 +39,7 @@ from ..schemas.agent_schema import (
     PurchaseRequestReview,
     PurchaseRequestResponse,
     PurchaseRequestListResponse,
+    RecommendQueryRequest,
 )
 
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
@@ -148,7 +150,7 @@ def update_agent_route(
 @router.post("/{handle}/recommend", response_model=RecommendationResponse)
 async def generate_recommendation_route(
     handle: str,
-    body: dict,
+    body: RecommendQueryRequest,
     session: Session = Depends(get_session),
     ai_service: AIService = Depends(get_ai_service),
     settings: Settings = Depends(get_settings),
@@ -158,7 +160,7 @@ async def generate_recommendation_route(
 
     Args:
         handle (str): Unique agent handle.
-        body (dict): Request body containing ``query`` key.
+        body (RecommendQueryRequest): Request body containing ``query`` field.
         session (Session): Database session.
         ai_service (AIService): AI service instance.
         settings (Settings): Application settings.
@@ -169,9 +171,7 @@ async def generate_recommendation_route(
     agent = get_agent_by_handle(session, handle)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    query = body.get("query", "").strip()
-    if not query:
-        raise HTTPException(status_code=422, detail="query is required")
+    query = body.query.strip()
     result = await generate_recommendation_service(agent.id, query, session, ai_service, settings)
     if result is None:
         raise HTTPException(status_code=404, detail="No matching datasets found for query")
@@ -223,9 +223,8 @@ def retract_recommendation_route(
     agent = get_agent_by_handle(session, handle)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    recs, _ = list_recommendations(session, agent_id=agent.id)
-    rec = next((r for r in recs if r.id == rec_id), None)
-    if not rec:
+    rec = get_recommendation_by_id(session, rec_id)
+    if not rec or rec.agent_id != agent.id:
         raise HTTPException(status_code=404, detail="Recommendation not found")
     return retract_recommendation_repo(session, rec)
 
@@ -329,8 +328,7 @@ def review_purchase_request_route(
     Returns:
         PurchaseRequestResponse: Updated purchase request.
     """
-    reqs, _ = list_purchase_requests(session)
-    req = next((r for r in reqs if r.id == request_id), None)
+    req = get_purchase_request_by_id(session, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Purchase request not found")
     return review_purchase_request_repo(session, req, data.status, data.reviewed_by)
