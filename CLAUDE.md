@@ -41,7 +41,7 @@ npm run test       # Jest tests
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
 pytest                                                    # All tests
 pytest tests/services/test_contract_service.py -q        # Single test file
@@ -86,7 +86,7 @@ Layered FastAPI architecture: **Routers → Services → Models/Schemas**
 - `app/models/` — SQLModel database models (PostgreSQL)
 - `app/config/settings.py` — All config via Pydantic `BaseSettings` with env var aliases; copy `server/.env.example` → `server/.env`
 
-Key API endpoints (base: `http://localhost:8000`):
+Key API endpoints (base: `http://localhost:8080`):
 
 - `/api/v1/llm/embed/batch` — Batch embedding pipeline for datasets
 - `/api/v1/ai/similarity-search` — Semantic ranking against marketplace listings
