@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import List, Literal, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class AgentCreateRequest(BaseModel):
@@ -38,6 +38,8 @@ class AgentUpdateRequest(BaseModel):
 
 class AgentResponse(BaseModel):
     """Response model for a single agent."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: UUID = Field(..., description="Unique identifier (UUID)")
     handle: str = Field(..., description="Unique handle for the agent")
@@ -73,6 +75,8 @@ class AgentListResponse(BaseModel):
 
 class RecommendationResponse(BaseModel):
     """Response model for a single recommendation."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: UUID = Field(..., description="Unique identifier (UUID)")
     agent_id: UUID = Field(..., description="ID of the agent making the recommendation")
@@ -131,6 +135,8 @@ class PurchaseRequestReview(BaseModel):
 
 class PurchaseRequestResponse(BaseModel):
     """Response model for a single purchase request."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     id: UUID = Field(..., description="Unique identifier (UUID)")
     agent_id: UUID = Field(..., description="ID of the agent receiving the request")

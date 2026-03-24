@@ -33,6 +33,22 @@ import { useCurrencyStore } from "@/stores/currency-store";
 import { useWalletStore } from "@/stores/wallet-store";
 import type { DisplayCurrency } from "@/lib/fx";
 
+type CurrencyOption = {
+  code: DisplayCurrency;
+  icon: string;
+};
+
+const CURRENCY_OPTIONS = [
+  { code: "ETH", icon: "/eth-logo.svg" },
+  { code: "USD", icon: "/usa-flag.svg" },
+  { code: "CAD", icon: "/canada-flag.svg" },
+  { code: "EUR", icon: "/eu-flag.svg" },
+  { code: "USDC", icon: "/usdc-logo.svg" },
+  { code: "SOL", icon: "/sol-logo.svg" },
+  { code: "CNY", icon: "/china-flag.svg" },
+  { code: "USDT", icon: "/usdt-logo.svg" },
+] as const satisfies readonly CurrencyOption[];
+
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
@@ -58,6 +74,9 @@ function Navbar() {
   const resultCount = useSearchStore((state) => state.resultCount);
   const isSearching = useSearchStore((state) => state.isSearching);
   const submittedQuery = useSearchStore((state) => state.submittedQuery);
+  const selectedCurrency = CURRENCY_OPTIONS.find(
+    (option) => option.code === preferredCurrency,
+  );
 
   const executeSearch = () => {
     submitSearch();
@@ -187,18 +206,37 @@ function Navbar() {
                 className="h-9 gap-1.5 border-border/80 bg-background/75 px-2 text-xs font-medium md:px-3"
                 title="Display currency (payments remain ETH on-chain)"
               >
+                {selectedCurrency && (
+                  <img
+                    src={selectedCurrency.icon}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-4 w-4 shrink-0 rounded-sm object-contain"
+                  />
+                )}
                 {preferredCurrency}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[120px]">
-              {(["ETH", "USD", "CAD", "EUR", "USDC", "SOL", "CNY", "USDT"] as DisplayCurrency[]).map((c) => (
+              {CURRENCY_OPTIONS.map((option) => (
                 <DropdownMenuItem
-                  key={c}
-                  onClick={() => setPreferredCurrency(c)}
-                  className={cn("gap-2 text-xs", preferredCurrency === c ? "bg-accent" : "")}
+                  key={option.code}
+                  onClick={() => setPreferredCurrency(option.code)}
+                  className={cn(
+                    "gap-2 text-xs",
+                    preferredCurrency === option.code ? "bg-accent" : "",
+                  )}
                 >
-                  {c}
-                  {preferredCurrency === c && <span className="ml-auto text-xs">✓</span>}
+                  <img
+                    src={option.icon}
+                    alt=""
+                    aria-hidden="true"
+                    className="h-4 w-4 shrink-0 rounded-sm object-contain"
+                  />
+                  <span>{option.code}</span>
+                  {preferredCurrency === option.code && (
+                    <span className="ml-auto text-xs">✓</span>
+                  )}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>

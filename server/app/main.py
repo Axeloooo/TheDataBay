@@ -7,11 +7,9 @@ import logging
 import os
 import time
 import uuid
-from pathlib import Path
 from typing import Any
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
 from .config.settings import Settings, get_settings
 from .routers import (
     health_router,
@@ -22,11 +20,8 @@ from .routers import (
 )
 from .routers import agent_router
 from .database.engine import create_db_and_tables
-from .models import agent as _agent_models  # noqa: F401 — registers tables with SQLModel metadata
 
 settings: Settings = get_settings()
-
-SKILL_MD_PATH = Path(__file__).resolve().parent.parent.parent / "skill.md"
 
 logging.basicConfig(
     level=getattr(logging, os.getenv("LOG_LEVEL", "INFO").upper(), logging.INFO),
@@ -58,10 +53,14 @@ async def lifespan(app: FastAPI):
         Generator[None, Any, None]: Generator that yields None
     """
     create_db_and_tables()
-    if os.getenv("ENVIRONMENT") == "development" and os.getenv("SEED_AGENTS", "").lower() == "true":
+    if (
+        os.getenv("ENVIRONMENT") == "development"
+        and os.getenv("SEED_AGENTS", "").lower() == "true"
+    ):
         from .database.engine import get_engine
         from sqlmodel import Session as SQLSession
         from .seeds.agent_seeds import seed_agents
+
         engine = get_engine()
         with SQLSession(engine) as session:
             seed_agents(session)
@@ -101,7 +100,9 @@ async def request_logging_middleware(request: Request, call_next):
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
     started = time.perf_counter()
     base_logger = logging.LoggerAdapter(logger, {"request_id": request_id})
-    base_logger.info("request.start method=%s path=%s", request.method, request.url.path)
+    base_logger.info(
+        "request.start method=%s path=%s", request.method, request.url.path
+    )
 
     try:
         response = await call_next(request)
@@ -125,12 +126,6 @@ async def request_logging_middleware(request: Request, call_next):
         elapsed_ms,
     )
     return response
-
-
-@app.get("/skill.md")
-async def serve_skill_md():
-    """Serve the skill.md file for agent discovery."""
-    return FileResponse(str(SKILL_MD_PATH), media_type="text/markdown")
 
 
 @app.get("/")

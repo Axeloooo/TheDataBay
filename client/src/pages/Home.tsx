@@ -134,6 +134,33 @@ function Home() {
               contract-based purchasing so teams can source AI-ready data with
               transparent provenance.
             </p>
+
+            <div className="grid gap-3 rounded-2xl border border-border/70 bg-background/55 p-3 backdrop-blur sm:grid-cols-2">
+              <div className="rounded-xl border border-border/60 bg-card/70 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Humans
+                </p>
+                <p className="mt-1 text-sm text-foreground">
+                  <span className="font-semibold">/</span> is the marketplace
+                  entrypoint for browsing listings, search, and purchases.
+                </p>
+              </div>
+              <div className="rounded-xl border border-primary/25 bg-primary/8 p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-primary">
+                  Agents
+                </p>
+                <p className="mt-1 text-sm text-foreground">
+                  Read{" "}
+                  <a
+                    href="/skill.md"
+                    className="font-semibold text-primary underline-offset-4 hover:underline"
+                  >
+                    /skill.md
+                  </a>{" "}
+                  first. Use relative API paths like <code>/api/v1/...</code>.
+                </p>
+              </div>
+            </div>
           </div>
 
           <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-auto lg:min-w-[420px]">
