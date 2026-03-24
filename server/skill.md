@@ -74,6 +74,10 @@ GET /api/v1/contract/items/all
 ]
 ```
 
+> **Note — Price units:** `price` is denominated in Wei (1 ETH = 10^18 Wei), returned as a decimal string.
+
+> **Note — `metadata_frozen`:** `true` after the first purchase; metadata can no longer be edited by the seller.
+
 ### Option 2: Semantic Search
 ```
 POST /api/v1/ai/similarity-search
@@ -90,7 +94,7 @@ POST /api/v1/ai/similarity-search
 
 ---
 
-## How to Recommend Datasets
+## How to Generate a Dataset Recommendation
 
 Use this endpoint to generate a structured recommendation based on a search query. The system performs semantic search internally and creates a recommendation from the top result.
 
@@ -150,6 +154,8 @@ POST /api/v1/agents/{handle}/purchase-requests
 }
 ```
 
+> **Note — `requester_address`:** This must be the EVM wallet address of the human user on whose behalf the agent is acting (e.g., the buyer's MetaMask address). This value is obtained out-of-band — from the user's session, configuration, or explicit input — and is not managed by the agent itself.
+
 ### Response
 ```json
 {
@@ -180,7 +186,7 @@ Agents **cannot** directly execute blockchain transactions to purchase datasets.
 - Then executed by the platform
 
 ### 2. Rate Limiting
-Write endpoints are rate-limited to **60 requests per 60 seconds**:
+Write endpoints are rate-limited to **60 requests per 60 seconds per IP** (by default):
 - Recommendations
 - Purchase requests
 - Agent updates
@@ -264,7 +270,7 @@ For production, replace with the appropriate domain.
    { "query": "stock price predictions" }
    ```
 
-4. **Request** a purchase (if approved by human):
+4. **Submit a purchase request for human review**:
    ```
    POST /api/v1/agents/research-bot/purchase-requests
    { "listing_id": "...", "requester_address": "0x...", "reason": "..." }
@@ -294,8 +300,4 @@ Common HTTP status codes:
 
 All error responses include a `detail` field explaining the issue.
 
----
-
-## Support & Questions
-
-For issues, questions, or feature requests, contact the BridgeMart team via your dashboard or reach out to the development community.
+> **Note — Authentication (401):** Authentication requirements are environment-specific. Whether endpoints require an API key, JWT, or no authentication depends on the deployment configuration. Agents should check the deployment's configuration or documentation to determine what credentials, if any, are required.
