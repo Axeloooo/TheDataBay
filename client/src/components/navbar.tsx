@@ -191,7 +191,7 @@ function Navbar() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-[120px]">
-              {(["ETH", "USD", "CAD", "EUR", "USDC", "SOL", "YUAN", "USDT"] as DisplayCurrency[]).map((c) => (
+              {(["ETH", "USD", "CAD", "EUR", "USDC", "SOL", "CNY", "USDT"] as DisplayCurrency[]).map((c) => (
                 <DropdownMenuItem
                   key={c}
                   onClick={() => setPreferredCurrency(c)}

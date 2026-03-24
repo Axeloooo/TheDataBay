@@ -299,6 +299,8 @@ function DatasetDetail() {
                 <option value="EUR">EUR</option>
                 <option value="USDC">USDC</option>
                 <option value="SOL">SOL</option>
+                <option value="CNY">CNY</option>
+                <option value="USDT">USDT</option>
               </select>
             </div>
             <p>Execution currently uses ETH/wei on-chain.</p>

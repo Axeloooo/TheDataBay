@@ -33,6 +33,8 @@ function normalizeCurrency(raw: string): DisplayCurrency {
     case "USDC":
     case "SOL":
     case "ETH":
+    case "CNY":
+    case "USDT":
       return raw.trim() as DisplayCurrency;
     default:
       return "ETH";

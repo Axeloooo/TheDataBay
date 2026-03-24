@@ -308,6 +308,8 @@ function Upload() {
                     <option value="EUR">EUR</option>
                     <option value="USDC">USDC</option>
                     <option value="SOL">SOL</option>
+                    <option value="CNY">CNY</option>
+                    <option value="USDT">USDT</option>
                   </select>
                   <p className="text-xs text-muted-foreground">
                     Execution currently uses ETH/wei on-chain.

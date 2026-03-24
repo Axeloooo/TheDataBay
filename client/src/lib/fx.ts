@@ -1,4 +1,4 @@
-export type DisplayCurrency = "ETH" | "CAD" | "USD" | "EUR" | "USDC" | "SOL" | "YUAN" | "USDT";
+export type DisplayCurrency = "ETH" | "CAD" | "USD" | "EUR" | "USDC" | "SOL" | "CNY" | "USDT";
 
 export type FxRates = {
   ethUsd: number;
@@ -6,6 +6,8 @@ export type FxRates = {
   ethEur: number;
   ethUsdc: number;
   ethSol: number;
+  ethCny: number;
+  ethUsdt: number;
   updatedAt: number;
 };
 
@@ -14,14 +16,14 @@ const DEFAULT_TTL_MS = 60_000;
 
 export async function fetchFxRates(): Promise<FxRates> {
   const response = await fetch(
-    "https://api.coingecko.com/api/v3/simple/price?ids=ethereum,solana,usd-coin&vs_currencies=usd,cad,eur",
+    "https://api.coingecko.com/api/v3/simple/price?ids=ethereum,solana,usd-coin&vs_currencies=usd,cad,eur,cny",
   );
   if (!response.ok) {
     throw new Error(`FX request failed (${response.status})`);
   }
 
   const data = (await response.json()) as {
-    ethereum?: { usd?: number; cad?: number; eur?: number };
+    ethereum?: { usd?: number; cad?: number; eur?: number; cny?: number };
     solana?: { usd?: number };
     "usd-coin"?: { usd?: number };
   };
@@ -29,10 +31,11 @@ export async function fetchFxRates(): Promise<FxRates> {
   const ethUsd = data.ethereum?.usd ?? 0;
   const ethCad = data.ethereum?.cad ?? 0;
   const ethEur = data.ethereum?.eur ?? 0;
+  const ethCny = data.ethereum?.cny ?? 0;
   const solUsd = data.solana?.usd ?? 0;
   const usdcUsd = data["usd-coin"]?.usd ?? 1;
 
-  if (ethUsd <= 0 || ethCad <= 0 || ethEur <= 0) {
+  if (ethUsd <= 0 || ethCad <= 0 || ethEur <= 0 || ethCny <= 0) {
     throw new Error("FX payload missing ETH rates");
   }
 
@@ -42,6 +45,8 @@ export async function fetchFxRates(): Promise<FxRates> {
     ethEur,
     ethUsdc: usdcUsd > 0 ? ethUsd / usdcUsd : ethUsd,
     ethSol: solUsd > 0 ? ethUsd / solUsd : 0,
+    ethCny,
+    ethUsdt: ethUsd,  // USDT ≈ 1 USD
     updatedAt: Date.now(),
   };
 
@@ -82,6 +87,10 @@ export function convertEthToCurrency(
       return ethAmount * rates.ethUsdc;
     case "SOL":
       return rates.ethSol > 0 ? ethAmount * rates.ethSol : null;
+    case "CNY":
+      return ethAmount * rates.ethCny;
+    case "USDT":
+      return ethAmount * rates.ethUsdt;
     default:
       return null;
   }
@@ -91,7 +100,7 @@ export function formatCurrencyAmount(
   value: number,
   currency: DisplayCurrency,
 ): string {
-  if (currency === "ETH" || currency === "USDC" || currency === "SOL") {
+  if (currency === "ETH" || currency === "USDC" || currency === "SOL" || currency === "USDT") {
     return `${value.toLocaleString(undefined, {
       maximumFractionDigits: 4,
     })} ${currency}`;
