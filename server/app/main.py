@@ -58,6 +58,13 @@ async def lifespan(app: FastAPI):
         Generator[None, Any, None]: Generator that yields None
     """
     create_db_and_tables()
+    if os.getenv("ENVIRONMENT") == "development" and os.getenv("SEED_AGENTS", "").lower() == "true":
+        from .database.engine import get_engine
+        from sqlmodel import Session as SQLSession
+        from .seeds.agent_seeds import seed_agents
+        engine = get_engine()
+        with SQLSession(engine) as session:
+            seed_agents(session)
     yield
 
 
