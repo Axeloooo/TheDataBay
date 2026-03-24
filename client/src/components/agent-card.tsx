@@ -28,7 +28,7 @@ export function AgentCard({ agent, className }: AgentCardProps) {
           />
         ) : (
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/70 bg-background/60 text-muted-foreground">
-            <Bot className="h-5 w-5" />
+            <Bot className="h-5 w-5" aria-hidden="true" />
           </div>
         )}
         <div className="min-w-0 flex-1">

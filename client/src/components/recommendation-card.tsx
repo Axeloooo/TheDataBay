@@ -18,7 +18,7 @@ export function RecommendationCard({ recommendation, className }: Recommendation
       {/* Always-visible AI-generated badge */}
       <div className="flex items-center justify-between mb-3">
         <Badge className="gap-1 bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
-          <Bot className="h-3 w-3" />
+          <Bot className="h-3 w-3" aria-hidden="true" />
           AI-generated
         </Badge>
         {recommendation.is_retracted && (
@@ -32,7 +32,14 @@ export function RecommendationCard({ recommendation, className }: Recommendation
           <span>Confidence</span>
           <span className="font-medium">{confidencePct}%</span>
         </div>
-        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+        <div
+          className="h-1.5 rounded-full bg-muted overflow-hidden"
+          role="progressbar"
+          aria-valuenow={confidencePct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label="Confidence"
+        >
           <div
             className={cn(
               "h-full rounded-full transition-all",
@@ -52,22 +59,22 @@ export function RecommendationCard({ recommendation, className }: Recommendation
           {recommendation.pros.length > 0 && (
             <div>
               <div className="flex items-center gap-1 font-medium text-green-600 dark:text-green-400 mb-1">
-                <ThumbsUp className="h-3 w-3" />
+                <ThumbsUp className="h-3 w-3" aria-hidden="true" />
                 Pros
               </div>
               <ul className="space-y-0.5 text-muted-foreground">
-                {recommendation.pros.map((p, i) => <li key={i}>• {p}</li>)}
+                {recommendation.pros.map((p, i) => <li key={`${p}-${i}`}>• {p}</li>)}
               </ul>
             </div>
           )}
           {recommendation.cons.length > 0 && (
             <div>
               <div className="flex items-center gap-1 font-medium text-red-600 dark:text-red-400 mb-1">
-                <ThumbsDown className="h-3 w-3" />
+                <ThumbsDown className="h-3 w-3" aria-hidden="true" />
                 Cons
               </div>
               <ul className="space-y-0.5 text-muted-foreground">
-                {recommendation.cons.map((c, i) => <li key={i}>• {c}</li>)}
+                {recommendation.cons.map((c, i) => <li key={`${c}-${i}`}>• {c}</li>)}
               </ul>
             </div>
           )}

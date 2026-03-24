@@ -12,6 +12,7 @@ interface DatasetRecommendationsProps {
 export function DatasetRecommendations({ listingId }: DatasetRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<AgentRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -21,8 +22,10 @@ export function DatasetRecommendations({ listingId }: DatasetRecommendationsProp
         if (!active) return;
         setRecommendations(res.recommendations);
       })
-      .catch(() => {
-        // Silently fail — recommendations are non-critical
+      .catch((err) => {
+        console.error("Failed to load recommendations:", err);
+        if (!active) return;
+        setError(true);
       })
       .finally(() => {
         if (!active) return;
