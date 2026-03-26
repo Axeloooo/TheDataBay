@@ -153,6 +153,7 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 | `solskill`                    | `.agents/skills/solskill/`                    | Solidity/Foundry contract logic, testing, and security-sensitive changes |
 | `copywriting`                 | `.agents/skills/copywriting/`                 | Marketing/product copy improvements and messaging                        |
 | `skill-creator`               | `.agents/skills/skill-creator/`               | Create/update/evaluate repository skills                                 |
+| `python-testing-patterns`     | `.agents/skills/python-testing-patterns/`     | Python test design, fixtures, mocking, and best practices                |
 
 ### Recommended Skill Combinations
 
