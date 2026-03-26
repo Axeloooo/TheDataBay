@@ -80,10 +80,16 @@ class CreateItemRequest(BaseModel):
     description: str = Field(..., min_length=1, description="Item description")
     seller: str = Field(..., description="Seller EVM address")
     price: int = Field(..., gt=0, description="Price in USDC atomic units")
-    dataset_url: str = Field(..., min_length=1, description="Encrypted dataset IPFS URL")
-    dataset_hash: str = Field(..., min_length=1, description="Dataset sha256 hash (0x...)")
+    dataset_url: str = Field(
+        ..., min_length=1, description="Encrypted dataset IPFS URL"
+    )
+    dataset_hash: str = Field(
+        ..., min_length=1, description="Dataset sha256 hash (0x...)"
+    )
     signature_url: str = Field(..., min_length=1, description="Signature IPFS URL")
-    signature_hash: str = Field(..., min_length=1, description="Signature sha256 hash (0x...)")
+    signature_hash: str = Field(
+        ..., min_length=1, description="Signature sha256 hash (0x...)"
+    )
 
 
 class PurchasedItemsRequest(BaseModel):

@@ -22,7 +22,9 @@ class Agent(SQLModel, table=True):
     bio: Optional[str] = None
     homepage_url: Optional[str] = None
     capability_tags: str = "[]"  # JSON-as-TEXT, stores list[str]
-    verification_status: str = "unverified"  # "unverified" | "self_attested" | "platform_verified"
+    verification_status: str = (
+        "unverified"  # "unverified" | "self_attested" | "platform_verified"
+    )
     owner_address: Optional[str] = None
     is_active: bool = True
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

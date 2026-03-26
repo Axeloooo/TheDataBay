@@ -5,7 +5,6 @@ Pydantic schemas for Marketplace endpoints.
 from typing import Literal
 from pydantic import BaseModel, Field
 
-
 SETTLEMENT_CURRENCY = "USDC"
 SETTLEMENT_DECIMALS = 6
 
@@ -13,7 +12,9 @@ SETTLEMENT_DECIMALS = 6
 class MarketplaceDataItem(BaseModel):
     """Schema for a single data item."""
 
-    id: str = Field(..., description="Unique identifier (bytes32 hex) for the data item")
+    id: str = Field(
+        ..., description="Unique identifier (bytes32 hex) for the data item"
+    )
     title: str = Field(..., description="Title of the data item")
     description: str = Field(..., description="Description of the data item")
     seller: str = Field(..., description="Seller address")
@@ -22,7 +23,8 @@ class MarketplaceDataItem(BaseModel):
         default=SETTLEMENT_CURRENCY, description="Settlement currency for purchases"
     )
     settlement_decimals: int = Field(
-        default=SETTLEMENT_DECIMALS, description="Decimal places for settlement token atomic units"
+        default=SETTLEMENT_DECIMALS,
+        description="Decimal places for settlement token atomic units",
     )
     dataset_url: str = Field(..., description="URL to the dataset")
     dataset_hash: str = Field(

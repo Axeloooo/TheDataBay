@@ -12,7 +12,6 @@ from sqlmodel import Session, select, func, or_, col
 from ..models.agent import Agent, AgentRecommendation, AgentPurchaseRequest
 from ..schemas.agent_schema import AgentCreateRequest, AgentUpdateRequest
 
-
 # ---------------------------------------------------------------------------
 # Agent functions
 # ---------------------------------------------------------------------------
@@ -233,18 +232,24 @@ def list_recommendations(
 
     if agent_id is not None:
         statement = statement.where(AgentRecommendation.agent_id == agent_id)
-        count_statement = count_statement.where(AgentRecommendation.agent_id == agent_id)
+        count_statement = count_statement.where(
+            AgentRecommendation.agent_id == agent_id
+        )
 
     if listing_id is not None:
         statement = statement.where(AgentRecommendation.listing_id == listing_id)
-        count_statement = count_statement.where(AgentRecommendation.listing_id == listing_id)
+        count_statement = count_statement.where(
+            AgentRecommendation.listing_id == listing_id
+        )
 
     total = session.exec(count_statement).one()
     recs = session.exec(statement.offset(offset).limit(limit)).all()
     return list(recs), total
 
 
-def get_recommendation_by_id(session: Session, rec_id: uuid.UUID) -> Optional[AgentRecommendation]:
+def get_recommendation_by_id(
+    session: Session, rec_id: uuid.UUID
+) -> Optional[AgentRecommendation]:
     """Get a recommendation by its primary key ID.
 
     Args:
@@ -342,7 +347,9 @@ def list_purchase_requests(
 
     if agent_id is not None:
         statement = statement.where(AgentPurchaseRequest.agent_id == agent_id)
-        count_statement = count_statement.where(AgentPurchaseRequest.agent_id == agent_id)
+        count_statement = count_statement.where(
+            AgentPurchaseRequest.agent_id == agent_id
+        )
 
     if status is not None:
         statement = statement.where(AgentPurchaseRequest.status == status)
@@ -361,7 +368,9 @@ def list_purchase_requests(
     return list(reqs), total
 
 
-def get_purchase_request_by_id(session: Session, request_id: uuid.UUID) -> Optional[AgentPurchaseRequest]:
+def get_purchase_request_by_id(
+    session: Session, request_id: uuid.UUID
+) -> Optional[AgentPurchaseRequest]:
     """Get a purchase request by its primary key ID.
 
     Args:

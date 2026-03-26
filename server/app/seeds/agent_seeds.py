@@ -9,17 +9,19 @@ from sqlmodel import Session, select
 from ..models.agent import Agent, AgentRecommendation, AgentPurchaseRequest
 from .mock_marketplace_items import load_mock_marketplace_items
 
-
 # Use fixed UUIDs so seeds are idempotent
 QUALITY_AUDITOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 FINANCE_SCOUT_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 NLP_RECOMMENDER_ID = uuid.UUID("00000000-0000-0000-0000-000000000003")
 
+
 def seed_agents(session: Session) -> None:
     """Seed demo agent data. Idempotent — skips if agents already exist."""
 
     # Check if already seeded
-    existing = session.exec(select(Agent).where(Agent.handle == "quality-auditor")).first()
+    existing = session.exec(
+        select(Agent).where(Agent.handle == "quality-auditor")
+    ).first()
     if existing:
         return
 

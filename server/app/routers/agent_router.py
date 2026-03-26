@@ -25,7 +25,9 @@ from ..services.agent_repo import (
     get_purchase_request_by_id,
     review_purchase_request as review_purchase_request_repo,
 )
-from ..services.agent_service import generate_recommendation as generate_recommendation_service
+from ..services.agent_service import (
+    generate_recommendation as generate_recommendation_service,
+)
 from ..services.ai_service import AIService, get_ai_service
 from ..services.rate_limiter import agent_write_rate_limiter
 from ..schemas.agent_schema import (
@@ -43,7 +45,9 @@ from ..schemas.agent_schema import (
 )
 
 router = APIRouter(prefix="/api/v1/agents", tags=["agents"])
-purchase_router = APIRouter(prefix="/api/v1/purchase-requests", tags=["purchase-requests"])
+purchase_router = APIRouter(
+    prefix="/api/v1/purchase-requests", tags=["purchase-requests"]
+)
 rec_router = APIRouter(prefix="/api/v1/recommendations", tags=["recommendations"])
 
 logger = logging.getLogger(__name__)
@@ -98,7 +102,9 @@ def list_agents_route(
     Returns:
         AgentListResponse: Paginated list of agents.
     """
-    agents, total = list_agents(session, search=search, tag=tag, status=status, offset=offset, limit=limit)
+    agents, total = list_agents(
+        session, search=search, tag=tag, status=status, offset=offset, limit=limit
+    )
     return AgentListResponse(agents=agents, count=len(agents), total=total)
 
 
@@ -172,9 +178,13 @@ async def generate_recommendation_route(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     query = body.query.strip()
-    result = await generate_recommendation_service(agent.id, query, session, ai_service, settings)
+    result = await generate_recommendation_service(
+        agent.id, query, session, ai_service, settings
+    )
     if result is None:
-        raise HTTPException(status_code=404, detail="No matching datasets found for query")
+        raise HTTPException(
+            status_code=404, detail="No matching datasets found for query"
+        )
     return result
 
 
@@ -199,11 +209,17 @@ def list_agent_recommendations(
     agent = get_agent_by_handle(session, handle)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    recs, total = list_recommendations(session, agent_id=agent.id, offset=offset, limit=limit)
-    return RecommendationListResponse(recommendations=recs, count=len(recs), total=total)
+    recs, total = list_recommendations(
+        session, agent_id=agent.id, offset=offset, limit=limit
+    )
+    return RecommendationListResponse(
+        recommendations=recs, count=len(recs), total=total
+    )
 
 
-@router.post("/{handle}/recommendations/{rec_id}/retract", response_model=RecommendationResponse)
+@router.post(
+    "/{handle}/recommendations/{rec_id}/retract", response_model=RecommendationResponse
+)
 def retract_recommendation_route(
     handle: str,
     rec_id: uuid.UUID,
@@ -234,7 +250,11 @@ def retract_recommendation_route(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{handle}/purchase-requests", response_model=PurchaseRequestResponse, status_code=201)
+@router.post(
+    "/{handle}/purchase-requests",
+    response_model=PurchaseRequestResponse,
+    status_code=201,
+)
 def submit_purchase_request(
     handle: str,
     data: PurchaseRequestCreate,
@@ -254,7 +274,9 @@ def submit_purchase_request(
     agent = get_agent_by_handle(session, handle)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    req = create_purchase_request(session, agent.id, data.listing_id, data.requester_address, data.reason)
+    req = create_purchase_request(
+        session, agent.id, data.listing_id, data.requester_address, data.reason
+    )
     return req
 
 
@@ -281,7 +303,9 @@ def list_agent_purchase_requests(
     agent = get_agent_by_handle(session, handle)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    reqs, total = list_purchase_requests(session, agent_id=agent.id, status=status, offset=offset, limit=limit)
+    reqs, total = list_purchase_requests(
+        session, agent_id=agent.id, status=status, offset=offset, limit=limit
+    )
     return PurchaseRequestListResponse(requests=reqs, count=len(reqs), total=total)
 
 
@@ -308,7 +332,9 @@ def list_all_purchase_requests(
     Returns:
         PurchaseRequestListResponse: Paginated list of purchase requests.
     """
-    reqs, total = list_purchase_requests(session, status=status, offset=offset, limit=limit)
+    reqs, total = list_purchase_requests(
+        session, status=status, offset=offset, limit=limit
+    )
     return PurchaseRequestListResponse(requests=reqs, count=len(reqs), total=total)
 
 
@@ -357,5 +383,9 @@ def get_recommendations_for_listing(
     Returns:
         RecommendationListResponse: Paginated list of recommendations for the listing.
     """
-    recs, total = list_recommendations(session, listing_id=listing_id, offset=offset, limit=limit)
-    return RecommendationListResponse(recommendations=recs, count=len(recs), total=total)
+    recs, total = list_recommendations(
+        session, listing_id=listing_id, offset=offset, limit=limit
+    )
+    return RecommendationListResponse(
+        recommendations=recs, count=len(recs), total=total
+    )

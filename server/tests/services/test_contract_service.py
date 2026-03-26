@@ -159,7 +159,9 @@ def test_get_purchased_items_by_wallet_pagination_and_deduping(monkeypatch, sett
         functions=FakeFunctions(item_views),
     )
 
-    monkeypatch.setattr(contract_service, "_get_contract", lambda _settings: fake_contract)
+    monkeypatch.setattr(
+        contract_service, "_get_contract", lambda _settings: fake_contract
+    )
     monkeypatch.setattr(
         contract_service,
         "_get_web3",

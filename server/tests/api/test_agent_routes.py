@@ -102,7 +102,9 @@ def test_agent_routes_serialize_sqlmodel_fields(client, seeded_agent):
     assert global_payload["requests"][0]["status"] == "pending"
 
 
-def test_purchase_request_review_route_updates_status(client, seeded_agent, sqlite_engine):
+def test_purchase_request_review_route_updates_status(
+    client, seeded_agent, sqlite_engine
+):
     request_id = seeded_agent["request_id"]
 
     response = client.post(

@@ -9,7 +9,6 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
-
 DEFAULT_MANIFEST_RELATIVE_PATH = Path("shared") / "mock-marketplace-items.json"
 
 

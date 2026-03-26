@@ -7,7 +7,6 @@ from pydantic import SecretStr, ValidationError
 
 from app.config.settings import Settings, get_settings
 
-
 ENV_TEMPLATE = """
 APP_NAME="BridgeMart API"
 APP_VERSION="0.1.0"
