@@ -7,6 +7,7 @@ COPY server/requirements.txt /code/requirements.txt
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
 COPY server/app /code/app
+COPY shared /code/shared
 
 EXPOSE 8080
 

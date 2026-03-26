@@ -41,7 +41,7 @@ docker_build_with_restart(
     ".",
     dockerfile="./infra/docker/development/server.Dockerfile",
     entrypoint="fastapi dev app/main.py --host 0.0.0.0 --port 8080",
-    live_update=[sync("./server", "/code")],
+    live_update=[sync("./server", "/code"), sync("./shared", "/code/shared")],
 )
 
 k8s_yaml("./infra/k8s/development/server-deployment.yaml")
