@@ -170,6 +170,8 @@ def client_factory(
 
 
 @pytest.fixture
-def client(client_factory: Callable[..., Iterator[TestClient]]) -> Generator[TestClient, None, None]:
+def client(
+    client_factory: Callable[..., Iterator[TestClient]],
+) -> Generator[TestClient, None, None]:
     with client_factory() as test_client:
         yield test_client

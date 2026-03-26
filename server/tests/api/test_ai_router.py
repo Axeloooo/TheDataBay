@@ -75,15 +75,17 @@ def test_similarity_search_returns_ranked_results(client, monkeypatch):
     assert ai_service.calls == [("customer churn", [dataset])]
 
 
-def test_similarity_search_returns_empty_results_when_no_items(
-    client, monkeypatch
-):
+def test_similarity_search_returns_empty_results_when_no_items(client, monkeypatch):
     class FailingAIService:
         async def rank_datasets(self, query, datasets):
-            raise AssertionError("rank_datasets should not be called when no items exist")
+            raise AssertionError(
+                "rank_datasets should not be called when no items exist"
+            )
 
     monkeypatch.setattr(ai_router, "get_all_items", lambda settings: [])
-    client.app.dependency_overrides[ai_router.get_ai_service] = lambda: FailingAIService()
+    client.app.dependency_overrides[ai_router.get_ai_service] = (
+        lambda: FailingAIService()
+    )
 
     response = client.post(
         "/api/v1/ai/similarity-search",

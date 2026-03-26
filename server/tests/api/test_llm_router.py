@@ -107,9 +107,7 @@ def test_create_batch_embeddings_rejects_invalid_settlement_decimals(
     )
 
     assert response.status_code == 400
-    assert response.json() == {
-        "detail": "Settlement decimals must equal 6 for USDC."
-    }
+    assert response.json() == {"detail": "Settlement decimals must equal 6 for USDC."}
 
 
 def test_embed_query_returns_vector_payload(client, monkeypatch, settings):

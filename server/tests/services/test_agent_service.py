@@ -59,7 +59,9 @@ def test_generate_recommendation_success(monkeypatch):
         captured.update(kwargs)
         return SimpleNamespace(**kwargs)
 
-    monkeypatch.setattr(agent_service, "create_recommendation", fake_create_recommendation)
+    monkeypatch.setattr(
+        agent_service, "create_recommendation", fake_create_recommendation
+    )
 
     recommendation = asyncio.run(
         agent_service.generate_recommendation(
@@ -136,7 +138,9 @@ def test_generate_recommendation_returns_none_below_threshold(monkeypatch):
         create_called["value"] = True
         return SimpleNamespace(**kwargs)
 
-    monkeypatch.setattr(agent_service, "create_recommendation", fake_create_recommendation)
+    monkeypatch.setattr(
+        agent_service, "create_recommendation", fake_create_recommendation
+    )
 
     recommendation = asyncio.run(
         agent_service.generate_recommendation(

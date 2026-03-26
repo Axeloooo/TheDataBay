@@ -26,7 +26,9 @@ def make_agent(handle: str, **overrides) -> Agent:
     return Agent(**payload)
 
 
-def make_recommendation(agent_id: uuid.UUID, listing_id: str = "listing-1", **overrides):
+def make_recommendation(
+    agent_id: uuid.UUID, listing_id: str = "listing-1", **overrides
+):
     payload = {
         "id": uuid.uuid4(),
         "agent_id": agent_id,
@@ -45,7 +47,9 @@ def make_recommendation(agent_id: uuid.UUID, listing_id: str = "listing-1", **ov
     return AgentRecommendation(**payload)
 
 
-def make_purchase_request(agent_id: uuid.UUID, listing_id: str = "listing-1", **overrides):
+def make_purchase_request(
+    agent_id: uuid.UUID, listing_id: str = "listing-1", **overrides
+):
     payload = {
         "id": uuid.uuid4(),
         "agent_id": agent_id,
@@ -65,7 +69,9 @@ def make_purchase_request(agent_id: uuid.UUID, listing_id: str = "listing-1", **
 @pytest.fixture(autouse=True)
 def override_agent_dependencies(client, db_session):
     client.app.dependency_overrides[agent_router.get_session] = lambda: db_session
-    client.app.dependency_overrides[agent_router.agent_write_rate_limiter] = lambda: None
+    client.app.dependency_overrides[agent_router.agent_write_rate_limiter] = (
+        lambda: None
+    )
     try:
         yield
     finally:
@@ -78,7 +84,9 @@ def test_register_agent_returns_created_agent(client, monkeypatch):
     created = make_agent("climate-bot", display_name="Climate Bot")
     captured = {}
 
-    monkeypatch.setattr(agent_router, "get_agent_by_handle", lambda session, handle: None)
+    monkeypatch.setattr(
+        agent_router, "get_agent_by_handle", lambda session, handle: None
+    )
 
     def fake_create_agent(session, data):
         captured["session"] = session
@@ -136,7 +144,9 @@ def test_list_agents_returns_paginated_response(client, monkeypatch):
     ]
     captured = {}
 
-    def fake_list_agents(session, search=None, tag=None, status=None, offset=0, limit=20):
+    def fake_list_agents(
+        session, search=None, tag=None, status=None, offset=0, limit=20
+    ):
         captured["args"] = {
             "session": session,
             "search": search,
@@ -189,7 +199,9 @@ def test_get_agent_returns_agent(client, monkeypatch):
 
 
 def test_get_agent_returns_404_when_missing(client, monkeypatch):
-    monkeypatch.setattr(agent_router, "get_agent_by_handle", lambda session, handle: None)
+    monkeypatch.setattr(
+        agent_router, "get_agent_by_handle", lambda session, handle: None
+    )
 
     response = client.get("/api/v1/agents/missing-bot")
 
@@ -208,7 +220,9 @@ def test_update_agent_returns_updated_agent(client, monkeypatch):
     )
     captured = {}
 
-    monkeypatch.setattr(agent_router, "get_agent_by_handle", lambda session, handle: existing)
+    monkeypatch.setattr(
+        agent_router, "get_agent_by_handle", lambda session, handle: existing
+    )
 
     def fake_update_agent(session, agent, data):
         captured["agent"] = agent
@@ -219,7 +233,11 @@ def test_update_agent_returns_updated_agent(client, monkeypatch):
 
     response = client.patch(
         "/api/v1/agents/climate-bot",
-        json={"display_name": "New Name", "bio": "Updated bio", "capability_tags": ["climate", "ranker"]},
+        json={
+            "display_name": "New Name",
+            "bio": "Updated bio",
+            "capability_tags": ["climate", "ranker"],
+        },
     )
 
     assert response.status_code == 200
@@ -232,7 +250,9 @@ def test_update_agent_returns_updated_agent(client, monkeypatch):
 
 
 def test_update_agent_returns_404_when_missing(client, monkeypatch):
-    monkeypatch.setattr(agent_router, "get_agent_by_handle", lambda session, handle: None)
+    monkeypatch.setattr(
+        agent_router, "get_agent_by_handle", lambda session, handle: None
+    )
 
     response = client.patch("/api/v1/agents/missing-bot", json={"bio": "Updated bio"})
 
@@ -246,7 +266,9 @@ def test_generate_recommendation_returns_recommendation(client, monkeypatch):
     captured = {}
     ai_service = object()
 
-    monkeypatch.setattr(agent_router, "get_agent_by_handle", lambda session, handle: agent)
+    monkeypatch.setattr(
+        agent_router, "get_agent_by_handle", lambda session, handle: agent
+    )
 
     async def fake_generate(agent_id, query, session, resolved_ai_service, settings):
         captured["args"] = {
@@ -280,7 +302,9 @@ def test_generate_recommendation_returns_404_when_no_results(client, monkeypatch
     agent = make_agent("climate-bot")
     ai_service = object()
 
-    monkeypatch.setattr(agent_router, "get_agent_by_handle", lambda session, handle: agent)
+    monkeypatch.setattr(
+        agent_router, "get_agent_by_handle", lambda session, handle: agent
+    )
 
     async def fake_generate(agent_id, query, session, resolved_ai_service, settings):
         return None
@@ -308,8 +332,12 @@ def test_retract_recommendation_returns_updated_record(client, monkeypatch):
     )
     captured = {}
 
-    monkeypatch.setattr(agent_router, "get_agent_by_handle", lambda session, handle: agent)
-    monkeypatch.setattr(agent_router, "get_recommendation_by_id", lambda session, rec_id: original)
+    monkeypatch.setattr(
+        agent_router, "get_agent_by_handle", lambda session, handle: agent
+    )
+    monkeypatch.setattr(
+        agent_router, "get_recommendation_by_id", lambda session, rec_id: original
+    )
 
     def fake_retract(session, rec):
         captured["rec"] = rec
@@ -317,7 +345,9 @@ def test_retract_recommendation_returns_updated_record(client, monkeypatch):
 
     monkeypatch.setattr(agent_router, "retract_recommendation_repo", fake_retract)
 
-    response = client.post(f"/api/v1/agents/climate-bot/recommendations/{original.id}/retract")
+    response = client.post(
+        f"/api/v1/agents/climate-bot/recommendations/{original.id}/retract"
+    )
 
     assert response.status_code == 200
     assert response.json()["id"] == str(original.id)
@@ -330,7 +360,9 @@ def test_submit_purchase_request_returns_created_request(client, monkeypatch):
     created = make_purchase_request(agent.id, listing_id="listing-9")
     captured = {}
 
-    monkeypatch.setattr(agent_router, "get_agent_by_handle", lambda session, handle: agent)
+    monkeypatch.setattr(
+        agent_router, "get_agent_by_handle", lambda session, handle: agent
+    )
 
     def fake_create_request(session, agent_id, listing_id, requester_address, reason):
         captured["args"] = {
@@ -371,7 +403,9 @@ def test_list_agent_purchase_requests_returns_filtered_requests(client, monkeypa
     ]
     captured = {}
 
-    monkeypatch.setattr(agent_router, "get_agent_by_handle", lambda session, handle: agent)
+    monkeypatch.setattr(
+        agent_router, "get_agent_by_handle", lambda session, handle: agent
+    )
 
     def fake_list_requests(session, agent_id=None, status=None, offset=0, limit=20):
         captured["args"] = {
@@ -472,7 +506,11 @@ def test_review_purchase_request_returns_reviewed_request(client, monkeypatch):
     assert response.status_code == 200
     assert response.json()["id"] == str(pending.id)
     assert response.json()["status"] == "approved"
-    assert response.json()["reviewed_by"] == "0x00000000000000000000000000000000000000ff"
+    assert (
+        response.json()["reviewed_by"] == "0x00000000000000000000000000000000000000ff"
+    )
     assert captured["args"]["req"].id == pending.id
     assert captured["args"]["status"] == "approved"
-    assert captured["args"]["reviewed_by"] == "0x00000000000000000000000000000000000000ff"
+    assert (
+        captured["args"]["reviewed_by"] == "0x00000000000000000000000000000000000000ff"
+    )

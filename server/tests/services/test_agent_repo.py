@@ -185,7 +185,9 @@ def test_recommendation_crud_filtering_and_retraction_persist(db_engine, monkeyp
 
     with Session(db_engine) as session:
         agent = agent_repo.create_agent(session, make_create_request("rec-agent"))
-        other_agent = agent_repo.create_agent(session, make_create_request("other-agent"))
+        other_agent = agent_repo.create_agent(
+            session, make_create_request("other-agent")
+        )
 
         rec = agent_repo.create_recommendation(
             session=session,
@@ -252,7 +254,9 @@ def test_purchase_request_create_list_get_and_review_persist(db_engine, monkeypa
 
     with Session(db_engine) as session:
         agent = agent_repo.create_agent(session, make_create_request("request-agent"))
-        other_agent = agent_repo.create_agent(session, make_create_request("second-agent"))
+        other_agent = agent_repo.create_agent(
+            session, make_create_request("second-agent")
+        )
 
         request = agent_repo.create_purchase_request(
             session,
@@ -309,6 +313,4 @@ def test_purchase_request_create_list_get_and_review_persist(db_engine, monkeypa
         assert persisted.status == "approved"
         assert persisted.reviewed_by == "0x00000000000000000000000000000000000000aa"
         assert persisted.reviewed_at == datetime(2024, 3, 2)
-        assert (
-            agent_repo.get_purchase_request_by_id(session, uuid.uuid4()) is None
-        )
+        assert agent_repo.get_purchase_request_by_id(session, uuid.uuid4()) is None

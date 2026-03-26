@@ -3,7 +3,6 @@ import pytest
 from app.routers import contract_router
 from app.schemas.marketplace_schema import MarketplaceDataItem
 
-
 LISTING_ID = "123e4567-e89b-12d3-a456-426614174000"
 
 
@@ -93,7 +92,9 @@ def test_contract_item_read_endpoints_patch_router_module(
 
     with client_factory(settings=settings) as client:
         all_response = client.get("/api/v1/contract/items/all")
-        paged_response = client.get("/api/v1/contract/items", params={"start": 2, "count": 5})
+        paged_response = client.get(
+            "/api/v1/contract/items", params={"start": 2, "count": 5}
+        )
         item_response = client.get(f"/api/v1/contract/items/{LISTING_ID}")
 
     assert all_response.status_code == 200

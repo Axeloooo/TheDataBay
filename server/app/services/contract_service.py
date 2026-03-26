@@ -398,7 +398,9 @@ def _call_contract_read(callable_obj, operation: str):
         raise
     except Exception as exc:
         if isinstance(exc, BadFunctionCallOutput):
-            logger.warning("Contract read hit missing or incompatible bytecode: %s", exc)
+            logger.warning(
+                "Contract read hit missing or incompatible bytecode: %s", exc
+            )
         _maybe_raise_custom_error(exc, operation)
         _raise_upstream(f"Contract read failed: {operation}", exc)
 

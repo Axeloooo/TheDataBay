@@ -7,7 +7,6 @@ from web3 import Web3
 
 from app.services import contract_service
 
-
 LISTING_ID = "123e4567-e89b-12d3-a456-426614174000"
 
 
@@ -163,7 +162,9 @@ def test_get_all_items_returns_empty_when_contract_not_deployed(monkeypatch, set
     monkeypatch.setattr(
         contract_service,
         "_get_contract",
-        lambda _settings: (_ for _ in ()).throw(AssertionError("should not build contract")),
+        lambda _settings: (_ for _ in ()).throw(
+            AssertionError("should not build contract")
+        ),
     )
 
     assert contract_service.get_all_items(settings) == []
@@ -450,7 +451,9 @@ def test_buy_item_rejects_insufficient_payment(monkeypatch, settings):
             raise AssertionError("buyItem should not be called when payment is too low")
 
     fake_contract = SimpleNamespace(functions=FakeFunctions())
-    monkeypatch.setattr(contract_service, "_get_contract", lambda _settings: fake_contract)
+    monkeypatch.setattr(
+        contract_service, "_get_contract", lambda _settings: fake_contract
+    )
     monkeypatch.setattr(
         contract_service,
         "_call_contract_read",
