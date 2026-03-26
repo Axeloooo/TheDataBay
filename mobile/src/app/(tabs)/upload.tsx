@@ -19,13 +19,14 @@ import { SurfaceCard } from "@/components/ui/surface-card";
 import { AppTheme } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import {
-  convertEthToCurrency,
+  convertSettlementToCurrency,
   formatCurrencyAmount,
   type DisplayCurrency,
 } from "@/src/lib/fx";
+import { SETTLEMENT_DECIMALS } from "@/src/lib/marketplace";
 import { useCurrencyStore } from "@/src/stores/currency-store";
 import {
-  selectUploadPriceWei,
+  selectUploadPriceAtomic,
   useUploadStore,
 } from "@/src/stores/upload-store";
 import { useWalletStore } from "@/src/stores/wallet-store";
@@ -35,8 +36,11 @@ const CURRENCIES: DisplayCurrency[] = [
   "USD",
   "CAD",
   "EUR",
+  "MXN",
   "USDC",
   "SOL",
+  "CNY",
+  "USDT",
 ];
 
 function FieldLabel({ label, hint }: { label: string; hint?: string }) {
@@ -96,9 +100,7 @@ function CurrencyPicker({
 
 export default function UploadScreen() {
   const palette = useAppTheme();
-  const preferredCurrency = useCurrencyStore(
-    (state) => state.preferredCurrency,
-  );
+  const displayCurrency = useCurrencyStore((state) => state.displayCurrency);
   const rates = useCurrencyStore((state) => state.rates);
   const {
     address,
@@ -110,8 +112,8 @@ export default function UploadScreen() {
   const {
     title,
     description,
-    priceEth,
-    payCurrency,
+    settlementAmount,
+    quoteCurrency,
     selectedFile,
     job,
     jobStatus,
@@ -122,8 +124,8 @@ export default function UploadScreen() {
     persistedSession,
     setTitle,
     setDescription,
-    setPriceEth,
-    setPayCurrency,
+    setSettlementAmount,
+    setQuoteCurrency,
     setSelectedFile,
     initializeUploadState,
     submitUpload,
@@ -134,8 +136,8 @@ export default function UploadScreen() {
   } = useUploadStore();
 
   useEffect(() => {
-    void initializeUploadState(preferredCurrency);
-  }, [initializeUploadState, preferredCurrency]);
+    void initializeUploadState(displayCurrency);
+  }, [displayCurrency, initializeUploadState]);
 
   useEffect(() => {
     const activeJobId = job?.job_id ?? persistedSession?.jobId;
@@ -170,12 +172,18 @@ export default function UploadScreen() {
     persistedSession?.signatureUrl ??
     null;
   const priceEquivalent = useMemo(() => {
-    if (!priceEth || payCurrency === "ETH") {
+    const atomicAmount = selectUploadPriceAtomic(settlementAmount);
+    if (!atomicAmount) {
       return null;
     }
 
-    return convertEthToCurrency(Number(priceEth), payCurrency, rates);
-  }, [payCurrency, priceEth, rates]);
+    return convertSettlementToCurrency(
+      atomicAmount,
+      SETTLEMENT_DECIMALS,
+      quoteCurrency,
+      rates,
+    );
+  }, [quoteCurrency, rates, settlementAmount]);
 
   const canCreateListing =
     effectiveStatus === "completed" &&
@@ -235,9 +243,9 @@ export default function UploadScreen() {
             Upload, embed, and list from mobile
           </Text>
           <Text style={[styles.subtitle, { color: palette.subtleText }]}>
-            BridgeMart mobile now mirrors the web listing flow: submit your CSV,
-            wait for signed outputs, then create the on-chain listing with
-            WalletConnect.
+            BridgeMart mobile mirrors the web listing flow: submit your CSV,
+            enter the USDC settlement amount, preview quote values, then create
+            the on-chain listing with WalletConnect.
           </Text>
         </View>
 
@@ -319,10 +327,10 @@ export default function UploadScreen() {
             ]}
           />
 
-          <FieldLabel label="Price (ETH)" />
+          <FieldLabel label="Settlement amount (USDC)" />
           <TextInput
-            value={priceEth}
-            onChangeText={setPriceEth}
+            value={settlementAmount}
+            onChangeText={setSettlementAmount}
             placeholder="0.0500"
             placeholderTextColor={palette.subtleText}
             keyboardType="decimal-pad"
@@ -337,15 +345,15 @@ export default function UploadScreen() {
           />
           {priceEquivalent !== null ? (
             <Text style={[styles.fieldHint, { color: palette.subtleText }]}>
-              Approx. {formatCurrencyAmount(priceEquivalent, payCurrency)}
+              Quote preview: {formatCurrencyAmount(priceEquivalent, quoteCurrency)}
             </Text>
           ) : null}
 
           <FieldLabel
-            label="Display currency"
-            hint="On-chain settlement remains ETH/wei."
+            label="Quote currency"
+            hint="Settlement is fixed to USDC; other currencies are display-only."
           />
-          <CurrencyPicker value={payCurrency} onChange={setPayCurrency} />
+          <CurrencyPicker value={quoteCurrency} onChange={setQuoteCurrency} />
         </SurfaceCard>
 
         <SurfaceCard style={styles.sectionCard}>
@@ -384,7 +392,7 @@ export default function UploadScreen() {
               !selectedFile ||
               !title ||
               !description ||
-              !selectUploadPriceWei(priceEth)
+              !selectUploadPriceAtomic(settlementAmount)
             }
           />
         </SurfaceCard>

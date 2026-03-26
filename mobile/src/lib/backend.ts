@@ -16,7 +16,17 @@ import type {
   SimilaritySearchResponse,
 } from "@/src/types/ai";
 
-function normalizeWeiString(value: unknown): string {
+type MarketplaceApiItem = Omit<
+  MarketplaceDataItem,
+  "price_atomic" | "settlement_currency" | "settlement_decimals"
+> & {
+  price?: unknown;
+  price_atomic?: unknown;
+  settlement_currency?: unknown;
+  settlement_decimals?: unknown;
+};
+
+function normalizeAtomicString(value: unknown): string {
   if (typeof value === "string") {
     if (!/^\d+$/.test(value)) {
       throw new Error("Invalid marketplace price format from API.");
@@ -31,7 +41,7 @@ function normalizeWeiString(value: unknown): string {
 
     if (!Number.isSafeInteger(value)) {
       throw new Error(
-        "Marketplace price exceeds safe integer precision. API must return wei as a string.",
+        "Marketplace price exceeds safe integer precision. API must return atomic units as a string.",
       );
     }
 
@@ -42,11 +52,36 @@ function normalizeWeiString(value: unknown): string {
 }
 
 function normalizeMarketplaceItem(
-  item: MarketplaceDataItem,
+  item: MarketplaceApiItem,
 ): MarketplaceDataItem {
+  const priceAtomic = item.price_atomic ?? item.price;
+  if (priceAtomic === undefined || priceAtomic === null) {
+    throw new Error("Missing marketplace price from API.");
+  }
+
+  const settlementCurrency = String(item.settlement_currency ?? "USDC");
+  if (settlementCurrency !== "USDC") {
+    throw new Error("Unsupported marketplace settlement currency from API.");
+  }
+
+  const settlementDecimals = Number(item.settlement_decimals ?? 6);
+  if (settlementDecimals !== 6) {
+    throw new Error("Unsupported marketplace settlement decimals from API.");
+  }
+
+  const {
+    price: _legacyPrice,
+    price_atomic: _legacyAtomic,
+    settlement_currency: _legacyCurrency,
+    settlement_decimals: _legacyDecimals,
+    ...rest
+  } = item;
+
   return {
-    ...item,
-    price: normalizeWeiString(item.price),
+    ...rest,
+    price_atomic: normalizeAtomicString(priceAtomic),
+    settlement_currency: "USDC",
+    settlement_decimals: 6,
   };
 }
 
@@ -61,14 +96,14 @@ export const backend = {
     apiRequest<JobStatusResponse>(`/api/v1/llm/jobs/${jobId}`),
 
   getMarketplaceItems: async () => {
-    const items = await apiRequest<MarketplaceDataItem[]>(
+    const items = await apiRequest<MarketplaceApiItem[]>(
       "/api/v1/contract/items/all",
     );
     return items.map(normalizeMarketplaceItem);
   },
 
   getMarketplaceItem: async (listingId: string) => {
-    const item = await apiRequest<MarketplaceDataItem>(
+    const item = await apiRequest<MarketplaceApiItem>(
       `/api/v1/contract/items/${listingId}`,
     );
     return normalizeMarketplaceItem(item);

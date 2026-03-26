@@ -25,7 +25,7 @@ function HeroSection({
     () => [
       { label: "Visible listings", value: String(listingCount) },
       { label: "Purchased", value: String(purchaseCount) },
-      { label: "Settlement", value: "ETH" },
+      { label: "Settlement", value: "USDC" },
     ],
     [listingCount, purchaseCount],
   );

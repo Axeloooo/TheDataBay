@@ -3,11 +3,14 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppTheme } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/use-app-theme";
-import { formatCurrencyAmount, convertEthToCurrency } from "@/src/lib/fx";
 import {
+  formatCurrencyAmount,
+  convertSettlementToCurrency,
+} from "@/src/lib/fx";
+import {
+  formatSettlementAmount,
   formatPurchaseCount,
   truncateAddress,
-  weiToEth,
 } from "@/src/lib/marketplace";
 import { useCurrencyStore } from "@/src/stores/currency-store";
 import type { MarketplaceDataItem } from "@/src/types/contract";
@@ -19,14 +22,21 @@ type Props = {
 
 export default function DatasetCard({ item, onPress }: Props) {
   const palette = useAppTheme();
-  const preferredCurrency = useCurrencyStore(
-    (state) => state.preferredCurrency,
-  );
+  const displayCurrency = useCurrencyStore((state) => state.displayCurrency);
   const rates = useCurrencyStore((state) => state.rates);
-  const ethAmount = Number.parseFloat(weiToEth(item.price));
+  const settlementAmount = formatSettlementAmount(
+    item.price_atomic,
+    item.settlement_decimals,
+  );
+  const isFree = BigInt(item.price_atomic) === 0n;
   const converted =
-    preferredCurrency !== "ETH"
-      ? convertEthToCurrency(ethAmount, preferredCurrency, rates)
+    !isFree && displayCurrency !== item.settlement_currency
+      ? convertSettlementToCurrency(
+          item.price_atomic,
+          item.settlement_decimals,
+          displayCurrency,
+          rates,
+        )
       : null;
 
   return (
@@ -60,9 +70,9 @@ export default function DatasetCard({ item, onPress }: Props) {
           style={[styles.priceBadge, { backgroundColor: `${palette.tint}15` }]}
         >
           <Text style={[styles.priceText, { color: palette.tint }]}>
-            {ethAmount > 0
-              ? `${ethAmount.toLocaleString("en-US", { maximumFractionDigits: 4 })} ETH`
-              : "Free"}
+            {isFree
+              ? "Free"
+              : `${settlementAmount} ${item.settlement_currency}`}
           </Text>
         </View>
       </View>
@@ -88,7 +98,7 @@ export default function DatasetCard({ item, onPress }: Props) {
         <View style={styles.metaRight}>
           {converted !== null && (
             <Text style={[styles.fxText, { color: palette.subtleText }]}>
-              ~ {formatCurrencyAmount(converted, preferredCurrency)}
+              ~ {formatCurrencyAmount(converted, displayCurrency)}
             </Text>
           )}
           <Text style={[styles.seller, { color: palette.text }]}>

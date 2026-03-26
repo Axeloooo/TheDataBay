@@ -1,11 +1,15 @@
 import type { WalletType } from "@/src/types/dataset";
 
+export type MarketplaceSettlementCurrency = "USDC";
+
 export type MarketplaceDataItem = {
   id: string;
   title: string;
   description: string;
   seller: string;
-  price: string; // wei as string
+  price_atomic: string;
+  settlement_currency: MarketplaceSettlementCurrency;
+  settlement_decimals: 6;
   dataset_url: string;
   dataset_hash: string;
   signature_url: string;

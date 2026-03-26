@@ -22,8 +22,11 @@ const CURRENCIES: DisplayCurrency[] = [
   "USD",
   "CAD",
   "EUR",
+  "MXN",
   "USDC",
   "SOL",
+  "CNY",
+  "USDT",
 ];
 
 export default function WalletScreen() {
@@ -39,7 +42,7 @@ export default function WalletScreen() {
     openConnectModal,
     disconnectWallet,
   } = useWalletStore();
-  const { preferredCurrency, setPreferredCurrency } = useCurrencyStore();
+  const { displayCurrency, setDisplayCurrency } = useCurrencyStore();
   const {
     purchases,
     purchasesLoading,
@@ -93,17 +96,17 @@ export default function WalletScreen() {
         <SurfaceCard style={styles.card}>
           <View style={styles.rowBetween}>
             <Text style={[styles.sectionTitle, { color: palette.text }]}>
-              Display currency
+              Quote currency
             </Text>
-            <StatusPill label={preferredCurrency} tone="info" />
+            <StatusPill label={displayCurrency} tone="info" />
           </View>
           <View style={styles.chipWrap}>
             {CURRENCIES.map((currency) => {
-              const active = currency === preferredCurrency;
+              const active = currency === displayCurrency;
               return (
                 <Pressable
                   key={currency}
-                  onPress={() => setPreferredCurrency(currency)}
+                  onPress={() => setDisplayCurrency(currency)}
                   style={[
                     styles.chip,
                     {

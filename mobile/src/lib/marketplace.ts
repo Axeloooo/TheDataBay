@@ -2,9 +2,9 @@ import {
   BrowserProvider,
   Contract,
   Interface,
-  formatEther,
+  formatUnits,
   getAddress,
-  parseEther,
+  parseUnits,
 } from "ethers";
 import type { Provider as AppKitProvider } from "@reown/appkit-common-react-native";
 
@@ -17,6 +17,12 @@ import type { MarketplaceDataItem } from "@/src/types/contract";
 type Eip1193Provider = AppKitProvider;
 
 const errorInterface = new Interface(marketplaceAbi);
+export const SETTLEMENT_CURRENCY = "USDC" as const;
+export const SETTLEMENT_DECIMALS = 6 as const;
+const erc20Abi = [
+  "function allowance(address owner,address spender) view returns (uint256)",
+  "function approve(address spender,uint256 amount) returns (bool)",
+];
 
 function getContractAddress(): string {
   if (!ENV.CONTRACT_ADDRESS) {
@@ -34,6 +40,17 @@ function normalizeListingId(listingId: string): string {
   return /^0x[0-9a-fA-F]{64}$/.test(listingId)
     ? listingId
     : uuidToBytes32(listingId);
+}
+
+function formatWholeWithSeparators(value: string): string {
+  return value.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+function trimTrailingZeros(value: string): string {
+  return value
+    .replace(/(\.\d*?[1-9])0+$/, "$1")
+    .replace(/\.0+$/, "")
+    .replace(/\.$/, "");
 }
 
 export function getWalletProvider(): Eip1193Provider {
@@ -70,7 +87,7 @@ export async function createItemTx(params: {
   title: string;
   description: string;
   seller: string;
-  priceWei: string;
+  priceAtomic: string;
   datasetUrl: string;
   datasetHash: string;
   signatureUrl: string;
@@ -93,7 +110,7 @@ export async function createItemTx(params: {
       params.title,
       params.description,
       params.seller,
-      params.priceWei,
+      params.priceAtomic,
       params.datasetUrl,
       params.datasetHash,
       params.signatureUrl,
@@ -105,7 +122,7 @@ export async function createItemTx(params: {
       params.title,
       params.description,
       params.seller,
-      params.priceWei,
+      params.priceAtomic,
       params.datasetUrl,
       params.datasetHash,
       params.signatureUrl,
@@ -119,18 +136,33 @@ export async function createItemTx(params: {
   }
 }
 
-export async function buyItemTx(listingId: string, priceWei: bigint) {
+export async function buyItemTx(
+  listingId: string,
+  priceAtomic: string | bigint,
+) {
   try {
     const provider = await getEvmProvider();
     const signer = await provider.getSigner();
     const contract = new Contract(getContractAddress(), marketplaceAbi, signer);
     const feeBps = (await contract.feeBps()) as bigint;
-    const fee = (priceWei * feeBps) / 10_000n;
-    const total = priceWei + fee;
+    const normalizedPrice = BigInt(priceAtomic);
+    const fee = (normalizedPrice * feeBps) / 10_000n;
+    const total = normalizedPrice + fee;
 
-    const tx = await contract.buyItem(normalizeListingId(listingId), {
-      value: total,
-    });
+    const tokenAddress = getAddress((await contract.settlementToken()) as string);
+    const settlementToken = new Contract(tokenAddress, erc20Abi, signer);
+    const buyerAddress = await signer.getAddress();
+    const allowance = (await settlementToken.allowance(
+      buyerAddress,
+      getContractAddress(),
+    )) as bigint;
+
+    if (allowance < total) {
+      const approvalTx = await settlementToken.approve(getContractAddress(), total);
+      await approvalTx.wait();
+    }
+
+    const tx = await contract.buyItem(normalizeListingId(listingId));
     const receipt = await tx.wait();
 
     return receipt?.hash ?? tx.hash;
@@ -139,17 +171,35 @@ export async function buyItemTx(listingId: string, priceWei: bigint) {
   }
 }
 
-export function weiToEth(wei: string | number | bigint): string {
+export function parseSettlementAmount(
+  amount: string,
+  decimals: number = SETTLEMENT_DECIMALS,
+): string | null {
+  const normalized = amount.trim().replace(/,/g, "");
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) {
+    return null;
+  }
+
   try {
-    return formatEther(wei);
+    return parseUnits(normalized, decimals).toString();
   } catch {
-    return "0";
+    return null;
   }
 }
 
-export function ethToWeiString(eth: string): string {
+export function formatSettlementAmount(
+  atomicAmount: string | bigint,
+  decimals: number = SETTLEMENT_DECIMALS,
+): string {
   try {
-    return parseEther(eth).toString();
+    const normalized = trimTrailingZeros(formatUnits(atomicAmount, decimals));
+    const [whole, fraction] = normalized.split(".");
+    const formattedWhole = formatWholeWithSeparators(whole);
+    return fraction ? `${formattedWhole}.${fraction}` : formattedWhole;
   } catch {
     return "0";
   }

@@ -3,7 +3,10 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppTheme } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/use-app-theme";
-import { truncateAddress, weiToEth } from "@/src/lib/marketplace";
+import {
+  formatSettlementAmount,
+  truncateAddress,
+} from "@/src/lib/marketplace";
 import type { MarketplaceDataItem } from "@/src/types/contract";
 
 type Props = {
@@ -13,7 +16,11 @@ type Props = {
 
 export default function PurchaseRow({ item, onPress }: Props) {
   const palette = useAppTheme();
-  const ethPrice = Number.parseFloat(weiToEth(item.price));
+  const settlementAmount = formatSettlementAmount(
+    item.price_atomic,
+    item.settlement_decimals,
+  );
+  const isFree = BigInt(item.price_atomic) === 0n;
 
   return (
     <Pressable
@@ -37,7 +44,7 @@ export default function PurchaseRow({ item, onPress }: Props) {
           {item.title}
         </Text>
         <Text style={[styles.meta, { color: palette.subtleText }]}>
-          {ethPrice.toLocaleString("en-US", { maximumFractionDigits: 4 })} ETH
+          {isFree ? "Free" : `${settlementAmount} ${item.settlement_currency}`}
         </Text>
       </View>
       <View style={styles.trailing}>

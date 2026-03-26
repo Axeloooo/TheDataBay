@@ -21,7 +21,10 @@ import { AppTheme } from "@/constants/theme";
 import { useAppTheme } from "@/hooks/use-app-theme";
 import { backend } from "@/src/lib/backend";
 import { decodeBase64, decryptAesGcm, utf8Bytes } from "@/src/lib/crypto";
-import { convertEthToCurrency, formatCurrencyAmount } from "@/src/lib/fx";
+import {
+  convertSettlementToCurrency,
+  formatCurrencyAmount,
+} from "@/src/lib/fx";
 import { bytes32ToUuid } from "@/src/lib/ids";
 import {
   verifyDatasetIntegrity,
@@ -30,9 +33,9 @@ import {
 import { resolveIpfsUrl } from "@/src/lib/ipfs";
 import {
   buyItemTx,
+  formatSettlementAmount,
   formatPurchaseCount,
   truncateAddress,
-  weiToEth,
 } from "@/src/lib/marketplace";
 import { useCurrencyStore } from "@/src/stores/currency-store";
 import { useMarketplaceStore } from "@/src/stores/marketplace-store";
@@ -78,7 +81,7 @@ export default function DatasetDetailScreen() {
     failMutation,
     openConnectModal,
   } = useWalletStore();
-  const { preferredCurrency, rates } = useCurrencyStore();
+  const { displayCurrency, rates } = useCurrencyStore();
   const fetchPurchases = useMarketplaceStore((state) => state.fetchPurchases);
 
   const [dataset, setDataset] = useState<MarketplaceDataItem | null>(null);
@@ -178,14 +181,11 @@ export default function DatasetDetailScreen() {
     beginMutation("buy");
 
     try {
-      let listingPriceWei: bigint;
-      try {
-        listingPriceWei = BigInt(dataset.price);
-      } catch {
-        throw new Error("Invalid listing price from API.");
+      if (dataset.settlement_currency !== "USDC" || dataset.settlement_decimals !== 6) {
+        throw new Error("Unsupported settlement metadata from API.");
       }
 
-      const txHash = await buyItemTx(dataset.id, listingPriceWei);
+      const txHash = await buyItemTx(dataset.id, dataset.price_atomic);
       completeMutation(txHash);
       await checkAccess();
       if (address) {
@@ -298,16 +298,26 @@ export default function DatasetDetailScreen() {
     );
   }
 
-  const ethAmount = Number.parseFloat(weiToEth(dataset.price));
-  const convertedAmount = convertEthToCurrency(
-    ethAmount,
-    preferredCurrency,
+  const settlementAmount = formatSettlementAmount(
+    dataset.price_atomic,
+    dataset.settlement_decimals,
+  );
+  const isFree = BigInt(dataset.price_atomic) === 0n;
+  const convertedAmount = convertSettlementToCurrency(
+    dataset.price_atomic,
+    dataset.settlement_decimals,
+    displayCurrency,
     rates,
   );
-  const displayPrice =
+  const displayPrice = isFree
+    ? "Free"
+    : `${settlementAmount} ${dataset.settlement_currency}`;
+  const quotePrice =
+    !isFree &&
+    displayCurrency !== dataset.settlement_currency &&
     convertedAmount !== null
-      ? formatCurrencyAmount(convertedAmount, preferredCurrency)
-      : `${ethAmount.toLocaleString("en-US", { maximumFractionDigits: 4 })} ETH`;
+      ? `~ ${formatCurrencyAmount(convertedAmount, displayCurrency)}`
+      : null;
 
   const isDownloading = downloadStep !== "idle";
   const buyLoading = activeMutation === "buy";
@@ -342,9 +352,16 @@ export default function DatasetDetailScreen() {
               }
               tone={isPurchased ? "success" : "info"}
             />
-            <Text style={[styles.price, { color: palette.text }]}>
-              {displayPrice}
-            </Text>
+            <View style={styles.priceStack}>
+              <Text style={[styles.price, { color: palette.text }]}>
+                {displayPrice}
+              </Text>
+              {quotePrice ? (
+                <Text style={[styles.quotePrice, { color: palette.subtleText }]}>
+                  {quotePrice}
+                </Text>
+              ) : null}
+            </View>
           </View>
         </View>
 
@@ -475,6 +492,14 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 17,
     fontWeight: "800",
+  },
+  priceStack: {
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  quotePrice: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   card: {
     gap: AppTheme.spacing.md,
