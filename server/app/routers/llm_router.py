@@ -3,7 +3,16 @@ LLM router for embedding generation using Ollama.
 """
 
 import logging
-from fastapi import APIRouter, File, UploadFile, BackgroundTasks, status, Depends, Form
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    UploadFile,
+    status,
+)
 
 from ..database.engine import get_session
 from ..schemas.job_schema import JobResponse, JobStatusResponse
@@ -36,7 +45,10 @@ async def create_batch_embeddings(
     title: str = Form(...),
     description: str = Form(...),
     seller: str = Form(...),
-    price: int = Form(...),
+    price: int | None = Form(None),
+    price_atomic: int | None = Form(None),
+    settlement_currency: str = Form("USDC"),
+    settlement_decimals: int = Form(6),
     seller_wallet_type: str = Form("evm"),
     settings: Settings = Depends(get_settings),
     job_manager: JobManager = Depends(get_job_manager),
@@ -58,7 +70,10 @@ async def create_batch_embeddings(
         title (str): Dataset title
         description (str): Dataset description
         seller (str): Seller EVM address
-        price (int): Price in wei
+        price (int | None): Legacy price field in USDC atomic units
+        price_atomic (int | None): Preferred price field in USDC atomic units
+        settlement_currency (str): Settlement currency metadata
+        settlement_decimals (int): Settlement decimals metadata
         seller_wallet_type (str): Seller wallet type (evm only for now)
         settings (Settings): Application settings instance
         job_manager (JobManager): Job manager instance
@@ -73,6 +88,18 @@ async def create_batch_embeddings(
         file.filename,
         seller,
     )
+    effective_price = price_atomic if price_atomic is not None else price
+    if effective_price is None:
+        raise HTTPException(status_code=400, detail="price_atomic is required.")
+    if settlement_currency != "USDC":
+        raise HTTPException(
+            status_code=400, detail="Only USDC settlement is supported."
+        )
+    if settlement_decimals != 6:
+        raise HTTPException(
+            status_code=400, detail="Settlement decimals must equal 6 for USDC."
+        )
+
     return await enqueue_batch_job(
         file=file,
         background_tasks=background_tasks,
@@ -81,7 +108,7 @@ async def create_batch_embeddings(
         title=title,
         description=description,
         seller=seller,
-        price=price,
+        price=effective_price,
         session=session,
         seller_wallet_type=seller_wallet_type,
     )

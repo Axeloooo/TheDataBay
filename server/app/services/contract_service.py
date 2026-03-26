@@ -12,7 +12,11 @@ from typing import Any, Dict, List, Union
 
 from fastapi import HTTPException
 from ..schemas.dataset_schema import WalletType
-from ..schemas.marketplace_schema import MarketplaceDataItem
+from ..schemas.marketplace_schema import (
+    MarketplaceDataItem,
+    SETTLEMENT_CURRENCY,
+    SETTLEMENT_DECIMALS,
+)
 from web3 import Web3
 from web3.contract import Contract
 
@@ -259,7 +263,9 @@ def _item_view_to_schema(raw: Any) -> MarketplaceDataItem:
         title=title,
         description=description,
         seller=seller,
-        price=int(price),
+        price_atomic=str(int(price)),
+        settlement_currency=SETTLEMENT_CURRENCY,
+        settlement_decimals=SETTLEMENT_DECIMALS,
         dataset_url=dataset_url,
         dataset_hash=_to_hex(dataset_hash),
         signature_url=signature_url,
@@ -643,7 +649,7 @@ def create_item(
         title (str): Item title
         description (str): Item description
         seller (str): Seller address
-        price (int): Item price
+        price (int): Item price in USDC atomic units
         dataset_url (str): Dataset URL
         dataset_hash (str): Dataset hash
         signature_url (str): Signature URL
@@ -690,7 +696,7 @@ def buy_item(listing_id: str, value_wei: int, settings: Settings) -> str:
 
     Args:
         listing_id (str): Listing UUID string
-        value_wei (int): Value in Wei to send with the transaction
+        value_wei (int): Settlement payment amount in USDC atomic units
         settings (Settings): Application settings instance
 
     Returns:
@@ -721,7 +727,7 @@ def buy_item(listing_id: str, value_wei: int, settings: Settings) -> str:
         )
 
     tx = contract.functions.buyItem(item_id)
-    return _send_tx(tx, settings, value=value_wei)
+    return _send_tx(tx, settings)
 
 
 def update_dataset_url(listing_id: str, new_url: str, settings: Settings) -> str:
@@ -772,7 +778,7 @@ def update_price(listing_id: str, new_price: int, settings: Settings) -> str:
 
     Args:
         listing_id (str): Listing UUID string
-        new_price (int): New price for the item
+        new_price (int): New price for the item in USDC atomic units
         settings (Settings): Application settings instance
 
     Returns:

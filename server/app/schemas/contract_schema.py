@@ -17,7 +17,7 @@ class TxHashResponse(BaseModel):
 class BuyItemRequest(BaseModel):
     """Buy item request schema."""
 
-    value_wei: int = Field(..., ge=0, description="Payment amount in wei")
+    value_wei: int = Field(..., ge=0, description="Payment amount in USDC atomic units")
 
 
 class UpdateDatasetUrlRequest(BaseModel):
@@ -36,7 +36,7 @@ class UpdateSignatureRequest(BaseModel):
 class UpdatePriceRequest(BaseModel):
     """Update price request schema."""
 
-    new_price: int = Field(..., gt=0, description="New item price in wei")
+    new_price: int = Field(..., gt=0, description="New item price in USDC atomic units")
 
 
 class SetFeeConfigRequest(BaseModel):
@@ -79,7 +79,7 @@ class CreateItemRequest(BaseModel):
     title: str = Field(..., min_length=1, description="Item title")
     description: str = Field(..., min_length=1, description="Item description")
     seller: str = Field(..., description="Seller EVM address")
-    price: int = Field(..., gt=0, description="Price in wei")
+    price: int = Field(..., gt=0, description="Price in USDC atomic units")
     dataset_url: str = Field(..., min_length=1, description="Encrypted dataset IPFS URL")
     dataset_hash: str = Field(..., min_length=1, description="Dataset sha256 hash (0x...)")
     signature_url: str = Field(..., min_length=1, description="Signature IPFS URL")

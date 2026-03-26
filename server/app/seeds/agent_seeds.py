@@ -7,17 +7,13 @@ import uuid
 from datetime import datetime, timezone
 from sqlmodel import Session, select
 from ..models.agent import Agent, AgentRecommendation, AgentPurchaseRequest
+from .mock_marketplace_items import load_mock_marketplace_items
 
 
 # Use fixed UUIDs so seeds are idempotent
 QUALITY_AUDITOR_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 FINANCE_SCOUT_ID = uuid.UUID("00000000-0000-0000-0000-000000000002")
 NLP_RECOMMENDER_ID = uuid.UUID("00000000-0000-0000-0000-000000000003")
-
-# Demo listing IDs (on-chain refs — use plausible UUIDs)
-DEMO_LISTING_1 = "11111111-1111-1111-1111-111111111111"
-DEMO_LISTING_2 = "22222222-2222-2222-2222-222222222222"
-
 
 def seed_agents(session: Session) -> None:
     """Seed demo agent data. Idempotent — skips if agents already exist."""
@@ -28,6 +24,9 @@ def seed_agents(session: Session) -> None:
         return
 
     now = datetime.now(timezone.utc)
+    mock_items = load_mock_marketplace_items()
+    demo_listing_1 = mock_items[0].listing_id
+    demo_listing_2 = mock_items[1].listing_id
 
     # Demo Agent 1: quality-auditor (platform_verified)
     agent1 = Agent(
@@ -75,7 +74,7 @@ def seed_agents(session: Session) -> None:
     # Demo Recommendation 1: finance-scout recommends listing 1
     rec1 = AgentRecommendation(
         agent_id=FINANCE_SCOUT_ID,
-        listing_id=DEMO_LISTING_1,
+        listing_id=demo_listing_1,
         confidence=0.87,
         similarity_score=0.87,
         rationale="Strong semantic match for financial time-series data needs.",
@@ -90,7 +89,7 @@ def seed_agents(session: Session) -> None:
     # Demo Recommendation 2: nlp-recommender recommends listing 2
     rec2 = AgentRecommendation(
         agent_id=NLP_RECOMMENDER_ID,
-        listing_id=DEMO_LISTING_2,
+        listing_id=demo_listing_2,
         confidence=0.72,
         similarity_score=0.72,
         rationale="Good match for NLP classification and text analysis tasks.",
@@ -108,7 +107,7 @@ def seed_agents(session: Session) -> None:
     # Demo Purchase Request: quality-auditor requests listing 1
     req1 = AgentPurchaseRequest(
         agent_id=QUALITY_AUDITOR_ID,
-        listing_id=DEMO_LISTING_1,
+        listing_id=demo_listing_1,
         requester_address="0x9999999999999999999999999999999999999999",
         status="pending",
         reason="Need to audit dataset quality before certifying for marketplace.",
