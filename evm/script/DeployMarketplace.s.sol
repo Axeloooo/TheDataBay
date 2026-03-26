@@ -27,7 +27,8 @@ contract DeployMarketplace is Script {
         if (settlementToken == address(0)) {
             mockUsdc = new MockUSDC();
             settlementToken = address(mockUsdc);
-            mockUsdc.mint(vm.addr(deployKey), 5_000_000 * 10 ** 6);
+            address mintRecipient = vm.envOr("ANVIL_USDC_RECIPIENT", vm.addr(deployKey));
+            mockUsdc.mint(mintRecipient, 5_000_000 * 10 ** 6);
         }
 
         marketplace = new Marketplace(vm.addr(deployKey), settlementToken, feeRecipient, feeBps);
