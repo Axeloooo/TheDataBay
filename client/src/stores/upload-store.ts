@@ -6,6 +6,7 @@ import { createItemTx } from "@/lib/marketplace";
 import { uuidToBytes32 } from "@/lib/ids";
 import { fireConfettiBurst } from "@/lib/confetti";
 import type { DisplayCurrency } from "@/lib/fx";
+import { parseUnits } from "ethers";
 import type { JobResponse, JobStatusResponse } from "@/types/llm";
 import {
   clearUploadSession,
@@ -19,8 +20,8 @@ type UploadStatus = "queued" | "running" | "completed" | "failed";
 type UploadStore = {
   title: string;
   description: string;
-  priceEth: string;
-  payCurrency: DisplayCurrency;
+  priceUsdc: string;
+  displayCurrency: DisplayCurrency;
   file: File | null;
   job: JobResponse | null;
   jobStatus: JobStatusResponse | null;
@@ -33,8 +34,8 @@ type UploadStore = {
   hasInitialized: boolean;
   setTitle: (value: string) => void;
   setDescription: (value: string) => void;
-  setPriceEth: (value: string) => void;
-  setPayCurrency: (value: DisplayCurrency) => void;
+  setPriceUsdc: (value: string) => void;
+  setDisplayCurrency: (value: DisplayCurrency) => void;
   setFile: (value: File | null) => void;
   setError: (value: string | null) => void;
   initializeUploadState: (preferredCurrency: DisplayCurrency) => void;
@@ -47,16 +48,12 @@ type UploadStore = {
 };
 
 const STORAGE_KEY = "bridgemart_upload_store_v1";
+const SETTLEMENT_DECIMALS = 6;
 
-function parsePriceWei(priceEth: string): string | null {
-  if (!priceEth) return null;
-  const [whole, fraction = ""] = priceEth.split(".");
-  const fracPadded = `${fraction}${"0".repeat(18)}`.slice(0, 18);
+function parsePriceAtomic(priceUsdc: string): string | null {
+  if (!priceUsdc) return null;
   try {
-    return (
-      BigInt(whole || "0") * 10n ** 18n +
-      BigInt(fracPadded || "0")
-    ).toString();
+    return parseUnits(priceUsdc, SETTLEMENT_DECIMALS).toString();
   } catch {
     return null;
   }
@@ -121,8 +118,8 @@ export const useUploadStore = create<UploadStore>()(
     (set, get) => ({
       title: "",
       description: "",
-      priceEth: "",
-      payCurrency: "ETH",
+      priceUsdc: "",
+      displayCurrency: "USDC",
       file: null,
       job: null,
       jobStatus: null,
@@ -135,8 +132,8 @@ export const useUploadStore = create<UploadStore>()(
       hasInitialized: false,
       setTitle: (value) => set({ title: value }),
       setDescription: (value) => set({ description: value }),
-      setPriceEth: (value) => set({ priceEth: value }),
-      setPayCurrency: (value) => set({ payCurrency: value }),
+      setPriceUsdc: (value) => set({ priceUsdc: value }),
+      setDisplayCurrency: (value) => set({ displayCurrency: value }),
       setFile: (value) => set({ file: value }),
       setError: (value) => set({ error: value }),
       initializeUploadState: (preferredCurrency) => {
@@ -144,16 +141,22 @@ export const useUploadStore = create<UploadStore>()(
         if (state.hasInitialized) return;
 
         const session = loadUploadSession();
+        const legacyState = state as UploadStore & {
+          priceEth?: string;
+          payCurrency?: DisplayCurrency;
+        };
         const nextState: Partial<UploadStore> = {
           hasInitialized: true,
         };
         const hasDraft =
           !!state.title ||
           !!state.description ||
-          !!state.priceEth ||
-          state.payCurrency !== "ETH";
+          !!legacyState.priceUsdc ||
+          !!legacyState.priceEth ||
+          legacyState.displayCurrency !== "USDC" ||
+          legacyState.payCurrency !== undefined;
         if (!hasDraft && !session) {
-          nextState.payCurrency = preferredCurrency;
+          nextState.displayCurrency = preferredCurrency;
         }
 
         if (!session) {
@@ -168,12 +171,18 @@ export const useUploadStore = create<UploadStore>()(
         if (!state.description) {
           nextState.description = session.description;
         }
-        if (!state.priceEth && session.priceWei) {
-          const whole = BigInt(session.priceWei) / 10n ** 18n;
-          const fraction = (BigInt(session.priceWei) % 10n ** 18n)
+        const sessionPriceAtomic = session.priceAtomic ?? session.priceWei;
+        if (!legacyState.priceUsdc && sessionPriceAtomic) {
+          const whole = BigInt(sessionPriceAtomic) / 10n ** BigInt(SETTLEMENT_DECIMALS);
+          const fraction = (BigInt(sessionPriceAtomic) % 10n ** BigInt(SETTLEMENT_DECIMALS))
             .toString()
-            .padStart(18, "0");
-          nextState.priceEth = `${whole}.${fraction}`.replace(/\.?0+$/, "");
+            .padStart(SETTLEMENT_DECIMALS, "0");
+          nextState.priceUsdc = `${whole}.${fraction}`.replace(/\.?0+$/, "");
+        }
+        if (!hasDraft) {
+          nextState.displayCurrency = preferredCurrency;
+        } else if (legacyState.payCurrency) {
+          nextState.displayCurrency = legacyState.payCurrency;
         }
         if (session.jobId && !state.job) {
           nextState.job = {
@@ -222,8 +231,13 @@ export const useUploadStore = create<UploadStore>()(
           set({ error: "Select a dataset file." });
           return;
         }
-        const priceWei = parsePriceWei(state.priceEth);
-        if (!priceWei) {
+        const legacyState = state as UploadStore & {
+          priceEth?: string;
+        };
+        const priceAtomic = parsePriceAtomic(
+          legacyState.priceUsdc ?? legacyState.priceEth ?? "",
+        );
+        if (!priceAtomic) {
           set({ error: "Enter a valid price." });
           return;
         }
@@ -233,7 +247,11 @@ export const useUploadStore = create<UploadStore>()(
         formData.append("title", state.title);
         formData.append("description", state.description);
         formData.append("seller", address);
-        formData.append("price", priceWei);
+        formData.append("price_atomic", priceAtomic);
+        formData.append("settlement_currency", "USDC");
+        formData.append("settlement_decimals", String(SETTLEMENT_DECIMALS));
+        // Legacy compatibility while the backend finishes the migration.
+        formData.append("price", priceAtomic);
         formData.append("seller_wallet_type", "evm");
 
         set({ loading: true, error: null });
@@ -246,7 +264,9 @@ export const useUploadStore = create<UploadStore>()(
             title: state.title,
             description: state.description,
             seller: address,
-            priceWei,
+            priceAtomic,
+            settlementCurrency: "USDC",
+            settlementDecimals: SETTLEMENT_DECIMALS,
             fileName: state.file.name,
             status: "queued",
             createdAt: new Date().toISOString(),
@@ -379,9 +399,11 @@ export const useUploadStore = create<UploadStore>()(
           return null;
         }
 
-        const effectivePriceWei =
-          state.persistedSession?.priceWei ?? parsePriceWei(state.priceEth);
-        if (!effectivePriceWei) {
+        const effectivePriceAtomic =
+          state.persistedSession?.priceAtomic ??
+          state.persistedSession?.priceWei ??
+          parsePriceAtomic(state.priceUsdc);
+        if (!effectivePriceAtomic) {
           set({ error: "Missing price." });
           return null;
         }
@@ -395,7 +417,7 @@ export const useUploadStore = create<UploadStore>()(
             description:
               state.persistedSession?.description ?? state.description,
             seller: address,
-            priceWei: effectivePriceWei,
+            priceAtomic: effectivePriceAtomic,
             datasetUrl: currentDatasetUrl,
             datasetHash: currentDatasetHash,
             signatureUrl: currentSignatureUrl,
@@ -430,8 +452,8 @@ export const useUploadStore = create<UploadStore>()(
       partialize: (state) => ({
         title: state.title,
         description: state.description,
-        priceEth: state.priceEth,
-        payCurrency: state.payCurrency,
+        priceUsdc: state.priceUsdc,
+        displayCurrency: state.displayCurrency,
         job: state.job,
         jobStatus: state.jobStatus,
         persistedSession: state.persistedSession,
@@ -449,6 +471,6 @@ export const useUploadStore = create<UploadStore>()(
   ),
 );
 
-export function selectUploadPriceWei(priceEth: string): string | null {
-  return parsePriceWei(priceEth);
+export function selectUploadPriceAtomic(priceUsdc: string): string | null {
+  return parsePriceAtomic(priceUsdc);
 }

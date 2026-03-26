@@ -237,6 +237,8 @@ make getall
 
 `make seed-anvil` uses `evm/script/SeedMarketplace.s.sol` and creates deterministic UUID-compatible `bytes32` item IDs so frontend route + backend UUID conversion remain consistent.
 
+`make deploy-anvil` also syncs the deployed marketplace address into local app config files used by the server and Tilt-based client/server deployments.
+
 ## 🧰 Troubleshooting
 
 ### MetaMask connected but create/buy fails
@@ -248,7 +250,13 @@ make getall
 ### Error: no contract code found at configured address
 
 - Address is wrong for the active chain or deployment changed.
-- Re-run `make deploy-anvil` and update `VITE_CONTRACT_ADDRESS`.
+- Re-run `make deploy-anvil` so local config files are refreshed with the new address.
+
+### `getAllItems()` reverts in the backend but `make getall` works
+
+- Check that the backend is calling the same deployed address saved in `evm/deployments/anvil_marketplace.addr`.
+- If you redeployed Anvil, re-run `make deploy-anvil` to sync `infra/k8s/development/secrets.yaml` and `server/.env`.
+- Restart the server resource after the config update so the new `CONTRACT_ADDRESS` is loaded.
 
 ### `Marketplace__ItemDoesNotExist(bytes32)`
 

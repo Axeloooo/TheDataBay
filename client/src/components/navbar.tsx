@@ -21,33 +21,16 @@ import {
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { toast } from "sonner";
+import { DisplayCurrencySelector } from "@/components/display-currency-selector";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { cn } from "@/lib/utils";
 import { useSearchStore } from "@/stores/search-store";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { useWalletStore } from "@/stores/wallet-store";
-import type { DisplayCurrency } from "@/lib/fx";
-
-type CurrencyOption = {
-  code: DisplayCurrency;
-  icon: string;
-};
-
-const CURRENCY_OPTIONS = [
-  { code: "ETH", icon: "/eth-logo.svg" },
-  { code: "USD", icon: "/usa-flag.svg" },
-  { code: "CAD", icon: "/canada-flag.svg" },
-  { code: "EUR", icon: "/eu-flag.svg" },
-  { code: "USDC", icon: "/usdc-logo.svg" },
-  { code: "SOL", icon: "/sol-logo.svg" },
-  { code: "CNY", icon: "/china-flag.svg" },
-  { code: "USDT", icon: "/usdt-logo.svg" },
-] as const satisfies readonly CurrencyOption[];
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -74,9 +57,6 @@ function Navbar() {
   const resultCount = useSearchStore((state) => state.resultCount);
   const isSearching = useSearchStore((state) => state.isSearching);
   const submittedQuery = useSearchStore((state) => state.submittedQuery);
-  const selectedCurrency = CURRENCY_OPTIONS.find(
-    (option) => option.code === preferredCurrency,
-  );
 
   const executeSearch = () => {
     submitSearch();
@@ -115,7 +95,7 @@ function Navbar() {
               BridgeMart
             </div>
             <div className="truncate text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-              Cross-chain dataset exchange
+              USDC-settled dataset exchange
             </div>
           </div>
         </Link>
@@ -199,48 +179,13 @@ function Navbar() {
             )}
           </NavLink>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="h-9 gap-1.5 border-border/80 bg-background/75 px-2 text-xs font-medium md:px-3"
-                title="Display currency (payments remain ETH on-chain)"
-              >
-                {selectedCurrency && (
-                  <img
-                    src={selectedCurrency.icon}
-                    alt=""
-                    aria-hidden="true"
-                    className="h-4 w-4 shrink-0 rounded-sm object-contain"
-                  />
-                )}
-                {preferredCurrency}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[120px]">
-              {CURRENCY_OPTIONS.map((option) => (
-                <DropdownMenuItem
-                  key={option.code}
-                  onClick={() => setPreferredCurrency(option.code)}
-                  className={cn(
-                    "gap-2 text-xs",
-                    preferredCurrency === option.code ? "bg-accent" : "",
-                  )}
-                >
-                  <img
-                    src={option.icon}
-                    alt=""
-                    aria-hidden="true"
-                    className="h-4 w-4 shrink-0 rounded-sm object-contain"
-                  />
-                  <span>{option.code}</span>
-                  {preferredCurrency === option.code && (
-                    <span className="ml-auto text-xs">✓</span>
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <DisplayCurrencySelector
+            value={preferredCurrency}
+            onChange={setPreferredCurrency}
+            compact
+            title="Quote currency"
+            buttonClassName="h-9 px-2 text-xs font-medium md:px-3"
+          />
 
           {isConnected && (
             <Link to="/upload">
@@ -281,7 +226,7 @@ function Navbar() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={connect} className="gap-2">
                   <Hexagon className="h-4 w-4" />
-                  Ethereum
+                  EVM
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled className="gap-2">
                   <Orbit className="h-4 w-4" />
@@ -314,8 +259,8 @@ function Navbar() {
       </div>
       {ratesUnavailable && (
         <p className="mt-2 text-right text-[11px] font-medium text-muted-foreground">
-          Live FX feed unavailable; prices shown in ETH remain accurate
-          on-chain.
+          Live FX feed unavailable; quote conversions may be approximate, but
+          settlement remains in USDC.
         </p>
       )}
     </div>

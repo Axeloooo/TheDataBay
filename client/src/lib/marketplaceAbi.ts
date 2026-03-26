@@ -1,7 +1,8 @@
 export const marketplaceAbi = [
   "function createItem(bytes32 itemId,string title,string description,address seller,uint256 price,string datasetUrl,bytes32 datasetHash,string signatureUrl,bytes32 signatureHash)",
-  "function buyItem(bytes32 itemId) payable",
+  "function buyItem(bytes32 itemId)",
   "function feeBps() view returns (uint256)",
+  "function settlementToken() view returns (address)",
   "function getItemView(bytes32 itemId) view returns (tuple(bytes32 itemId,string title,string description,address seller,uint256 price,string datasetUrl,bytes32 datasetHash,string signatureUrl,bytes32 signatureHash,bool exists,uint256 purchaseCount))",
   "error Marketplace__InitialOwnerRequired()",
   "error Marketplace__ItemDoesNotExist(bytes32)",

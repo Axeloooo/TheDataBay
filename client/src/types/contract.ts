@@ -1,11 +1,20 @@
 import type { WalletType } from "@/types/dataset";
 
+export type SettlementCurrency = "USDC";
+
 export type MarketplaceDataItem = {
   id: string;
   title: string;
   description: string;
   seller: string;
-  price: string;
+  price_atomic?: string;
+  settlement_currency?: SettlementCurrency | string;
+  settlement_decimals?: number;
+  /**
+   * Legacy compatibility for pre-migration listings.
+   * New code should read `price_atomic` plus settlement metadata.
+   */
+  price?: string | number | bigint;
   dataset_url: string;
   dataset_hash: string;
   signature_url: string;
