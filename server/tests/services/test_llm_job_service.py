@@ -56,6 +56,27 @@ def test_enqueue_batch_job_invalid_extension(settings, job_manager):
         )
 
 
+def test_enqueue_batch_job_rejects_non_evm_wallet(settings, job_manager):
+    file = make_upload_file("data.csv", b"col1,col2\n1,2\n")
+    tasks = BackgroundTasks()
+
+    with pytest.raises(HTTPException):
+        asyncio.run(
+            llm_job_service.enqueue_batch_job(
+                file=file,
+                background_tasks=tasks,
+                settings=settings,
+                job_manager=job_manager,
+                title="Dataset",
+                description="Desc",
+                seller="0x0000000000000000000000000000000000000001",
+                price=100,
+                session=object(),
+                seller_wallet_type="solana",
+            )
+        )
+
+
 def test_enqueue_batch_job_too_large(settings, job_manager):
     file = make_upload_file("data.csv", b"x" * 10)
     tasks = BackgroundTasks()

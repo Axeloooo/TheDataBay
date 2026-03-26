@@ -97,6 +97,30 @@ def test_upload_signature_success(monkeypatch, settings):
     assert signature_hash == expected_hash
 
 
+def test_upload_signature_without_compression(monkeypatch, settings):
+    response = FakeResponse(status_code=200, json_data={"IpfsHash": "QmHash"})
+    monkeypatch.setattr(
+        pinata_service.httpx,
+        "AsyncClient",
+        make_async_client(post_response=response),
+    )
+
+    embeddings = [[0.1, 0.2]]
+    filename = "data.csv"
+
+    ipfs_url, signature_hash = asyncio.run(
+        pinata_service.upload_signature(embeddings, filename, settings, compress=False)
+    )
+
+    expected_bytes = json.dumps(
+        {"embeddings": embeddings, "filename": filename}
+    ).encode("utf-8")
+    expected_hash = "0x" + hashlib.sha256(expected_bytes).hexdigest()
+
+    assert ipfs_url == "ipfs://QmHash"
+    assert signature_hash == expected_hash
+
+
 def test_upload_bytes_success(monkeypatch, settings):
     response = FakeResponse(status_code=200, json_data={"IpfsHash": "QmHash"})
     monkeypatch.setattr(
