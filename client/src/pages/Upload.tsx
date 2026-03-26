@@ -34,6 +34,7 @@ import { isSameAddress } from "@/lib/marketplace";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { useWalletStore } from "@/stores/wallet-store";
 import { selectUploadPriceAtomic, useUploadStore } from "@/stores/upload-store";
+import { ChainIcon } from "@/components/chain-icon";
 
 function Upload() {
   const isConnected = useWalletStore((state) => state.isConnected);
@@ -203,8 +204,8 @@ function Upload() {
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
             <Button className="gap-2" onClick={() => void connect()}>
-              <Wallet className="h-4 w-4" />
-              Connect EVM Wallet
+              <ChainIcon chain="evm" className="h-4 w-4" />
+              Connect Ethereum Wallet
             </Button>
             <Button variant="outline" onClick={() => navigate("/")}>
               Back to Marketplace
@@ -537,6 +538,25 @@ function Upload() {
                     </Button>
                   </div>
                 </div>
+                {createTxHash && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Create Tx</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-xs break-all">
+                        {createTxHash}
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() =>
+                          copyToClipboard(createTxHash, "Create Tx Hash")
+                        }
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between gap-3">
                   <Button
                     variant="outline"
@@ -590,25 +610,6 @@ function Upload() {
                     )}
                   </Button>
                 </div>
-                {createTxHash && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Create Tx</p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-xs break-all">
-                        {createTxHash}
-                      </code>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() =>
-                          copyToClipboard(createTxHash, "Create Tx Hash")
-                        }
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}

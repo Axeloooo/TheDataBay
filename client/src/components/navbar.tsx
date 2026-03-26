@@ -12,8 +12,6 @@ import {
   Wallet,
   Upload,
   X,
-  Hexagon,
-  Orbit,
   Sparkles,
   CircleHelp,
   Bot,
@@ -31,6 +29,7 @@ import {
 import { useSearchStore } from "@/stores/search-store";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { useWalletStore } from "@/stores/wallet-store";
+import { ChainIcon } from "@/components/chain-icon";
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
@@ -225,11 +224,11 @@ function Navbar() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={connect} className="gap-2">
-                  <Hexagon className="h-4 w-4" />
-                  EVM
+                  <ChainIcon chain="evm" className="h-4 w-4" />
+                  Ethereum
                 </DropdownMenuItem>
                 <DropdownMenuItem disabled className="gap-2">
-                  <Orbit className="h-4 w-4" />
+                  <ChainIcon chain="solana" className="h-4 w-4 opacity-70" />
                   Solana (coming soon)
                 </DropdownMenuItem>
               </DropdownMenuContent>

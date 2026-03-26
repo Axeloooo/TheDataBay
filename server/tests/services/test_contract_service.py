@@ -66,6 +66,23 @@ def test_get_purchased_items_by_wallet_invalid_block_range(monkeypatch, settings
     assert "start_block cannot be greater than end_block" in str(exc_info.value.detail)
 
 
+def test_get_all_items_returns_empty_when_contract_not_deployed(monkeypatch, settings):
+    fake_web3 = SimpleNamespace(
+        eth=SimpleNamespace(
+            get_code=lambda _address: b"",
+        )
+    )
+
+    monkeypatch.setattr(contract_service, "_get_web3", lambda _settings: fake_web3)
+    monkeypatch.setattr(
+        contract_service,
+        "_get_contract",
+        lambda _settings: (_ for _ in ()).throw(AssertionError("should not build contract")),
+    )
+
+    assert contract_service.get_all_items(settings) == []
+
+
 def test_get_purchased_items_by_wallet_pagination_and_deduping(monkeypatch, settings):
     item_a = bytes.fromhex("01" * 32)
     item_b = bytes.fromhex("02" * 32)

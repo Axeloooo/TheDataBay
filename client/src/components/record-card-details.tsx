@@ -13,17 +13,15 @@ import {
   Shield,
   Link2,
   Users,
-  Hexagon,
-  Orbit,
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { MarketplaceDataItem } from "@/types/contract";
 import { Badge } from "@/components/ui/badge";
+import { ChainIcon, detectAddressChain } from "@/components/chain-icon";
 import {
   convertSettlementToCurrency,
-  DISPLAY_CURRENCY_OPTIONS,
   formatCurrencyAmount,
 } from "@/lib/fx";
 import { normalizeMarketplacePrice } from "@/lib/marketplace";
@@ -66,11 +64,7 @@ function RecordCardDetails({
           rates,
         )
       : null;
-  const preferredCurrencyOption =
-    DISPLAY_CURRENCY_OPTIONS.find((option) => option.code === preferredCurrency) ??
-    DISPLAY_CURRENCY_OPTIONS[0];
-  const sellerIsEvm = /^0x[a-fA-F0-9]{40}$/.test(dataset.seller);
-  const sellerIsSolana = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(dataset.seller);
+  const sellerChain = detectAddressChain(dataset.seller);
 
   return (
     <div className="space-y-6">
@@ -144,16 +138,8 @@ function RecordCardDetails({
                 </span>
               </p>
               {equivalent !== null && (
-                <p className="mt-2 inline-flex items-center gap-2 text-sm text-muted-foreground">
-                  <img
-                    src={preferredCurrencyOption.icon}
-                    alt=""
-                    aria-hidden="true"
-                    className="h-4 w-4 rounded-sm object-contain"
-                  />
-                  <span>
-                    ~ {formatCurrencyAmount(equivalent, preferredCurrency)}
-                  </span>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  ~ {formatCurrencyAmount(equivalent, preferredCurrency)}
                 </p>
               )}
               <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
@@ -255,15 +241,15 @@ function RecordCardDetails({
           <div>
             <p className="text-sm text-muted-foreground mb-2">Seller Address</p>
             <div className="mb-2">
-              <Badge variant="outline">
-                {sellerIsEvm ? (
+              <Badge variant="outline" className="gap-1.5">
+                {sellerChain === "evm" ? (
                   <>
-                    <Hexagon className="mr-1 h-3.5 w-3.5" />
-                    EVM
+                    <ChainIcon chain="evm" className="h-3.5 w-3.5" />
+                    Ethereum
                   </>
-                ) : sellerIsSolana ? (
+                ) : sellerChain === "solana" ? (
                   <>
-                    <Orbit className="mr-1 h-3.5 w-3.5" />
+                    <ChainIcon chain="solana" className="h-3.5 w-3.5" />
                     Solana
                   </>
                 ) : (
@@ -272,7 +258,12 @@ function RecordCardDetails({
               </Badge>
             </div>
             <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-sm">
+              {sellerChain && (
+                <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted/60">
+                  <ChainIcon chain={sellerChain} className="h-5 w-5" />
+                </div>
+              )}
+              <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm">
                 {dataset.seller}
               </code>
               <Button
