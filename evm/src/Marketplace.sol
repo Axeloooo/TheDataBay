@@ -2,15 +2,20 @@
 pragma solidity ^0.8.19;
 
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
  * @title BridgeMart Marketplace (single-chain now, CCIP-ready later)
  * @author Axel Sanchez (@Axeloooo)
- * @notice ETH purchases on one chain. Later: CCIP can call _purchase() after cross-chain funds arrive.
+ * @notice USDC purchases on one chain. Later: CCIP can call _purchase() after cross-chain funds arrive.
+ * @custom:security-contact security@bridgemart.com
  */
 contract Marketplace is Ownable, ReentrancyGuard {
+    using SafeERC20 for IERC20;
+
     // ========= Errors =========
     error Marketplace__InitialOwnerRequired();
     error Marketplace__ItemDoesNotExist(bytes32 itemId);
@@ -21,13 +26,15 @@ contract Marketplace is Ownable, ReentrancyGuard {
     error Marketplace__DescriptionRequired();
     error Marketplace__DatasetUrlRequired();
     error Marketplace__SignatureUrlRequired();
-    error Marketplace__InvalidPayment(uint256 required, uint256 provided);
     error Marketplace__AlreadyHasAccess(bytes32 walletId, bytes32 itemId);
-    error Marketplace__TransferFailed();
     error Marketplace__InvalidFeeBps(uint256 bps);
     error Marketplace__FeeRecipientRequired();
+    error Marketplace__SettlementTokenRequired();
     error Marketplace__SellerRequired();
+    error Marketplace__SellerCannotBuyOwnItem();
     error Marketplace__ItemFrozen(bytes32 itemId);
+    error Marketplace__InsufficientAllowance(uint256 required, uint256 available);
+    error Marketplace__InsufficientBalance(uint256 required, uint256 available);
 
     // ========= Storage =========
 
@@ -35,7 +42,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
         string title;
         string description;
         address seller;
-        uint256 price; // wei
+        uint256 price; // USDC atomic units (6 decimals)
 
         string datasetUrl;
         bytes32 datasetHash;
@@ -73,11 +80,12 @@ contract Marketplace is Ownable, ReentrancyGuard {
     // fee in basis points (bps): 100 = 1%, 250 = 2.5%, 10000 = 100%
     uint256 public feeBps;
     address public feeRecipient;
+    IERC20 public immutable settlementToken;
+    uint8 public constant SETTLEMENT_DECIMALS = 6;
 
-    // Maximum price to prevent overflow in totalPrice calculation (price + fee)
-    // Set to 10^6 ETH (1 million ETH) which is practical and leaves ample room for fee addition
-    // With max fee of 100% (feeBps = 10000), max totalPrice = 2 * 10^6 ETH, well below uint256 max
-    uint256 public constant MAX_PRICE = 1_000_000 ether;
+    // Maximum price to prevent overflow in totalPrice calculation (price + fee).
+    // Set to 1,000,000 USDC with 6 decimals, which leaves ample room for fee addition.
+    uint256 public constant MAX_PRICE = 1_000_000 * 10 ** 6;
 
     // ========= Events =========
     event FeeConfigUpdated(uint256 oldFeeBps, uint256 newFeeBps, address oldRecipient, address newRecipient);
@@ -124,12 +132,18 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @notice Marketplace constructor
      *
      * @param initialOwner The address of the initial owner
+     * @param _settlementToken The USDC token address used for settlement
      * @param _feeRecipient The address that will receive marketplace fees
      * @param _feeBps The fee in basis points (bps)
      */
-    constructor(address initialOwner, address _feeRecipient, uint256 _feeBps) Ownable(initialOwner) {
+    constructor(address initialOwner, address _settlementToken, address _feeRecipient, uint256 _feeBps)
+        Ownable(initialOwner)
+    {
+        if (initialOwner == address(0)) revert Marketplace__InitialOwnerRequired();
+        if (_settlementToken == address(0)) revert Marketplace__SettlementTokenRequired();
         if (_feeRecipient == address(0)) revert Marketplace__FeeRecipientRequired();
         if (_feeBps > 10_000) revert Marketplace__InvalidFeeBps(_feeBps);
+        settlementToken = IERC20(_settlementToken);
         feeRecipient = _feeRecipient;
         feeBps = _feeBps;
     }
@@ -162,7 +176,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
      * @param title The title of the dataset
      * @param description The description of the dataset
      * @param seller The address of the dataset seller
-     * @param price The price in wei
+     * @param price The price in USDC atomic units
      * @param datasetUrl The URL of the dataset
      * @param datasetHash The hash of the dataset
      * @param signatureUrl The URL of the signature
@@ -276,35 +290,36 @@ contract Marketplace is Ownable, ReentrancyGuard {
 
     // ========= Purchase (single chain now) =========
     /**
-     * @notice Purchase an item by paying the exact amount (price + fee).
+     * @notice Purchase an item by transferring USDC (price + fee) from the buyer.
      *
      * @param itemId The ID of the item to purchase
      */
-    function buyItem(bytes32 itemId) external payable nonReentrant onlyExistingItem(itemId) {
-        _purchase(itemId, msg.sender, msg.value);
+    function buyItem(bytes32 itemId) external nonReentrant onlyExistingItem(itemId) {
+        _purchase(itemId, msg.sender);
     }
 
     /**
      *
      * @notice Internal purchase logic, can be called by CCIP handler later for cross-chain purchases.
      *
-     * @dev Internal purchase path. Later CCIP receiver can call this after receiving bridged USDC (or ETH).
+     * @dev Internal purchase path. Later CCIP receiver can call this after receiving bridged USDC.
      *      Fee and totalPrice calculations are overflow-safe due to MAX_PRICE enforcement.
-     *      With MAX_PRICE = 10^6 ETH and max feeBps = 10000 (100%), max totalPrice = 2 * 10^6 ETH,
-     *      which is well within uint256 range and practically sendable as msg.value.
      *      Follows checks-effects-interactions pattern: all state changes occur before external calls.
      *
      * @param itemId The ID of the item to purchase
      * @param buyer The address of the buyer
-     * @param amountPaid The amount paid by the buyer
      */
-    function _purchase(bytes32 itemId, address buyer, uint256 amountPaid) internal {
+    function _purchase(bytes32 itemId, address buyer) internal {
         DataItem storage it = items[itemId];
+        if (buyer == it.seller) revert Marketplace__SellerCannotBuyOwnItem();
 
         uint256 fee = (it.price * feeBps) / 10_000;
         uint256 totalPrice = it.price + fee;
+        uint256 allowance = settlementToken.allowance(buyer, address(this));
+        if (allowance < totalPrice) revert Marketplace__InsufficientAllowance(totalPrice, allowance);
+        uint256 balance = settlementToken.balanceOf(buyer);
+        if (balance < totalPrice) revert Marketplace__InsufficientBalance(totalPrice, balance);
 
-        if (amountPaid != totalPrice) revert Marketplace__InvalidPayment(totalPrice, amountPaid);
         bytes32 walletId = _walletIdForEvm(buyer);
         if (it.accessList[walletId]) revert Marketplace__AlreadyHasAccess(walletId, itemId);
 
@@ -312,15 +327,13 @@ contract Marketplace is Ownable, ReentrancyGuard {
         it.purchaseCount += 1;
 
         if (fee > 0) {
-            (bool okFee,) = feeRecipient.call{value: fee}("");
-            if (!okFee) revert Marketplace__TransferFailed();
+            settlementToken.safeTransferFrom(buyer, feeRecipient, fee);
         }
 
-        (bool okSeller,) = it.seller.call{value: it.price}("");
-        if (!okSeller) revert Marketplace__TransferFailed();
+        settlementToken.safeTransferFrom(buyer, it.seller, it.price);
 
         if (it.purchaseCount == 1) emit ItemFrozenAfterSale(itemId);
-        emit ItemPurchased(itemId, buyer, amountPaid, fee, it.price);
+        emit ItemPurchased(itemId, buyer, totalPrice, fee, it.price);
     }
 
     // ========= Views =========

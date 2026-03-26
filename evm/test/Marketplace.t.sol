@@ -3,15 +3,18 @@ pragma solidity ^0.8.19;
 
 import {Test} from "forge-std/Test.sol";
 import {Marketplace} from "../src/Marketplace.sol";
+import {MockUSDC} from "../src/MockUSDC.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 contract MarketplaceTest is Test {
     Marketplace public marketplace;
+    MockUSDC public usdc;
 
     address owner = address(0xA11CE);
     address feeRecipient = address(0xFEE);
     address seller = address(0xB0B);
     address buyer = address(0xCAFE);
+    address poorBuyer = address(0xDEAD);
 
     uint256 feeBps = 250; // 2.5%
 
@@ -21,13 +24,14 @@ contract MarketplaceTest is Test {
     bytes32 constant DATASET_HASH = bytes32(uint256(0x1111));
     string constant SIG_URL = "ipfs://signature.json.gz";
     bytes32 constant SIG_HASH = bytes32(uint256(0x2222));
-    uint256 constant PRICE = 1 ether;
+    uint256 constant PRICE = 1_000_000;
 
     uint256 private idCounter = 0;
 
     function setUp() public {
-        marketplace = new Marketplace(owner, feeRecipient, feeBps);
-        vm.deal(buyer, 100 ether);
+        usdc = new MockUSDC();
+        marketplace = new Marketplace(owner, address(usdc), feeRecipient, feeBps);
+        usdc.mint(buyer, 100_000_000);
     }
 
     function _walletId(address user) internal view returns (bytes32) {
@@ -45,7 +49,9 @@ contract MarketplaceTest is Test {
 
     function _buy(bytes32 itemId, address _buyer, uint256 value) internal {
         vm.prank(_buyer);
-        marketplace.buyItem{value: value}(itemId);
+        usdc.approve(address(marketplace), value);
+        vm.prank(_buyer);
+        marketplace.buyItem(itemId);
     }
 
     function test_createItem_requires_seller() public {
@@ -63,6 +69,7 @@ contract MarketplaceTest is Test {
         assertEq(v.title, TITLE);
         assertEq(v.description, DESC);
         assertEq(v.seller, seller);
+        assertEq(v.price, PRICE);
     }
 
     function test_createItem_rejects_empty_fields() public {
@@ -149,29 +156,30 @@ contract MarketplaceTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(Marketplace.Marketplace__ItemDoesNotExist.selector, bytes32(uint256(999)))
         );
-        marketplace.buyItem{value: 1}(bytes32(uint256(999)));
+        marketplace.buyItem(bytes32(uint256(999)));
     }
 
-    function test_buyItem_rejects_underpayment() public {
+    function test_buyItem_rejects_insufficient_allowance() public {
         bytes32 itemId = _createDefaultItem();
         uint256 fee = (PRICE * feeBps) / 10_000;
         uint256 totalPrice = PRICE + fee;
         vm.prank(buyer);
-        vm.expectRevert(
-            abi.encodeWithSelector(Marketplace.Marketplace__InvalidPayment.selector, totalPrice, totalPrice - 1)
-        );
-        marketplace.buyItem{value: totalPrice - 1}(itemId);
+        vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__InsufficientAllowance.selector, totalPrice, 0));
+        marketplace.buyItem(itemId);
     }
 
-    function test_buyItem_rejects_overpayment() public {
+    function test_buyItem_rejects_insufficient_balance() public {
         bytes32 itemId = _createDefaultItem();
         uint256 fee = (PRICE * feeBps) / 10_000;
         uint256 totalPrice = PRICE + fee;
-        vm.prank(buyer);
+        usdc.mint(poorBuyer, totalPrice - 1);
+        vm.prank(poorBuyer);
+        usdc.approve(address(marketplace), totalPrice);
+        vm.prank(poorBuyer);
         vm.expectRevert(
-            abi.encodeWithSelector(Marketplace.Marketplace__InvalidPayment.selector, totalPrice, totalPrice + 1)
+            abi.encodeWithSelector(Marketplace.Marketplace__InsufficientBalance.selector, totalPrice, totalPrice - 1)
         );
-        marketplace.buyItem{value: totalPrice + 1}(itemId);
+        marketplace.buyItem(itemId);
     }
 
     function test_buyItem_prevents_double_purchase() public {
@@ -180,23 +188,39 @@ contract MarketplaceTest is Test {
         uint256 totalPrice = PRICE + fee;
         _buy(itemId, buyer, totalPrice);
         vm.prank(buyer);
+        usdc.approve(address(marketplace), totalPrice);
+        vm.prank(buyer);
         vm.expectRevert(
             abi.encodeWithSelector(Marketplace.Marketplace__AlreadyHasAccess.selector, _walletId(buyer), itemId)
         );
-        marketplace.buyItem{value: totalPrice}(itemId);
+        marketplace.buyItem(itemId);
     }
 
     function test_buyItem_transfers_funds() public {
         bytes32 itemId = _createDefaultItem();
         uint256 fee = (PRICE * feeBps) / 10_000;
         uint256 totalPrice = PRICE + fee;
-        uint256 sellerBalanceBefore = seller.balance;
-        uint256 feeBalanceBefore = feeRecipient.balance;
+        uint256 sellerBalanceBefore = usdc.balanceOf(seller);
+        uint256 feeBalanceBefore = usdc.balanceOf(feeRecipient);
+        uint256 buyerBalanceBefore = usdc.balanceOf(buyer);
 
         _buy(itemId, buyer, totalPrice);
 
-        assertEq(seller.balance, sellerBalanceBefore + PRICE);
-        assertEq(feeRecipient.balance, feeBalanceBefore + fee);
+        assertEq(usdc.balanceOf(seller), sellerBalanceBefore + PRICE);
+        assertEq(usdc.balanceOf(feeRecipient), feeBalanceBefore + fee);
+        assertEq(usdc.balanceOf(buyer), buyerBalanceBefore - totalPrice);
+    }
+
+    function test_buyItem_rejects_seller_purchase() public {
+        bytes32 itemId = _createDefaultItem();
+        uint256 fee = (PRICE * feeBps) / 10_000;
+        uint256 totalPrice = PRICE + fee;
+        usdc.mint(seller, totalPrice);
+        vm.prank(seller);
+        usdc.approve(address(marketplace), totalPrice);
+        vm.prank(seller);
+        vm.expectRevert(Marketplace.Marketplace__SellerCannotBuyOwnItem.selector);
+        marketplace.buyItem(itemId);
     }
 
     function test_updateDatasetUrl_onlySeller_and_notFrozen() public {
@@ -239,7 +263,7 @@ contract MarketplaceTest is Test {
         bytes32 itemId = _createDefaultItem();
         vm.prank(address(123));
         vm.expectRevert(Marketplace.Marketplace__SellerRequired.selector);
-        marketplace.updatePrice(itemId, 2 ether);
+        marketplace.updatePrice(itemId, 2_000_000);
 
         vm.prank(seller);
         vm.expectRevert(Marketplace.Marketplace__PriceMustBeGreaterThanZero.selector);
@@ -257,7 +281,7 @@ contract MarketplaceTest is Test {
 
         vm.prank(seller);
         vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__ItemFrozen.selector, itemId));
-        marketplace.updatePrice(itemId, 2 ether);
+        marketplace.updatePrice(itemId, 2_000_000);
     }
 
     function test_hasAccess_reverts_for_missing_item() public {

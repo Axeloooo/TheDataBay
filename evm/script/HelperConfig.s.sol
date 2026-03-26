@@ -9,6 +9,7 @@ contract HelperConfig is Script {
      */
     struct NetworkConfig {
         uint256 deployKey;
+        address settlementToken;
         address feeRecipient;
         uint256 feeBps;
     }
@@ -45,9 +46,10 @@ contract HelperConfig is Script {
         uint256 pk = vm.envUint("SEPOLIA_PRIVATE_KEY");
         address deployer = vm.addr(pk);
 
+        address settlementToken = vm.envAddress("SEPOLIA_USDC_ADDRESS");
         address feeR = vm.envOr("SEPOLIA_FEE_RECIPIENT", deployer);
         uint256 feeBps = vm.envOr("SEPOLIA_FEE_BPS", uint256(250));
-        return NetworkConfig({deployKey: pk, feeRecipient: feeR, feeBps: feeBps});
+        return NetworkConfig({deployKey: pk, settlementToken: settlementToken, feeRecipient: feeR, feeBps: feeBps});
     }
 
     /**
@@ -60,6 +62,11 @@ contract HelperConfig is Script {
 
         address defaultFeeRecipient = vm.addr(DEFAULT_ANVIL_KEY);
 
-        return NetworkConfig({deployKey: DEFAULT_ANVIL_KEY, feeRecipient: defaultFeeRecipient, feeBps: DEFAULT_FEE_BPS});
+        return NetworkConfig({
+            deployKey: DEFAULT_ANVIL_KEY,
+            settlementToken: address(0),
+            feeRecipient: defaultFeeRecipient,
+            feeBps: DEFAULT_FEE_BPS
+        });
     }
 }
