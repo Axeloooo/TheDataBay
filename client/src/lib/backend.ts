@@ -10,6 +10,7 @@ import type { KeyReleaseRequest, KeyReleaseResponse } from "@/types/dataset";
 import type { JobResponse, JobStatusResponse } from "@/types/llm";
 import type { SimilaritySearchRequest, SimilaritySearchResponse } from "@/types/ai";
 import type { Agent, AgentListResponse, RecommendationListResponse, PurchaseRequest, PurchaseRequestListResponse } from "@/types/agent";
+import { normalizeAtomicString } from "@/lib/atomic";
 
 type MarketplaceApiItem = Omit<
   MarketplaceDataItem,
@@ -20,30 +21,6 @@ type MarketplaceApiItem = Omit<
   settlement_currency?: unknown;
   settlement_decimals?: unknown;
 };
-
-function normalizeAtomicString(value: unknown): string {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!/^\d+$/.test(trimmed)) {
-      throw new Error("Invalid marketplace price format from API.");
-    }
-    return trimmed;
-  }
-
-  if (typeof value === "number") {
-    if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
-      throw new Error("Invalid marketplace price number from API.");
-    }
-    if (!Number.isSafeInteger(value)) {
-      throw new Error(
-        "Marketplace price exceeds safe integer precision. API must return atomic units as a string.",
-      );
-    }
-    return value.toString();
-  }
-
-  throw new Error("Unsupported marketplace price type from API.");
-}
 
 function normalizeMarketplaceItem(item: MarketplaceApiItem): MarketplaceDataItem {
   const priceAtomic = item.price_atomic ?? item.price;

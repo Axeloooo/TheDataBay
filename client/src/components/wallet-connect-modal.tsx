@@ -196,6 +196,7 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
                   <button
                     key={wallet.id === "injected" ? `injected-${(wallet as InjectedWalletOption).rdns}` : wallet.id}
                     title={wallet.name}
+                    aria-label={wallet.name}
                     onClick={() => void handleSelect(wallet)}
                     disabled={inactive}
                     className={[
@@ -214,6 +215,7 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
               <button
                 disabled
                 title="Solana — coming soon"
+                aria-label="Solana — coming soon"
                 className="flex aspect-square cursor-not-allowed items-center justify-center rounded-xl border border-border/40 bg-card/20 opacity-40 focus-visible:outline-none"
               >
                 <img

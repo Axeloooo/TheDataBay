@@ -406,10 +406,22 @@ export const useUploadStore = create<UploadStore>()(
           return null;
         }
 
+        const parsedPriceAtomic = parsePriceAtomic(state.priceUsdc);
         const effectivePriceAtomic =
-          state.persistedSession?.priceAtomic ??
-          state.persistedSession?.priceWei ??
-          parsePriceAtomic(state.priceUsdc);
+          state.persistedSession?.priceAtomic ?? parsedPriceAtomic;
+
+        if (
+          !effectivePriceAtomic &&
+          state.persistedSession?.priceWei &&
+          !state.persistedSession?.priceAtomic &&
+          !state.priceUsdc
+        ) {
+          set({
+            error:
+              "Saved price from an older draft is incompatible with current pricing. Please re-enter the listing price.",
+          });
+          return null;
+        }
         if (!effectivePriceAtomic) {
           set({ error: "Missing price." });
           return null;

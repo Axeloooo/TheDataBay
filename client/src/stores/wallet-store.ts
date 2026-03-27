@@ -51,9 +51,8 @@ export const useWalletStore = create<WalletStore>()(
         set({ userDisconnected: false, isConnecting: true });
         try {
           await walletRuntime.connect({ connector, eip6963Provider });
-        } catch (error) {
+        } finally {
           set({ isConnecting: false });
-          throw error;
         }
       },
 

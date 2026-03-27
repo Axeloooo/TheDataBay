@@ -12,6 +12,7 @@ import { walletRuntime } from "@/lib/wallet/runtime";
 import { marketplaceAbi } from "@/lib/marketplaceAbi";
 import { uuidToBytes32 } from "@/lib/ids";
 import type { MarketplaceDataItem, SettlementCurrency } from "@/types/contract";
+import { normalizeAtomicString } from "@/lib/atomic";
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS as
   | string
@@ -222,29 +223,6 @@ export function isSameAddress(a?: string | null, b?: string | null): boolean {
 
 export function listingIdFromItem(item: MarketplaceDataItem): string {
   return item.id;
-}
-
-function normalizeAtomicString(value: unknown): string {
-  if (typeof value === "bigint") {
-    if (value < 0n) {
-      throw new Error("Invalid marketplace price: negative bigint");
-    }
-    return value.toString();
-  }
-  if (typeof value === "number") {
-    if (!Number.isFinite(value) || value < 0) {
-      throw new Error("Invalid marketplace price: non-finite or negative number");
-    }
-    return Math.trunc(value).toString();
-  }
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!/^\d+$/.test(trimmed)) {
-      throw new Error("Invalid marketplace price: non-numeric string");
-    }
-    return trimmed;
-  }
-  throw new Error("Invalid marketplace price: unsupported type");
 }
 
 function normalizeDecimals(value: unknown): number {

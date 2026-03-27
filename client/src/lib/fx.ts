@@ -164,8 +164,9 @@ export function convertEthToCurrency(
 
   switch (currency) {
     case "USD":
-    case "USDC":
       return ethAmount * rates.ethUsd;
+    case "USDC":
+      return ethAmount * rates.ethUsdc;
     case "CAD":
       return ethAmount * rates.ethCad;
     case "MXN":
