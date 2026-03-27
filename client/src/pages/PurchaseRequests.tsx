@@ -7,6 +7,7 @@ import { backend } from "@/lib/backend";
 import { useAgentStore } from "@/stores/agent-store";
 import { useWalletStore } from "@/stores/wallet-store";
 import type { PurchaseRequest, PurchaseRequestStatus } from "@/types/agent";
+import { toast } from "sonner";
 
 type StatusFilter = "all" | PurchaseRequestStatus;
 
@@ -23,7 +24,12 @@ function PurchaseRequests() {
     loadingPurchaseRequests,
     purchaseRequestError,
     loadPurchaseRequests,
-  } = useAgentStore();
+  } = useAgentStore((state) => ({
+    purchaseRequests: state.purchaseRequests,
+    loadingPurchaseRequests: state.loadingPurchaseRequests,
+    purchaseRequestError: state.purchaseRequestError,
+    loadPurchaseRequests: state.loadPurchaseRequests,
+  }));
   const address = useWalletStore((state) => state.address);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -44,8 +50,10 @@ function PurchaseRequests() {
         reviewed_by: address ?? "unknown",
       });
       loadPurchaseRequests(statusFilter === "all" ? undefined : statusFilter);
-    } catch {
-      // Errors bubble silently; store will surface via next reload
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to approve request.";
+      toast.error(message);
     }
   };
 
@@ -56,8 +64,10 @@ function PurchaseRequests() {
         reviewed_by: address ?? "unknown",
       });
       loadPurchaseRequests(statusFilter === "all" ? undefined : statusFilter);
-    } catch {
-      // Errors bubble silently; store will surface via next reload
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to reject request.";
+      toast.error(message);
     }
   };
 

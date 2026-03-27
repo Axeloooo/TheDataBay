@@ -95,15 +95,15 @@ export function loadCachedFxRates(maxAgeMs: number = DEFAULT_TTL_MS): FxRates | 
     if (!raw) return null;
     const parsed = JSON.parse(raw) as FxRates;
     if (
-      !parsed.updatedAt ||
-      !parsed.ethUsd ||
-      !parsed.ethCad ||
-      !parsed.ethEur ||
-      !parsed.ethMxn ||
-      !parsed.ethCny ||
-      !parsed.ethUsdc ||
-      !parsed.ethSol ||
-      !parsed.ethUsdt
+      !Number.isFinite(parsed.updatedAt) ||
+      !Number.isFinite(parsed.ethUsd) ||
+      !Number.isFinite(parsed.ethCad) ||
+      !Number.isFinite(parsed.ethEur) ||
+      !Number.isFinite(parsed.ethMxn) ||
+      !Number.isFinite(parsed.ethCny) ||
+      !Number.isFinite(parsed.ethUsdc) ||
+      !Number.isFinite(parsed.ethSol) ||
+      !Number.isFinite(parsed.ethUsdt)
     ) {
       return null;
     }

@@ -319,12 +319,19 @@ function DatasetDetail() {
                   setActionError("Seller cannot buy their own listing.");
                   return;
                 }
+                if (
+                  !pricing?.priceAtomic ||
+                  !/^\d+$/.test(pricing.priceAtomic)
+                ) {
+                  setActionError(
+                    "Price unavailable. Please refresh and try again.",
+                  );
+                  return;
+                }
                 setActionError(null);
                 setIsBuying(true);
                 try {
-                  const priceAtomic = BigInt(
-                    pricing?.priceAtomic ?? "0",
-                  );
+                  const priceAtomic = BigInt(pricing.priceAtomic);
                   await buyItemTx(id, priceAtomic);
                   setIsPurchased(true);
                   toast.success("Purchase successful", {

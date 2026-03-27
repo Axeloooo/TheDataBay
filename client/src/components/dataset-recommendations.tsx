@@ -12,7 +12,7 @@ interface DatasetRecommendationsProps {
 export function DatasetRecommendations({ listingId }: DatasetRecommendationsProps) {
   const [recommendations, setRecommendations] = useState<AgentRecommendation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [, setError] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -46,6 +46,20 @@ export function DatasetRecommendations({ listingId }: DatasetRecommendationsProp
         <div className="space-y-3">
           <Skeleton className="h-32 w-full" />
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="mt-6">
+        <div className="flex items-center gap-2 mb-2">
+          <Bot className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Agent Recommendations</span>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Recommendations are unavailable right now. Please try again later.
+        </p>
       </div>
     );
   }
