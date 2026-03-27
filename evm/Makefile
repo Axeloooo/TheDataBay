@@ -53,7 +53,11 @@ deploy-anvil:
 		--broadcast \
 		--private-key $(ANVIL_PRIVATE_KEY)
 	@echo "Extracting deployed addresses..."
-	@ADDR=$$(jq -r '.transactions[] | select(.transactionType=="CREATE") | .contractAddress' broadcast/DeployMarketplace.s.sol/31337/run-latest.json | tail -n 1); \
+	@if ! command -v jq >/dev/null 2>&1; then \
+		echo "ERROR: jq is required but not installed. Please install jq."; \
+		exit 1; \
+	fi; \
+	ADDR=$$(jq -r '.transactions[] | select(.transactionType=="CREATE") | .contractAddress' broadcast/DeployMarketplace.s.sol/31337/run-latest.json | tail -n 1); \
 	if [ -z "$$ADDR" ]; then \
 		echo "ERROR: Could not extract deployed address from broadcast JSON"; \
 		exit 1; \
@@ -69,10 +73,12 @@ sync-local-contract-config:
 	@ADDR=$$(cat $(ANVIL_ADDR_FILE)); \
 	echo "Syncing local config files to marketplace address $$ADDR..."; \
 	if [ -f "../infra/k8s/development/secrets.yaml" ]; then \
+		cp "../infra/k8s/development/secrets.yaml" "../infra/k8s/development/secrets.yaml.bak"; \
 		perl -0pi -e 's/CONTRACT_ADDRESS: "[^"]+"/CONTRACT_ADDRESS: "'"$$ADDR"'"/' ../infra/k8s/development/secrets.yaml; \
 		echo "Updated ../infra/k8s/development/secrets.yaml"; \
 	fi; \
 	if [ -f "../server/.env" ]; then \
+		cp "../server/.env" "../server/.env.bak"; \
 		perl -0pi -e 's/CONTRACT_ADDRESS="[^"]+"/CONTRACT_ADDRESS="'"$$ADDR"'"/' ../server/.env; \
 		echo "Updated ../server/.env"; \
 	fi
@@ -115,7 +121,7 @@ create-item:
 # make mint-usdc TO=0x... AMOUNT=5000000
 mint-usdc:
 	@TOKEN=$$(cat $(ANVIL_USDC_ADDR_FILE)); \
-	TO=$${TO:-$(ANVIL_USDC_RECIPIENT)}; \
+	TO=$${TO:-$${ANVIL_USDC_RECIPIENT:-$$(cast wallet address --private-key $(ANVIL_PRIVATE_KEY))}}; \
 	AMOUNT=$${AMOUNT:-5000000000}; \
 	echo "Minting $$AMOUNT USDC atomic units to $$TO..."; \
 	cast send $$TOKEN "mint(address,uint256)" $$TO $$AMOUNT \

@@ -171,10 +171,11 @@ export const useUploadStore = create<UploadStore>()(
         if (!state.description) {
           nextState.description = session.description;
         }
-        const sessionPriceAtomic = session.priceAtomic ?? session.priceWei;
-        if (!legacyState.priceUsdc && sessionPriceAtomic) {
-          const whole = BigInt(sessionPriceAtomic) / 10n ** BigInt(SETTLEMENT_DECIMALS);
-          const fraction = (BigInt(sessionPriceAtomic) % 10n ** BigInt(SETTLEMENT_DECIMALS))
+        // Only migrate priceAtomic (USDC); legacy priceWei (ETH, 18 decimals) is incompatible.
+        // If session has priceWei but no priceAtomic, skip migration (will force re-entry).
+        if (!legacyState.priceUsdc && session.priceAtomic) {
+          const whole = BigInt(session.priceAtomic) / 10n ** BigInt(SETTLEMENT_DECIMALS);
+          const fraction = (BigInt(session.priceAtomic) % 10n ** BigInt(SETTLEMENT_DECIMALS))
             .toString()
             .padStart(SETTLEMENT_DECIMALS, "0");
           nextState.priceUsdc = `${whole}.${fraction}`.replace(/\.?0+$/, "");
@@ -234,9 +235,15 @@ export const useUploadStore = create<UploadStore>()(
         const legacyState = state as UploadStore & {
           priceEth?: string;
         };
-        const priceAtomic = parsePriceAtomic(
-          legacyState.priceUsdc ?? legacyState.priceEth ?? "",
-        );
+        // Explicit migration handling: do not silently reinterpret ETH price as USDC.
+        if (legacyState.priceEth && !legacyState.priceUsdc) {
+          set({
+            error:
+              "Price format has changed. Please re-enter the price in USDC to continue.",
+          });
+          return;
+        }
+        const priceAtomic = parsePriceAtomic(legacyState.priceUsdc ?? "");
         if (!priceAtomic) {
           set({ error: "Enter a valid price." });
           return;

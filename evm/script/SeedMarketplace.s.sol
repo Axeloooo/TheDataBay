@@ -62,6 +62,17 @@ contract SeedMarketplace is Script {
 
     function _loadItems() internal returns (SeedItem[] memory items) {
         string memory manifestPath = string.concat(vm.projectRoot(), "/../shared/mock-marketplace-items.json");
+        // Check if jq is available before attempting FFI call
+        string[] memory checkCmd = new string[](3);
+        checkCmd[0] = "bash";
+        checkCmd[1] = "-c";
+        checkCmd[2] = "command -v jq >/dev/null 2>&1 && echo 'ok' || echo 'missing'";
+
+        string memory jqCheck = string(vm.ffi(checkCmd));
+        if (keccak256(bytes(jqCheck)) != keccak256(bytes("ok\n"))) {
+            revert("jq is required but not installed. Please install jq to run seeding script.");
+        }
+
         string[] memory cmd = new string[](3);
         cmd[0] = "bash";
         cmd[1] = "-lc";

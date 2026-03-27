@@ -152,7 +152,35 @@ export function convertEthToCurrency(
   currency: DisplayCurrency,
   rates: FxRates | null,
 ): number | null {
-  return convertSettlementToCurrency(ethAmount, currency, rates);
+  if (!Number.isFinite(ethAmount)) return null;
+
+  // Conversions start from an ETH amount and use ETH-denominated rates.
+  switch (currency) {
+    case "ETH":
+      return ethAmount;
+    default:
+      if (!rates) return null;
+  }
+
+  switch (currency) {
+    case "USD":
+    case "USDC":
+      return ethAmount * rates.ethUsd;
+    case "CAD":
+      return ethAmount * rates.ethCad;
+    case "MXN":
+      return ethAmount * rates.ethMxn;
+    case "EUR":
+      return ethAmount * rates.ethEur;
+    case "SOL":
+      return rates.ethSol > 0 ? ethAmount * rates.ethSol : null;
+    case "CNY":
+      return ethAmount * rates.ethCny;
+    case "USDT":
+      return ethAmount * rates.ethUsdt;
+    default:
+      return null;
+  }
 }
 
 export function formatCurrencyAmount(

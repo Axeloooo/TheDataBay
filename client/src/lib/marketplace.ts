@@ -176,6 +176,14 @@ export async function buyItemTx(
     });
 
     if (allowance < total) {
+      // Safer approval strategy for USDT-like tokens that may require resetting allowance to 0 first.
+      // Check if we have an existing non-zero allowance that needs to be reset.
+      if (allowance > 0n) {
+        const resetTx = await token.approve(contractAddress, 0n);
+        console.info("[buyItemTx] resetting allowance", resetTx.hash);
+        await resetTx.wait();
+        console.info("[buyItemTx] allowance reset", resetTx.hash);
+      }
       const approvalTx = await token.approve(contractAddress, total);
       console.info("[buyItemTx] approval sent", approvalTx.hash);
       await approvalTx.wait();
@@ -218,16 +226,25 @@ export function listingIdFromItem(item: MarketplaceDataItem): string {
 
 function normalizeAtomicString(value: unknown): string {
   if (typeof value === "bigint") {
-    return value >= 0n ? value.toString() : "0";
+    if (value < 0n) {
+      throw new Error("Invalid marketplace price: negative bigint");
+    }
+    return value.toString();
   }
   if (typeof value === "number") {
-    return Number.isFinite(value) && value >= 0 ? Math.trunc(value).toString() : "0";
+    if (!Number.isFinite(value) || value < 0) {
+      throw new Error("Invalid marketplace price: non-finite or negative number");
+    }
+    return Math.trunc(value).toString();
   }
   if (typeof value === "string") {
     const trimmed = value.trim();
-    return /^\d+$/.test(trimmed) ? trimmed : "0";
+    if (!/^\d+$/.test(trimmed)) {
+      throw new Error("Invalid marketplace price: non-numeric string");
+    }
+    return trimmed;
   }
-  return "0";
+  throw new Error("Invalid marketplace price: unsupported type");
 }
 
 function normalizeDecimals(value: unknown): number {
@@ -267,7 +284,7 @@ export function normalizeMarketplacePrice(
     priceAtomic,
     settlementCurrency:
       item.settlement_currency === "USDC"
-        ? item.settlement_currency
+        ? "USDC"
         : DEFAULT_SETTLEMENT_CURRENCY,
     settlementDecimals: normalizeDecimals(item.settlement_decimals),
     settlementAmount: formatAtomicAmount(
@@ -281,7 +298,7 @@ export function getSettlementDisplayCurrency(
   item: Pick<MarketplaceDataItem, "settlement_currency">,
 ): SettlementCurrency {
   return item.settlement_currency === "USDC"
-    ? item.settlement_currency
+    ? "USDC"
     : DEFAULT_SETTLEMENT_CURRENCY;
 }
 

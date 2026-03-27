@@ -51,9 +51,24 @@ function normalizeMarketplaceItem(item: MarketplaceApiItem): MarketplaceDataItem
     throw new Error("Missing marketplace price from API.");
   }
 
-  const settlementCurrency = String(item.settlement_currency ?? "USDC");
+  const rawSettlementCurrency = item.settlement_currency;
+  const settlementCurrency = rawSettlementCurrency == null
+    ? "USDC"
+    : String(rawSettlementCurrency).trim().toUpperCase();
   if (settlementCurrency !== "USDC") {
     throw new Error("Unsupported marketplace settlement currency from API.");
+  }
+  if (
+    rawSettlementCurrency != null &&
+    String(rawSettlementCurrency) !== "USDC" &&
+    settlementCurrency === "USDC"
+  ) {
+    // Soft warning: backend returned USDC in a non-canonical format (e.g., wrong case/whitespace).
+    // This keeps the UI resilient while still surfacing potential backend drift.
+    console.warn(
+      "Non-canonical marketplace settlement currency from API; normalized to USDC:",
+      rawSettlementCurrency,
+    );
   }
 
   const settlementDecimals = Number(item.settlement_decimals ?? 6);

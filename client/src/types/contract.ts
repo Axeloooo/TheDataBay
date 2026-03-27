@@ -8,7 +8,7 @@ export type MarketplaceDataItem = {
   description: string;
   seller: string;
   price_atomic?: string;
-  settlement_currency?: SettlementCurrency | string;
+  settlement_currency?: SettlementCurrency | (string & {});
   settlement_decimals?: number;
   /**
    * Legacy compatibility for pre-migration listings.

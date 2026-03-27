@@ -114,9 +114,16 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
     if (wallet.id === "injected" && !wallet.isActive) return;
 
     if (wallet.id === "walletconnect") {
-      // Close our modal first — releases Radix scroll lock before WC QR modal opens
-      onOpenChange(false);
-      await connect("walletconnect");
+      setSelectedWallet(wallet);
+      setError(null);
+      try {
+        await connect("walletconnect");
+        onOpenChange(false);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Connection failed. Please try again.";
+        setError(message);
+      }
       return;
     }
 

@@ -67,13 +67,28 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
 
   loadAgent: async (handle: string) => {
     set({ loadingAgent: true, loadingRecommendations: true, agentError: null });
+
+    // First, load the agent itself.
     try {
       const agent = await backend.getAgent(handle);
       set({ selectedAgent: agent, loadingAgent: false });
+    } catch (err) {
+      set({
+        agentError: err instanceof Error ? err.message : "Failed to load agent",
+        loadingAgent: false,
+        loadingRecommendations: false,
+      });
+      return;
+    }
+
+    // Then, load recommendations separately so failures here don't present as agent-load failures.
+    try {
       const recsRes = await backend.getAgentRecommendations(handle);
       set({ recommendations: recsRes.recommendations, loadingRecommendations: false });
     } catch (err) {
-      set({ agentError: err instanceof Error ? err.message : "Failed to load agent", loadingAgent: false, loadingRecommendations: false });
+      // Log the recommendations error but don't overwrite a successful agent load.
+      console.error("Failed to load agent recommendations", err);
+      set({ loadingRecommendations: false });
     }
   },
 
