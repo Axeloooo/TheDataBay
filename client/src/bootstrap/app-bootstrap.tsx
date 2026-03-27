@@ -7,9 +7,8 @@ import { useWalletStore } from "@/stores/wallet-store";
 export function AppBootstrap() {
   const theme = useThemeStore((state) => state.theme);
   const applyTheme = useThemeStore((state) => state.applyTheme);
-  const initWalletListeners = useWalletStore(
-    (state) => state.initWalletListeners,
-  );
+  const restoreSession = useWalletStore((state) => state.restoreSession);
+  const subscribeToRuntime = useWalletStore((state) => state.subscribeToRuntime);
   const startRatesPolling = useCurrencyStore(
     (state) => state.startRatesPolling,
   );
@@ -25,14 +24,15 @@ export function AppBootstrap() {
   }, [theme, applyTheme]);
 
   useEffect(() => {
-    const cleanupWallet = initWalletListeners();
+    void restoreSession();
+    const unsubscribe = subscribeToRuntime();
     startRatesPolling();
 
     return () => {
-      cleanupWallet();
+      unsubscribe();
       stopRatesPolling();
     };
-  }, [initWalletListeners, startRatesPolling, stopRatesPolling]);
+  }, [restoreSession, subscribeToRuntime, startRatesPolling, stopRatesPolling]);
 
   return null;
 }

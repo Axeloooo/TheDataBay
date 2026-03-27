@@ -6,15 +6,12 @@ import {
   getAddress,
   parseUnits,
 } from "ethers";
-import type { Provider as AppKitProvider } from "@reown/appkit-common-react-native";
 
 import { ENV } from "@/constants/env";
-import { getAppKit } from "@/src/lib/appkit";
+import { walletRuntime } from "@/src/lib/wallet/runtime";
 import { uuidToBytes32 } from "@/src/lib/ids";
 import { marketplaceAbi } from "@/src/lib/marketplaceAbi";
 import type { MarketplaceDataItem } from "@/src/types/contract";
-
-type Eip1193Provider = AppKitProvider;
 
 const errorInterface = new Interface(marketplaceAbi);
 export const SETTLEMENT_CURRENCY = "USDC" as const;
@@ -53,23 +50,16 @@ function trimTrailingZeros(value: string): string {
     .replace(/\.$/, "");
 }
 
-export function getWalletProvider(): Eip1193Provider {
-  const provider = getAppKit()?.getProvider<Eip1193Provider>("eip155");
-
-  if (!provider) {
-    throw new Error("No connected WalletConnect provider found.");
-  }
-
-  return provider;
-}
-
 export async function getEvmProvider() {
-  const provider = new BrowserProvider(getWalletProvider());
+  const eip1193 = await walletRuntime.getEip1193Provider();
+  const provider = new BrowserProvider(
+    eip1193 as Parameters<typeof BrowserProvider>[0],
+  );
   const network = await provider.getNetwork();
 
   if (Number(network.chainId) !== ENV.CHAIN_ID) {
     throw new Error(
-      `Wrong network connected. Expected chain ${ENV.CHAIN_ID}, received ${network.chainId.toString()}.`,
+      `Wrong network. Expected chain ${ENV.CHAIN_ID}, got ${network.chainId.toString()}.`,
     );
   }
 

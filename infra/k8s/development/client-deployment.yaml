@@ -31,6 +31,11 @@ spec:
                 secretKeyRef:
                   name: bridgemart-secrets
                   key: PINATA_GATEWAY_URL
+            - name: VITE_WALLETCONNECT_PROJECT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: bridgemart-secrets
+                  key: WALLETCONNECT_PROJECT_ID
           resources:
             requests:
               memory: "384Mi"

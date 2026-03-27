@@ -17,29 +17,25 @@ import {
   Bot,
   ShoppingCart,
 } from "lucide-react";
+
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { DisplayCurrencySelector } from "@/components/display-currency-selector";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
+import { useState } from "react";
+import { WalletConnectModal } from "@/components/wallet-connect-modal";
 import { useSearchStore } from "@/stores/search-store";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { useWalletStore } from "@/stores/wallet-store";
-import { ChainIcon } from "@/components/chain-icon";
+
 
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 function Navbar() {
-  const address = useWalletStore((state) => state.address);
-  const isConnected = useWalletStore((state) => state.isConnected);
-  const connect = useWalletStore((state) => state.connect);
-  const disconnect = useWalletStore((state) => state.disconnect);
+  const [modalOpen, setModalOpen] = useState(false);
+  const { address, isConnected, isConnecting, disconnect, chainName, walletName } =
+    useWalletStore();
   const preferredCurrency = useCurrencyStore(
     (state) => state.preferredCurrency,
   );
@@ -215,24 +211,19 @@ function Navbar() {
           )}
 
           {!isConnected ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button className="h-9 gap-1.5 bg-primary px-2 text-xs text-primary-foreground shadow-sm hover:bg-primary/90 md:px-3 md:text-sm">
-                  <Wallet className="h-4 w-4" />
-                  <span className="hidden md:inline">Connect Wallet</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={connect} className="gap-2">
-                  <ChainIcon chain="evm" className="h-4 w-4" />
-                  Ethereum
-                </DropdownMenuItem>
-                <DropdownMenuItem disabled className="gap-2">
-                  <ChainIcon chain="solana" className="h-4 w-4 opacity-70" />
-                  Solana (coming soon)
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <>
+              <Button
+                className="h-9 gap-1.5 bg-primary px-2 text-xs text-primary-foreground shadow-sm hover:bg-primary/90 md:px-3 md:text-sm"
+                disabled={isConnecting}
+                onClick={() => setModalOpen(true)}
+              >
+                <Wallet className="h-4 w-4" />
+                <span className="hidden md:inline">
+                  {isConnecting ? "Connecting…" : "Connect Wallet"}
+                </span>
+              </Button>
+              <WalletConnectModal open={modalOpen} onOpenChange={setModalOpen} />
+            </>
           ) : (
             <div className="flex items-center gap-1.5 md:gap-2">
               <Button
@@ -241,11 +232,21 @@ function Navbar() {
                 title={address ?? ""}
                 className="h-9 border-border/80 bg-background/80 px-2 font-mono text-[11px] md:text-xs"
               >
+                {walletName && (
+                  <span className="mr-1 hidden text-muted-foreground md:inline">
+                    {walletName}
+                  </span>
+                )}
                 {shortAddress(address!)}
+                {chainName && (
+                  <span className="ml-1 hidden text-muted-foreground md:inline">
+                    · {chainName}
+                  </span>
+                )}
               </Button>
               <Button
                 variant="ghost"
-                onClick={disconnect}
+                onClick={() => void disconnect()}
                 className="h-9 px-2 text-xs md:px-3 md:text-sm"
               >
                 Disconnect

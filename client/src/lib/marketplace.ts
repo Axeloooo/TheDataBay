@@ -8,6 +8,7 @@ import {
   parseEther,
   ZeroAddress,
 } from "ethers";
+import { walletRuntime } from "@/lib/wallet/runtime";
 import { marketplaceAbi } from "@/lib/marketplaceAbi";
 import { uuidToBytes32 } from "@/lib/ids";
 import type { MarketplaceDataItem, SettlementCurrency } from "@/types/contract";
@@ -47,10 +48,8 @@ function getContractAddress(): string {
 }
 
 export async function getEvmProvider(): Promise<BrowserProvider> {
-  if (!window.ethereum) {
-    throw new Error("No injected wallet found");
-  }
-  return new BrowserProvider(window.ethereum);
+  const eip1193 = await walletRuntime.getEip1193Provider();
+  return new BrowserProvider(eip1193 as ConstructorParameters<typeof BrowserProvider>[0]);
 }
 
 export async function createItemTx(params: {
@@ -78,7 +77,7 @@ export async function createItemTx(params: {
       const chainId = network.chainId?.toString?.() ?? String(network.chainId);
       throw new Error(
         `No contract code found at ${contractAddress} on chain ${chainId}. ` +
-          "Check MetaMask network and VITE_CONTRACT_ADDRESS deployment target."
+          "Check connected wallet network and VITE_CONTRACT_ADDRESS deployment target."
       );
     }
     const contract = new Contract(contractAddress, marketplaceAbi, signer);

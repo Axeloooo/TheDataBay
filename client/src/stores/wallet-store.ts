@@ -1,125 +1,128 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { ensurePersistFormat } from "@/stores/persist-utils";
+import { walletRuntime } from "@/lib/wallet/runtime";
+import type { WalletConnectorType, WalletSessionSnapshot } from "@/lib/wallet/types";
+
+export type WalletMutationKind = "buy" | "create" | "connect" | null;
+
+type WalletStore = WalletSessionSnapshot & {
+  configError: string | null;
+  activeMutation: WalletMutationKind;
+  transactionHash: string | null;
+  transactionError: string | null;
+  userDisconnected: boolean;
+  connect(connector: WalletConnectorType, eip6963Provider?: object): Promise<void>;
+  disconnect(): Promise<void>;
+  restoreSession(): Promise<void>;
+  subscribeToRuntime(): () => void;
+  beginMutation(kind: WalletMutationKind): void;
+  completeMutation(hash: string | null): void;
+  failMutation(message: string): void;
+  clearMutation(): void;
+};
 
 type WalletPersistedState = {
   address: string | null;
+  userDisconnected: boolean;
 };
 
-type EthereumRequestArgs = {
-  method: string;
-  params?: unknown[];
-};
-
-type EthereumProvider = {
-  request: (args: EthereumRequestArgs) => Promise<unknown>;
-  on?: (event: string, callback: (...args: unknown[]) => void) => void;
-  removeListener?: (
-    event: string,
-    callback: (...args: unknown[]) => void,
-  ) => void;
-};
-
-type WalletStore = {
-  address: string | null;
-  isConnected: boolean;
-  connect: () => Promise<void>;
-  disconnect: () => void;
-  initWalletListeners: () => () => void;
-};
-
-const STORAGE_KEY = "bridgemart_wallet_address";
-
-ensurePersistFormat<WalletPersistedState>(STORAGE_KEY, (raw) => {
-  const normalized = raw.trim();
-  return {
-    address: normalized.length > 0 ? normalized : null,
-  };
-});
-
-function getInjectedProvider(): EthereumProvider | null {
-  if (typeof window === "undefined") return null;
-  return (window.ethereum as EthereumProvider | undefined) ?? null;
-}
-
-function normalizeFirstAccount(accounts: unknown): string | null {
-  if (!Array.isArray(accounts) || accounts.length === 0) {
-    return null;
-  }
-  const first = accounts[0];
-  return typeof first === "string" && first.length > 0 ? first : null;
-}
+const STORAGE_KEY = "bridgemart_wallet_v4";
 
 export const useWalletStore = create<WalletStore>()(
   persist(
     (set) => ({
+      // WalletSessionSnapshot defaults
       address: null,
+      chainId: null,
+      chainName: null,
+      walletName: null,
+      walletIcon: null,
+      connectorType: null,
       isConnected: false,
-      connect: async () => {
-        const provider = getInjectedProvider();
-        if (!provider) {
-          alert(
-            "No injected wallet found. Please install MetaMask (or a compatible wallet).",
-          );
+      isConnecting: false,
+      // Extra store state
+      configError: null,
+      activeMutation: null,
+      transactionHash: null,
+      transactionError: null,
+      userDisconnected: false,
+
+      connect: async (connector: WalletConnectorType, eip6963Provider?: object) => {
+        set({ userDisconnected: false, isConnecting: true });
+        try {
+          await walletRuntime.connect({ connector, eip6963Provider });
+        } catch (error) {
+          set({ isConnecting: false });
+          throw error;
+        }
+      },
+
+      disconnect: async () => {
+        await walletRuntime.disconnect();
+        set({
+          address: null,
+          chainId: null,
+          chainName: null,
+          walletName: null,
+          walletIcon: null,
+          connectorType: null,
+          isConnected: false,
+          isConnecting: false,
+          userDisconnected: true,
+        });
+      },
+
+      restoreSession: async () => {
+        if (useWalletStore.getState().userDisconnected) {
           return;
         }
-
-        try {
-          await provider.request({
-            method: "wallet_requestPermissions",
-            params: [{ eth_accounts: {} }],
-          });
-        } catch {
-          // Some wallets do not support permissions API; continue.
+        const snapshot = await walletRuntime.restoreSession();
+        if (snapshot) {
+          set(snapshot);
         }
-
-        const accounts = await provider.request({
-          method: "eth_requestAccounts",
-        });
-        const next = normalizeFirstAccount(accounts);
-        set({ address: next, isConnected: !!next });
       },
-      disconnect: () => {
-        set({ address: null, isConnected: false });
+
+      subscribeToRuntime: () => {
+        const { configError } = walletRuntime.getConnectionMetadata();
+        set({ configError });
+        const unsubscribe = walletRuntime.subscribeSession(
+          (snap: WalletSessionSnapshot) => {
+            set(snap);
+          },
+        );
+        return unsubscribe;
       },
-      initWalletListeners: () => {
-        const provider = getInjectedProvider();
-        if (!provider?.on) {
-          return () => undefined;
-        }
 
-        const handleAccountsChanged = (...args: unknown[]) => {
-          const next = normalizeFirstAccount(args[0]);
-          set({ address: next, isConnected: !!next });
-        };
+      beginMutation: (kind: WalletMutationKind) => {
+        set({ activeMutation: kind, transactionHash: null, transactionError: null });
+      },
 
-        const handleChainChanged = () => {
-          // no-op for now; app logic can derive fresh state from chain-specific reads.
-        };
+      completeMutation: (hash: string | null) => {
+        set({ activeMutation: null, transactionHash: hash, transactionError: null });
+      },
 
-        provider.on("accountsChanged", handleAccountsChanged);
-        provider.on("chainChanged", handleChainChanged);
+      failMutation: (message: string) => {
+        set({ activeMutation: null, transactionHash: null, transactionError: message });
+      },
 
-        return () => {
-          provider.removeListener?.("accountsChanged", handleAccountsChanged);
-          provider.removeListener?.("chainChanged", handleChainChanged);
-        };
+      clearMutation: () => {
+        set({ activeMutation: null, transactionHash: null, transactionError: null });
       },
     }),
     {
       name: STORAGE_KEY,
       storage: createJSONStorage(() => localStorage),
-      partialize: (state) => ({
+      partialize: (state): WalletPersistedState => ({
         address: state.address,
+        userDisconnected: state.userDisconnected,
       }),
       merge: (persisted, current) => {
-        const next = {
-          ...current,
-          ...(persisted as Partial<WalletStore>),
-        };
+        const p = persisted as Partial<WalletStore>;
         return {
-          ...next,
-          isConnected: !!next.address,
+          ...current,
+          address: p.address ?? null,
+          userDisconnected: p.userDisconnected ?? false,
+          isConnected: !!(p.address),
         };
       },
     },

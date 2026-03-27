@@ -203,7 +203,7 @@ function Upload() {
             support.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button className="gap-2" onClick={() => void connect()}>
+            <Button className="gap-2" onClick={() => void connect("walletconnect")}>
               <ChainIcon chain="evm" className="h-4 w-4" />
               Connect Ethereum Wallet
             </Button>
