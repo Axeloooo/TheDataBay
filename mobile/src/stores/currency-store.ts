@@ -9,11 +9,11 @@ import {
 } from "@/src/lib/fx";
 
 type CurrencyStore = {
-  preferredCurrency: DisplayCurrency;
+  displayCurrency: DisplayCurrency;
   rates: FxRates | null;
   ratesUnavailable: boolean;
   pollingIntervalId: ReturnType<typeof setInterval> | null;
-  setPreferredCurrency: (currency: DisplayCurrency) => void;
+  setDisplayCurrency: (currency: DisplayCurrency) => void;
   refreshRates: () => Promise<void>;
   startRatesPolling: () => void;
   stopRatesPolling: () => void;
@@ -21,16 +21,33 @@ type CurrencyStore = {
 
 const STORAGE_KEY = "bridgemart_preferred_currency_v1";
 
+function normalizeCurrency(raw: string): DisplayCurrency {
+  switch (raw.trim()) {
+    case "USDC":
+    case "USD":
+    case "CAD":
+    case "MXN":
+    case "EUR":
+    case "ETH":
+    case "SOL":
+    case "CNY":
+    case "USDT":
+      return raw.trim() as DisplayCurrency;
+    default:
+      return "USDC";
+  }
+}
+
 export const useCurrencyStore = create<CurrencyStore>()(
   persist(
     (set, get) => ({
-      preferredCurrency: "ETH",
+      displayCurrency: "USDC",
       rates: null,
       ratesUnavailable: false,
       pollingIntervalId: null,
 
-      setPreferredCurrency: (currency) => {
-        set({ preferredCurrency: currency });
+      setDisplayCurrency: (currency) => {
+        set({ displayCurrency: currency });
       },
 
       refreshRates: async () => {
@@ -65,8 +82,18 @@ export const useCurrencyStore = create<CurrencyStore>()(
       name: STORAGE_KEY,
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
-        preferredCurrency: state.preferredCurrency,
+        displayCurrency: state.displayCurrency,
       }),
+      merge: (persistedState, currentState) => {
+        const persisted = persistedState as Partial<CurrencyStore> | undefined;
+        return {
+          ...currentState,
+          ...persisted,
+          displayCurrency: normalizeCurrency(
+            String(persisted?.displayCurrency ?? currentState.displayCurrency),
+          ),
+        };
+      },
     },
   ),
 );

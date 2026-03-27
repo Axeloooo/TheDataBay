@@ -2,21 +2,24 @@ import {
   BrowserProvider,
   Contract,
   Interface,
-  formatEther,
+  formatUnits,
   getAddress,
-  parseEther,
+  parseUnits,
 } from "ethers";
-import type { Provider as AppKitProvider } from "@reown/appkit-common-react-native";
 
 import { ENV } from "@/constants/env";
-import { getAppKit } from "@/src/lib/appkit";
+import { walletRuntime } from "@/src/lib/wallet/runtime";
 import { uuidToBytes32 } from "@/src/lib/ids";
 import { marketplaceAbi } from "@/src/lib/marketplaceAbi";
 import type { MarketplaceDataItem } from "@/src/types/contract";
 
-type Eip1193Provider = AppKitProvider;
-
 const errorInterface = new Interface(marketplaceAbi);
+export const SETTLEMENT_CURRENCY = "USDC" as const;
+export const SETTLEMENT_DECIMALS = 6 as const;
+const erc20Abi = [
+  "function allowance(address owner,address spender) view returns (uint256)",
+  "function approve(address spender,uint256 amount) returns (bool)",
+];
 
 function getContractAddress(): string {
   if (!ENV.CONTRACT_ADDRESS) {
@@ -36,23 +39,27 @@ function normalizeListingId(listingId: string): string {
     : uuidToBytes32(listingId);
 }
 
-export function getWalletProvider(): Eip1193Provider {
-  const provider = getAppKit()?.getProvider<Eip1193Provider>("eip155");
+function formatWholeWithSeparators(value: string): string {
+  return value.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 
-  if (!provider) {
-    throw new Error("No connected WalletConnect provider found.");
-  }
-
-  return provider;
+function trimTrailingZeros(value: string): string {
+  return value
+    .replace(/(\.\d*?[1-9])0+$/, "$1")
+    .replace(/\.0+$/, "")
+    .replace(/\.$/, "");
 }
 
 export async function getEvmProvider() {
-  const provider = new BrowserProvider(getWalletProvider());
+  const eip1193 = await walletRuntime.getEip1193Provider();
+  const provider = new BrowserProvider(
+    eip1193 as Parameters<typeof BrowserProvider>[0],
+  );
   const network = await provider.getNetwork();
 
   if (Number(network.chainId) !== ENV.CHAIN_ID) {
     throw new Error(
-      `Wrong network connected. Expected chain ${ENV.CHAIN_ID}, received ${network.chainId.toString()}.`,
+      `Wrong network. Expected chain ${ENV.CHAIN_ID}, got ${network.chainId.toString()}.`,
     );
   }
 
@@ -70,7 +77,7 @@ export async function createItemTx(params: {
   title: string;
   description: string;
   seller: string;
-  priceWei: string;
+  priceAtomic: string;
   datasetUrl: string;
   datasetHash: string;
   signatureUrl: string;
@@ -93,7 +100,7 @@ export async function createItemTx(params: {
       params.title,
       params.description,
       params.seller,
-      params.priceWei,
+      params.priceAtomic,
       params.datasetUrl,
       params.datasetHash,
       params.signatureUrl,
@@ -105,7 +112,7 @@ export async function createItemTx(params: {
       params.title,
       params.description,
       params.seller,
-      params.priceWei,
+      params.priceAtomic,
       params.datasetUrl,
       params.datasetHash,
       params.signatureUrl,
@@ -119,18 +126,33 @@ export async function createItemTx(params: {
   }
 }
 
-export async function buyItemTx(listingId: string, priceWei: bigint) {
+export async function buyItemTx(
+  listingId: string,
+  priceAtomic: string | bigint,
+) {
   try {
     const provider = await getEvmProvider();
     const signer = await provider.getSigner();
     const contract = new Contract(getContractAddress(), marketplaceAbi, signer);
     const feeBps = (await contract.feeBps()) as bigint;
-    const fee = (priceWei * feeBps) / 10_000n;
-    const total = priceWei + fee;
+    const normalizedPrice = BigInt(priceAtomic);
+    const fee = (normalizedPrice * feeBps) / 10_000n;
+    const total = normalizedPrice + fee;
 
-    const tx = await contract.buyItem(normalizeListingId(listingId), {
-      value: total,
-    });
+    const tokenAddress = getAddress((await contract.settlementToken()) as string);
+    const settlementToken = new Contract(tokenAddress, erc20Abi, signer);
+    const buyerAddress = await signer.getAddress();
+    const allowance = (await settlementToken.allowance(
+      buyerAddress,
+      getContractAddress(),
+    )) as bigint;
+
+    if (allowance < total) {
+      const approvalTx = await settlementToken.approve(getContractAddress(), total);
+      await approvalTx.wait();
+    }
+
+    const tx = await contract.buyItem(normalizeListingId(listingId));
     const receipt = await tx.wait();
 
     return receipt?.hash ?? tx.hash;
@@ -139,17 +161,35 @@ export async function buyItemTx(listingId: string, priceWei: bigint) {
   }
 }
 
-export function weiToEth(wei: string | number | bigint): string {
+export function parseSettlementAmount(
+  amount: string,
+  decimals: number = SETTLEMENT_DECIMALS,
+): string | null {
+  const normalized = amount.trim().replace(/,/g, "");
+  if (!normalized) {
+    return null;
+  }
+
+  if (!/^\d+(?:\.\d+)?$/.test(normalized)) {
+    return null;
+  }
+
   try {
-    return formatEther(wei);
+    return parseUnits(normalized, decimals).toString();
   } catch {
-    return "0";
+    return null;
   }
 }
 
-export function ethToWeiString(eth: string): string {
+export function formatSettlementAmount(
+  atomicAmount: string | bigint,
+  decimals: number = SETTLEMENT_DECIMALS,
+): string {
   try {
-    return parseEther(eth).toString();
+    const normalized = trimTrailingZeros(formatUnits(atomicAmount, decimals));
+    const [whole, fraction] = normalized.split(".");
+    const formattedWhole = formatWholeWithSeparators(whole);
+    return fraction ? `${formattedWhole}.${fraction}` : formattedWhole;
   } catch {
     return "0";
   }

@@ -18,6 +18,7 @@ from .routers import (
     datasets_router,
     contract_router,
 )
+from .routers import agent_router
 from .database.engine import create_db_and_tables
 
 settings: Settings = get_settings()
@@ -52,6 +53,17 @@ async def lifespan(app: FastAPI):
         Generator[None, Any, None]: Generator that yields None
     """
     create_db_and_tables()
+    if (
+        os.getenv("ENVIRONMENT") == "development"
+        and os.getenv("SEED_AGENTS", "").lower() == "true"
+    ):
+        from .database.engine import get_engine
+        from sqlmodel import Session as SQLSession
+        from .seeds.agent_seeds import seed_agents
+
+        engine = get_engine()
+        with SQLSession(engine) as session:
+            seed_agents(session)
     yield
 
 
@@ -77,6 +89,9 @@ app.include_router(llm_router.router)
 app.include_router(ai_router.router)
 app.include_router(datasets_router.router)
 app.include_router(contract_router.router)
+app.include_router(agent_router.router)
+app.include_router(agent_router.purchase_router)
+app.include_router(agent_router.rec_router)
 
 
 @app.middleware("http")
@@ -85,7 +100,9 @@ async def request_logging_middleware(request: Request, call_next):
     request_id = request.headers.get("x-request-id") or str(uuid.uuid4())
     started = time.perf_counter()
     base_logger = logging.LoggerAdapter(logger, {"request_id": request_id})
-    base_logger.info("request.start method=%s path=%s", request.method, request.url.path)
+    base_logger.info(
+        "request.start method=%s path=%s", request.method, request.url.path
+    )
 
     try:
         response = await call_next(request)

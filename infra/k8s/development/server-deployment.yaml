@@ -150,6 +150,13 @@ spec:
                 secretKeyRef:
                   name: bridgemart-secrets
                   key: SERVER_PRIVATE_KEY
+
+            # Agent settings
+            - name: SEED_AGENTS
+              valueFrom:
+                secretKeyRef:
+                  name: bridgemart-secrets
+                  key: SEED_AGENTS
           resources:
             requests:
               memory: "512Mi"

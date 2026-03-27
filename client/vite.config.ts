@@ -11,4 +11,9 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  define: {
+    // WalletConnect packages reference Node.js `global` — map it to the
+    // browser equivalent so the app doesn't crash on import.
+    global: "globalThis",
+  },
 });

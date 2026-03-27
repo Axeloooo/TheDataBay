@@ -27,15 +27,18 @@ const STORAGE_KEY = "bridgemart_preferred_currency_v1";
 
 function normalizeCurrency(raw: string): DisplayCurrency {
   switch (raw.trim()) {
-    case "CAD":
-    case "USD":
-    case "EUR":
     case "USDC":
-    case "SOL":
+    case "USD":
+    case "CAD":
+    case "MXN":
+    case "EUR":
     case "ETH":
+    case "SOL":
+    case "CNY":
+    case "USDT":
       return raw.trim() as DisplayCurrency;
     default:
-      return "ETH";
+      return "USDC";
   }
 }
 
@@ -46,7 +49,7 @@ ensurePersistFormat<CurrencyPersistedState>(STORAGE_KEY, (raw) => ({
 export const useCurrencyStore = create<CurrencyStore>()(
   persist(
     (set, get) => ({
-      preferredCurrency: "ETH",
+      preferredCurrency: "USDC",
       rates: loadCachedFxRates(10 * 60_000),
       ratesUnavailable: false,
       pollingIntervalId: null,

@@ -8,10 +8,10 @@ import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
 import "react-native-reanimated";
 
+import { WalletPicker } from "@/components/wallet-picker";
 import { WalletSync } from "@/components/wallet-sync";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-import { WalletAppKitProvider } from "@/src/lib/appkit";
 import { useCurrencyStore } from "@/src/stores/currency-store";
 import { useMarketplaceStore } from "@/src/stores/marketplace-store";
 import { useWalletStore } from "@/src/stores/wallet-store";
@@ -58,22 +58,22 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={themedNavigation}>
-      <WalletAppKitProvider sync={<WalletSync />}>
-        <StoreBootstrap />
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="dataset/[id]"
-            options={{
-              title: "Dataset",
-              headerBackTitle: "Marketplace",
-              contentStyle: { backgroundColor: palette.background },
-            }}
-          />
-          <Stack.Screen name="+not-found" />
-        </Stack>
-        <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
-      </WalletAppKitProvider>
+      <StoreBootstrap />
+      <WalletSync />
+      <WalletPicker />
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen
+          name="dataset/[id]"
+          options={{
+            title: "Dataset",
+            headerBackTitle: "Marketplace",
+            contentStyle: { backgroundColor: palette.background },
+          }}
+        />
+        <Stack.Screen name="+not-found" />
+      </Stack>
+      <StatusBar style={colorScheme === "dark" ? "light" : "dark"} />
     </ThemeProvider>
   );
 }

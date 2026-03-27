@@ -6,7 +6,9 @@ export type PersistedUploadSession = {
   title: string;
   description: string;
   seller: string;
-  priceWei: string;
+  price_atomic: string;
+  settlement_currency: "USDC";
+  settlement_decimals: 6;
   fileName?: string;
   status?: "queued" | "running" | "completed" | "failed";
   datasetUrl?: string;
@@ -17,6 +19,7 @@ export type PersistedUploadSession = {
   createdAt: string;
   updatedAt: string;
   createTxHash?: string;
+  priceWei?: string;
 };
 
 const STORAGE_KEY = "bridgemart_upload_session_v1";

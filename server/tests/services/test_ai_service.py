@@ -10,7 +10,9 @@ def make_item(item_id: str, sig_url: str, sig_hash: str):
         title=f"Dataset {item_id}",
         description="desc",
         seller="0xSeller",
-        price="10",
+        price_atomic="10",
+        settlement_currency="USDC",
+        settlement_decimals=6,
         dataset_url="ipfs://dataset",
         dataset_hash="0xhash",
         signature_url=sig_url,
@@ -73,6 +75,30 @@ def test_similarity_threshold_filters(monkeypatch, settings):
     strict_settings = settings.model_copy(update={"similarity_threshold": 0.99})
     service = ai_service.AIService(strict_settings)
     datasets = [make_item("0x" + "01" * 32, "ipfs://a", "0xhash")]
+
+    results = asyncio.run(service.rank_datasets("query", datasets))
+
+    assert results == []
+
+
+def test_rank_datasets_skips_mismatched_embedding_dimensions(monkeypatch, settings):
+    def fake_generate_single_embedding(query, settings):
+        return [1.0, 0.0], 2
+
+    async def fake_download_signature_embeddings(
+        signature_url, settings, expected_signature_hash=None, compressed=True
+    ):
+        return [[0.1, 0.2, 0.3]]
+
+    monkeypatch.setattr(
+        ai_service, "generate_single_embedding", fake_generate_single_embedding
+    )
+    monkeypatch.setattr(
+        ai_service, "download_signature_embeddings", fake_download_signature_embeddings
+    )
+
+    service = ai_service.AIService(settings)
+    datasets = [make_item("0x" + "03" * 32, "ipfs://mismatch", "0xhash")]
 
     results = asyncio.run(service.rank_datasets("query", datasets))
 

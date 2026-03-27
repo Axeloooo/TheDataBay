@@ -25,15 +25,16 @@ import { useEffect, useMemo, useRef } from "react";
 import { uuidToBytes32 } from "@/lib/ids";
 import { toast } from "sonner";
 import ErrorPanel from "@/components/ui/error-panel";
+import { DisplayCurrencySelector } from "@/components/display-currency-selector";
 import {
-  convertEthToCurrency,
+  convertSettlementToCurrency,
   formatCurrencyAmount,
-  type DisplayCurrency,
 } from "@/lib/fx";
 import { isSameAddress } from "@/lib/marketplace";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { useWalletStore } from "@/stores/wallet-store";
-import { selectUploadPriceWei, useUploadStore } from "@/stores/upload-store";
+import { selectUploadPriceAtomic, useUploadStore } from "@/stores/upload-store";
+import { ChainIcon } from "@/components/chain-icon";
 
 function Upload() {
   const isConnected = useWalletStore((state) => state.isConnected);
@@ -48,8 +49,8 @@ function Upload() {
 
   const title = useUploadStore((state) => state.title);
   const description = useUploadStore((state) => state.description);
-  const priceEth = useUploadStore((state) => state.priceEth);
-  const payCurrency = useUploadStore((state) => state.payCurrency);
+  const priceUsdc = useUploadStore((state) => state.priceUsdc);
+  const displayCurrency = useUploadStore((state) => state.displayCurrency);
   const file = useUploadStore((state) => state.file);
   const job = useUploadStore((state) => state.job);
   const jobStatus = useUploadStore((state) => state.jobStatus);
@@ -61,8 +62,8 @@ function Upload() {
 
   const setTitle = useUploadStore((state) => state.setTitle);
   const setDescription = useUploadStore((state) => state.setDescription);
-  const setPriceEth = useUploadStore((state) => state.setPriceEth);
-  const setPayCurrency = useUploadStore((state) => state.setPayCurrency);
+  const setPriceUsdc = useUploadStore((state) => state.setPriceUsdc);
+  const setDisplayCurrency = useUploadStore((state) => state.setDisplayCurrency);
   const setFile = useUploadStore((state) => state.setFile);
   const setError = useUploadStore((state) => state.setError);
   const initializeUploadState = useUploadStore(
@@ -137,14 +138,17 @@ function Upload() {
     };
   }, [computedStatus]);
 
-  const priceWei = useMemo(() => selectUploadPriceWei(priceEth), [priceEth]);
+  const priceAtomic = useMemo(
+    () => selectUploadPriceAtomic(priceUsdc),
+    [priceUsdc],
+  );
 
   const priceEquivalent = useMemo(() => {
-    if (!priceEth || payCurrency === "ETH") return null;
-    const ethValue = Number(priceEth);
-    if (!Number.isFinite(ethValue)) return null;
-    return convertEthToCurrency(ethValue, payCurrency, rates);
-  }, [payCurrency, priceEth, rates]);
+    if (!priceUsdc || displayCurrency === "USDC") return null;
+    const usdcValue = Number(priceUsdc);
+    if (!Number.isFinite(usdcValue)) return null;
+    return convertSettlementToCurrency(usdcValue, displayCurrency, rates);
+  }, [displayCurrency, priceUsdc, rates]);
 
   const currentListingId =
     jobStatus?.listing_id ?? persistedSession?.listingId ?? null;
@@ -191,16 +195,16 @@ function Upload() {
             Connect Wallet to List Datasets
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Listing requires an Ethereum wallet signature. Connect your wallet
-            to upload, encrypt, and publish datasets on-chain.
+            Listing requires an EVM wallet signature. Connect your wallet to
+            upload, encrypt, and publish USDC-settled datasets on-chain.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             Solana wallet connection is planned for upcoming cross-chain
             support.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button className="gap-2" onClick={() => void connect()}>
-              <Wallet className="h-4 w-4" />
+            <Button className="gap-2" onClick={() => void connect("walletconnect")}>
+              <ChainIcon chain="evm" className="h-4 w-4" />
               Connect Ethereum Wallet
             </Button>
             <Button variant="outline" onClick={() => navigate("/")}>
@@ -218,8 +222,8 @@ function Upload() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Sell Your Dataset</h1>
           <p className="text-muted-foreground">
-            List your dataset with embeddings on the marketplace and earn ETH
-            from sales.
+            List your dataset with embeddings on the marketplace and settle
+            sales in USDC.
           </p>
         </div>
 
@@ -273,44 +277,35 @@ function Upload() {
               </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="price">Price (ETH)</Label>
+                  <Label htmlFor="price">Price (USDC)</Label>
                   <Input
                     id="price"
                     type="number"
-                    step="0.0001"
+                    step="0.000001"
                     min="0"
-                    placeholder="0.05"
+                    placeholder="12.50"
                     required
-                    value={priceEth}
-                    onChange={(event) => setPriceEth(event.target.value)}
+                    value={priceUsdc}
+                    onChange={(event) => setPriceUsdc(event.target.value)}
                   />
                   {priceEquivalent !== null && (
                     <p className="text-xs text-muted-foreground">
-                      ~ {formatCurrencyAmount(priceEquivalent, payCurrency)}
+                      ~ {formatCurrencyAmount(priceEquivalent, displayCurrency)}
                     </p>
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="pay-currency">
-                    Preferred Display Currency
+                  <Label htmlFor="display-currency">
+                    Display Currency
                   </Label>
-                  <select
-                    id="pay-currency"
-                    value={payCurrency}
-                    onChange={(event) =>
-                      setPayCurrency(event.target.value as DisplayCurrency)
-                    }
-                    className="h-10 w-full rounded-md border bg-background px-3 text-sm"
-                  >
-                    <option value="ETH">ETH</option>
-                    <option value="CAD">CAD</option>
-                    <option value="USD">USD</option>
-                    <option value="EUR">EUR</option>
-                    <option value="USDC">USDC</option>
-                    <option value="SOL">SOL</option>
-                  </select>
+                  <DisplayCurrencySelector
+                    value={displayCurrency}
+                    onChange={setDisplayCurrency}
+                    title="Display currency"
+                    buttonClassName="w-full justify-between"
+                  />
                   <p className="text-xs text-muted-foreground">
-                    Execution currently uses ETH/wei on-chain.
+                    Quotes only. Settlement stays in USDC on-chain.
                   </p>
                 </div>
               </div>
@@ -543,6 +538,25 @@ function Upload() {
                     </Button>
                   </div>
                 </div>
+                {createTxHash && (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">Create Tx</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-xs break-all">
+                        {createTxHash}
+                      </code>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={() =>
+                          copyToClipboard(createTxHash, "Create Tx Hash")
+                        }
+                      >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 <div className="flex justify-between gap-3">
                   <Button
                     variant="outline"
@@ -568,7 +582,11 @@ function Upload() {
                         setError("Missing signature upload outputs.");
                         return;
                       }
-                      if (!priceWei && !persistedSession?.priceWei) {
+                      if (
+                        !priceAtomic &&
+                        !persistedSession?.priceAtomic &&
+                        !persistedSession?.priceWei
+                      ) {
                         setError("Missing price.");
                         return;
                       }
@@ -592,25 +610,6 @@ function Upload() {
                     )}
                   </Button>
                 </div>
-                {createTxHash && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Create Tx</p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-xs break-all">
-                        {createTxHash}
-                      </code>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() =>
-                          copyToClipboard(createTxHash, "Create Tx Hash")
-                        }
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}

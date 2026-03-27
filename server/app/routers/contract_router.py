@@ -38,7 +38,7 @@ def get_max_price(settings: Settings = Depends(get_settings)) -> int:
         settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
 
     Returns:
-        int: Maximum item price in wei
+        int: Maximum item price in USDC atomic units
     """
     return contract_service.max_price(settings)
 
@@ -83,7 +83,9 @@ def get_owner(settings: Settings = Depends(get_settings)) -> str:
 
 
 @router.get("/items/all", response_model=List[MarketplaceDataItem])
-def get_all_items(settings: Settings = Depends(get_settings)) -> List[MarketplaceDataItem]:
+def get_all_items(
+    settings: Settings = Depends(get_settings),
+) -> List[MarketplaceDataItem]:
     """Get all marketplace items from the contract.
 
     Args:
@@ -161,7 +163,9 @@ def get_purchases_by_wallet(
         limit=request.limit,
         offset=request.offset,
     )
-    return PurchasedItemsResponse(wallet_id=wallet_id_hex, items=items, count=len(items))
+    return PurchasedItemsResponse(
+        wallet_id=wallet_id_hex, items=items, count=len(items)
+    )
 
 
 @router.post("/items", response_model=TxHashResponse)

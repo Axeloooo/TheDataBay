@@ -9,21 +9,26 @@ import {
   LoaderCircle,
 } from "lucide-react";
 import RecordCardDetails from "@/components/record-card-details";
+import { DisplayCurrencySelector } from "@/components/display-currency-selector";
 import { backend } from "@/lib/backend";
 import type { MarketplaceDataItem } from "@/types/contract";
-import { buyItemTx, isSameAddress, weiToEth } from "@/lib/marketplace";
+import {
+  buyItemTx,
+  isSameAddress,
+  normalizeMarketplacePrice,
+} from "@/lib/marketplace";
 import { bytes32ToUuid } from "@/lib/ids";
 import { decodeBase64, decryptAesGcm, utf8Bytes } from "@/lib/crypto";
 import { resolveIpfsUrl } from "@/lib/ipfs";
 import ErrorPanel from "@/components/ui/error-panel";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DatasetRecommendations } from "@/components/dataset-recommendations";
 import { toast } from "sonner";
 import { fireConfettiBurst } from "@/lib/confetti";
 import { verifyDatasetIntegrity, type IntegrityStatus } from "@/lib/integrity";
 import {
-  convertEthToCurrency,
+  convertSettlementToCurrency,
   formatCurrencyAmount,
-  type DisplayCurrency,
 } from "@/lib/fx";
 import { useWalletStore } from "@/stores/wallet-store";
 import { useCurrencyStore } from "@/stores/currency-store";
@@ -106,6 +111,7 @@ function DatasetDetail() {
   const [isBuying, setIsBuying] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isPurchased, setIsPurchased] = useState(false);
+  const [quoteCurrency, setQuoteCurrency] = useState(preferredCurrency);
   const [downloadStep, setDownloadStep] = useState<
     "idle" | "authorizing" | "decrypting" | "downloading"
   >("idle");
@@ -196,18 +202,23 @@ function DatasetDetail() {
     };
   }, [listingUuid, address]);
 
-  const canBuy = dataset ? !isSameAddress(dataset.seller, address) : false;
-  const priceEth = dataset ? weiToEth(dataset.price) : "0";
-  const [payCurrency, setPayCurrency] =
-    useState<DisplayCurrency>(preferredCurrency);
-  const equivalent =
-    payCurrency !== "ETH"
-      ? convertEthToCurrency(Number(priceEth), payCurrency, rates)
-      : null;
-
   useEffect(() => {
-    setPayCurrency(preferredCurrency);
+    setQuoteCurrency(preferredCurrency);
   }, [preferredCurrency]);
+
+  const pricing = useMemo(
+    () => (dataset ? normalizeMarketplacePrice(dataset) : null),
+    [dataset],
+  );
+  const canBuy = dataset ? !isSameAddress(dataset.seller, address) : false;
+  const quoteEquivalent =
+    pricing && quoteCurrency !== pricing.settlementCurrency
+      ? convertSettlementToCurrency(
+          Number(pricing.settlementAmount),
+          quoteCurrency,
+          rates,
+        )
+      : null;
 
   if (loading) {
     return (
@@ -271,6 +282,7 @@ function DatasetDetail() {
           integrityStatus={integrityStatus}
           integrityDetail={integrityDetail}
         />
+        {listingUuid && <DatasetRecommendations listingId={listingUuid} />}
         {actionError && (
           <div className="mt-4">
             <ErrorPanel
@@ -279,29 +291,20 @@ function DatasetDetail() {
             />
           </div>
         )}
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-end">
-          <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground">
-            <div className="mb-1 flex items-center gap-2">
-              <label htmlFor="pay-currency" className="font-medium">
-                Pay Currency
-              </label>
-              <select
-                id="pay-currency"
-                value={payCurrency}
-                onChange={(event) =>
-                  setPayCurrency(event.target.value as DisplayCurrency)
-                }
-                className="h-7 rounded border bg-background px-1"
-              >
-                <option value="ETH">ETH</option>
-                <option value="CAD">CAD</option>
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="USDC">USDC</option>
-                <option value="SOL">SOL</option>
-              </select>
-            </div>
-            <p>Execution currently uses ETH/wei on-chain.</p>
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-end">
+          <div className="rounded-lg border border-border/75 bg-card/55 px-3 py-3 text-xs text-muted-foreground shadow-sm">
+            <p className="mb-2 font-medium text-foreground">Quote currency</p>
+            <DisplayCurrencySelector
+              value={quoteCurrency}
+              onChange={setQuoteCurrency}
+              compact
+              title="Quote currency"
+              buttonClassName="h-8"
+            />
+            <p className="mt-2 max-w-xs">
+              Quotes only. Settlement stays in USDC at{" "}
+              {pricing?.settlementDecimals ?? 6} decimals.
+            </p>
           </div>
           {!isPurchased && (
             <Button
@@ -316,11 +319,20 @@ function DatasetDetail() {
                   setActionError("Seller cannot buy their own listing.");
                   return;
                 }
+                if (
+                  !pricing?.priceAtomic ||
+                  !/^\d+$/.test(pricing.priceAtomic)
+                ) {
+                  setActionError(
+                    "Price unavailable. Please refresh and try again.",
+                  );
+                  return;
+                }
                 setActionError(null);
                 setIsBuying(true);
                 try {
-                  const priceWei = BigInt(dataset.price);
-                  await buyItemTx(id, priceWei);
+                  const priceAtomic = BigInt(pricing.priceAtomic);
+                  await buyItemTx(id, priceAtomic);
                   setIsPurchased(true);
                   toast.success("Purchase successful", {
                     description: "Access granted for this dataset.",
@@ -343,10 +355,16 @@ function DatasetDetail() {
                 </>
               ) : (
                 <>
+                  <img
+                    src="/usdc-logo.svg"
+                    alt=""
+                    aria-hidden="true"
+                    className="h-4 w-4 rounded-full object-contain"
+                  />
                   <ShoppingCart className="h-4 w-4" />
-                  Buy Item ({priceEth} ETH
-                  {equivalent !== null
-                    ? ` • ~${formatCurrencyAmount(equivalent, payCurrency)}`
+                  Buy with USDC ({pricing?.settlementAmount ?? "0"} USDC
+                  {quoteEquivalent !== null
+                    ? ` • ~${formatCurrencyAmount(quoteEquivalent, quoteCurrency)}`
                     : ""}
                   )
                 </>

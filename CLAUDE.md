@@ -41,7 +41,7 @@ npm run test       # Jest tests
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 
 pytest                                                    # All tests
 pytest tests/services/test_contract_service.py -q        # Single test file
@@ -86,7 +86,7 @@ Layered FastAPI architecture: **Routers → Services → Models/Schemas**
 - `app/models/` — SQLModel database models (PostgreSQL)
 - `app/config/settings.py` — All config via Pydantic `BaseSettings` with env var aliases; copy `server/.env.example` → `server/.env`
 
-Key API endpoints (base: `http://localhost:8000`):
+Key API endpoints (base: `http://localhost:8080`):
 
 - `/api/v1/llm/embed/batch` — Batch embedding pipeline for datasets
 - `/api/v1/ai/similarity-search` — Semantic ranking against marketplace listings
@@ -118,3 +118,62 @@ Expo Router with file-based routing under `mobile/src/app/`.
 - **Server**: Python 3.11+; requires `.env` from `.env.example`
 - **EVM**: Foundry toolchain; requires `.env` from `.env.example` (Anvil RPC URL, private keys, fee config)
 - **Full stack**: Docker + Minikube for Tilt-based orchestration
+
+## Agent Skills
+
+Skills are located under `.claude/skills/` (shared across Claude Code in this repo).  
+Agents **must read the selected skill's `SKILL.md` before implementation** and follow its workflow, constraints, and quality checks.
+
+### Skill Loading Protocol (Required)
+
+1. **Classify the request** by domain (`client/`, `mobile/`, `server/`, `evm/`, docs/copy, debugging, or orchestration).
+2. **Load mandatory foundation skills first**:
+   - `brainstorming` before creative feature work, behavior changes, or significant refactors.
+   - `systematic-debugging` before attempting fixes for bugs, flaky tests, or unknown failures.
+3. **Load one or more domain skills** based on touched code.
+4. **Compose skills when needed** (foundation + domain + specialist), avoiding conflicting instructions.
+5. **Execute and verify** using commands/tests defined in this document.
+6. **Report what was used** in the final response (which skills drove decisions and checks).
+
+### Skill Selection Matrix
+
+| Skill                         | Path                                          | Primary trigger                                                          |
+| ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------ |
+| `brainstorming`               | `.agents/skills/brainstorming/`               | Any new feature, behavior change, or non-trivial redesign before coding  |
+| `systematic-debugging`        | `.agents/skills/systematic-debugging/`        | Bug investigation, failing tests, regressions, or unclear root cause     |
+| `subagent-driven-development` | `.agents/skills/subagent-driven-development/` | Multi-track work that can be safely parallelized                         |
+| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/` | `client/` React/Vite changes, performance, rendering, data fetching      |
+| `frontend-design`             | `.agents/skills/frontend-design/`             | UI-heavy pages/components requiring high design quality                  |
+| `shadcn`                      | `.agents/skills/shadcn/`                      | Add/fix/style shadcn/ui components in `client/`                          |
+| `react-state-management`      | `.agents/skills/react-state-management/`      | Zustand/global state refactors in `client/` or `mobile/`                 |
+| `typescript-advanced-types`   | `.agents/skills/typescript-advanced-types/`   | Complex TS generics, utility types, or type-level constraints            |
+| `vercel-react-native-skills`  | `.agents/skills/vercel-react-native-skills/`  | `mobile/` Expo/React Native features, perf, platform APIs                |
+| `fastapi-templates`           | `.agents/skills/fastapi-templates/`           | FastAPI route/service scaffolding, dependency injection, API structure   |
+| `api-design-principles`       | `.agents/skills/api-design-principles/`       | API contract design, endpoint semantics, request/response consistency    |
+| `solskill`                    | `.agents/skills/solskill/`                    | Solidity/Foundry contract logic, testing, and security-sensitive changes |
+| `copywriting`                 | `.agents/skills/copywriting/`                 | Marketing/product copy improvements and messaging                        |
+| `skill-creator`               | `.agents/skills/skill-creator/`               | Create/update/evaluate repository skills                                 |
+| `python-testing-patterns`     | `.agents/skills/python-testing-patterns/`     | Python test design, fixtures, mocking, and best practices                |
+
+### Recommended Skill Combinations
+
+- **New API endpoint**: `brainstorming` -> `api-design-principles` + `fastapi-templates`
+- **API bug/regression**: `systematic-debugging` -> `api-design-principles` (and `fastapi-templates` if structural)
+- **Client UI feature**: `brainstorming` -> `frontend-design` + `vercel-react-best-practices` (+ `shadcn` if used)
+- **State management changes**: `brainstorming` -> `react-state-management` (+ `typescript-advanced-types` if type-heavy)
+- **Mobile feature/perf issue**: `brainstorming` or `systematic-debugging` -> `vercel-react-native-skills`
+- **Contract feature/fix**: `brainstorming` or `systematic-debugging` -> `solskill`
+
+### Agent Optimization Rules
+
+- Prefer the **smallest correct skill set**; do not load unrelated skills.
+- If multiple skills apply, prioritize in this order: **safety/debugging -> architecture/design -> framework-specific -> type/perf polish**.
+- Re-check skill guidance when task scope expands (for example from UI tweak to state refactor).
+- Match verification depth to risk: contract and backend auth/payment paths require stronger validation.
+
+### Anti-Patterns (Do Not Do)
+
+- Starting implementation without reading the relevant `SKILL.md`.
+- Using only domain skills when debugging is required (skip-root-cause behavior).
+- Applying `frontend-design` for purely data/model/backend tasks.
+- Overusing `subagent-driven-development` for tightly coupled, sequential edits.

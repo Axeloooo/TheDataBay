@@ -12,7 +12,6 @@ from ..config.settings import Settings, get_settings
 from ..schemas.dataset_schema import KeyReleaseRequest, KeyReleaseResponse
 from ..services import contract_service, dataset_key_repo
 
-
 router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
 logger = logging.getLogger(__name__)
 

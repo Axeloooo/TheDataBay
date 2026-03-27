@@ -7,11 +7,11 @@ interface LayoutProps {
 
 function Layout({ children }: LayoutProps) {
   const messages = [
-    "BridgeMart is in beta development - flows and APIs may evolve quickly.",
-    "Dataset files are encrypted; key release is gated by on-chain access.",
-    "Localnet tip: verify MetaMask chain + deployed contract address before signing.",
-    "Solana cross-chain support (CCIP roadmap) is coming soon.",
-    "Current settlement is ETH/wei on EVM; multi-asset UX is display-only for now.",
+    "BridgeMart is in active beta — features and APIs are evolving. Check back often.",
+    "Every dataset is AES-encrypted before it reaches IPFS. The decryption key only releases after on-chain purchase.",
+    "Tip: confirm your MetaMask network and contract address match before signing any transaction.",
+    "USDC settlement is live. Solana and additional chains are on the roadmap.",
+    "Prices display in your preferred quote currency — settlement remains USDC on-chain.",
   ];
 
   return (

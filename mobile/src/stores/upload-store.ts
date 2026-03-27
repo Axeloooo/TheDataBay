@@ -4,14 +4,20 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { backend } from "@/src/lib/backend";
-import type { DisplayCurrency } from "@/src/lib/fx";
+import { type DisplayCurrency } from "@/src/lib/fx";
+import {
+  SETTLEMENT_CURRENCY,
+  SETTLEMENT_DECIMALS,
+  formatSettlementAmount,
+  parseSettlementAmount,
+  createItemTx,
+} from "@/src/lib/marketplace";
 import {
   clearUploadSession,
   loadUploadSession,
   saveUploadSession,
   type PersistedUploadSession,
 } from "@/src/lib/upload-session";
-import { createItemTx } from "@/src/lib/marketplace";
 import type { JobResponse, JobStatusResponse } from "@/src/types/llm";
 
 type UploadStatus = "queued" | "running" | "completed" | "failed";
@@ -19,8 +25,8 @@ type UploadStatus = "queued" | "running" | "completed" | "failed";
 type UploadStore = {
   title: string;
   description: string;
-  priceEth: string;
-  payCurrency: DisplayCurrency;
+  settlementAmount: string;
+  quoteCurrency: DisplayCurrency;
   selectedFile: DocumentPickerAsset | null;
   job: JobResponse | null;
   jobStatus: JobStatusResponse | null;
@@ -33,11 +39,11 @@ type UploadStore = {
   hasInitialized: boolean;
   setTitle: (value: string) => void;
   setDescription: (value: string) => void;
-  setPriceEth: (value: string) => void;
-  setPayCurrency: (value: DisplayCurrency) => void;
+  setSettlementAmount: (value: string) => void;
+  setQuoteCurrency: (value: DisplayCurrency) => void;
   setSelectedFile: (value: DocumentPickerAsset | null) => void;
   setError: (value: string | null) => void;
-  initializeUploadState: (preferredCurrency: DisplayCurrency) => Promise<void>;
+  initializeUploadState: (displayCurrency: DisplayCurrency) => Promise<void>;
   submitUpload: (address: string | null) => Promise<void>;
   pollJob: (jobId: string) => Promise<boolean>;
   startPolling: () => void;
@@ -47,34 +53,6 @@ type UploadStore = {
 };
 
 const STORAGE_KEY = "bridgemart_upload_store_v1";
-
-function parsePriceWei(priceEth: string): string | null {
-  const normalized = priceEth.trim();
-  if (!normalized) {
-    return null;
-  }
-
-  // Accept only non-negative decimal numbers (e.g., 1, 0.5, 10.0001).
-  if (!/^\d+(?:\.\d+)?$/.test(normalized)) {
-    return null;
-  }
-
-  const [whole, fraction = ""] = normalized.split(".");
-  if (fraction.length > 18) {
-    return null;
-  }
-
-  const fracPadded = fraction.padEnd(18, "0");
-
-  try {
-    return (
-      BigInt(whole || "0") * 10n ** 18n +
-      BigInt(fracPadded || "0")
-    ).toString();
-  } catch {
-    return null;
-  }
-}
 
 function statusToUploadStatus(status: string | null | undefined): UploadStatus {
   if (status === "completed") return "completed";
@@ -107,8 +85,8 @@ export const useUploadStore = create<UploadStore>()(
     (set, get) => ({
       title: "",
       description: "",
-      priceEth: "",
-      payCurrency: "ETH",
+      settlementAmount: "",
+      quoteCurrency: "USDC",
       selectedFile: null,
       job: null,
       jobStatus: null,
@@ -122,12 +100,12 @@ export const useUploadStore = create<UploadStore>()(
 
       setTitle: (value) => set({ title: value }),
       setDescription: (value) => set({ description: value }),
-      setPriceEth: (value) => set({ priceEth: value }),
-      setPayCurrency: (value) => set({ payCurrency: value }),
+      setSettlementAmount: (value) => set({ settlementAmount: value }),
+      setQuoteCurrency: (value) => set({ quoteCurrency: value }),
       setSelectedFile: (value) => set({ selectedFile: value }),
       setError: (value) => set({ error: value }),
 
-      async initializeUploadState(preferredCurrency) {
+      async initializeUploadState(displayCurrency) {
         const state = get();
         if (state.hasInitialized) {
           return;
@@ -138,11 +116,11 @@ export const useUploadStore = create<UploadStore>()(
         const hasDraft =
           !!state.title ||
           !!state.description ||
-          !!state.priceEth ||
-          state.payCurrency !== "ETH";
+          !!state.settlementAmount ||
+          state.quoteCurrency !== "USDC";
 
-        if (!hasDraft && !session) {
-          nextState.payCurrency = preferredCurrency;
+        if (!hasDraft) {
+          nextState.quoteCurrency = displayCurrency;
         }
 
         if (!session) {
@@ -153,12 +131,18 @@ export const useUploadStore = create<UploadStore>()(
         nextState.persistedSession = session;
         if (!state.title) nextState.title = session.title;
         if (!state.description) nextState.description = session.description;
-        if (!state.priceEth && session.priceWei) {
-          const whole = BigInt(session.priceWei) / 10n ** 18n;
-          const fraction = (BigInt(session.priceWei) % 10n ** 18n)
-            .toString()
-            .padStart(18, "0");
-          nextState.priceEth = `${whole}.${fraction}`.replace(/\.?0+$/, "");
+        if (!state.settlementAmount) {
+          if (session.price_atomic) {
+            nextState.settlementAmount = formatSettlementAmount(
+              session.price_atomic,
+              session.settlement_decimals ?? SETTLEMENT_DECIMALS,
+            );
+          } else if (session.priceWei) {
+            nextState.settlementAmount = formatSettlementAmount(
+              session.priceWei,
+              18,
+            );
+          }
         }
         if (session.jobId && !state.job) {
           nextState.job = {
@@ -182,9 +166,12 @@ export const useUploadStore = create<UploadStore>()(
           set({ error: "Select a CSV dataset file." });
           return;
         }
-        const priceWei = parsePriceWei(state.priceEth);
-        if (!priceWei) {
-          set({ error: "Enter a valid price in ETH." });
+        const priceAtomic = parseSettlementAmount(
+          state.settlementAmount,
+          SETTLEMENT_DECIMALS,
+        );
+        if (!priceAtomic) {
+          set({ error: "Enter a valid USDC settlement amount." });
           return;
         }
 
@@ -197,7 +184,10 @@ export const useUploadStore = create<UploadStore>()(
         formData.append("title", state.title);
         formData.append("description", state.description);
         formData.append("seller", address);
-        formData.append("price", priceWei);
+        formData.append("price_atomic", priceAtomic);
+        formData.append("settlement_currency", SETTLEMENT_CURRENCY);
+        formData.append("settlement_decimals", String(SETTLEMENT_DECIMALS));
+        formData.append("price", priceAtomic);
         formData.append("seller_wallet_type", "evm");
 
         set({ loading: true, error: null });
@@ -210,7 +200,9 @@ export const useUploadStore = create<UploadStore>()(
             title: state.title,
             description: state.description,
             seller: address,
-            priceWei,
+            price_atomic: priceAtomic,
+            settlement_currency: SETTLEMENT_CURRENCY,
+            settlement_decimals: SETTLEMENT_DECIMALS,
             fileName: state.selectedFile.name,
             status: "queued",
             createdAt: new Date().toISOString(),
@@ -344,10 +336,11 @@ export const useUploadStore = create<UploadStore>()(
           return null;
         }
 
-        const effectivePriceWei =
-          state.persistedSession?.priceWei ?? parsePriceWei(state.priceEth);
-        if (!effectivePriceWei) {
-          set({ error: "Missing price." });
+        const effectivePriceAtomic =
+          state.persistedSession?.price_atomic ??
+          parseSettlementAmount(state.settlementAmount, SETTLEMENT_DECIMALS);
+        if (!effectivePriceAtomic) {
+          set({ error: "Missing settlement amount." });
           return null;
         }
 
@@ -360,7 +353,7 @@ export const useUploadStore = create<UploadStore>()(
             description:
               state.persistedSession?.description ?? state.description,
             seller: address,
-            priceWei: effectivePriceWei,
+            priceAtomic: effectivePriceAtomic,
             datasetUrl: currentDatasetUrl,
             datasetHash: currentDatasetHash,
             signatureUrl: currentSignatureUrl,
@@ -397,8 +390,8 @@ export const useUploadStore = create<UploadStore>()(
       partialize: (state) => ({
         title: state.title,
         description: state.description,
-        priceEth: state.priceEth,
-        payCurrency: state.payCurrency,
+        settlementAmount: state.settlementAmount,
+        quoteCurrency: state.quoteCurrency,
         job: state.job,
         jobStatus: state.jobStatus,
         persistedSession: state.persistedSession,
@@ -416,6 +409,6 @@ export const useUploadStore = create<UploadStore>()(
   ),
 );
 
-export function selectUploadPriceWei(priceEth: string) {
-  return parsePriceWei(priceEth);
+export function selectUploadPriceAtomic(settlementAmount: string) {
+  return parseSettlementAmount(settlementAmount, SETTLEMENT_DECIMALS);
 }

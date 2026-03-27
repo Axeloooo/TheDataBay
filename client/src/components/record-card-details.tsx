@@ -13,17 +13,18 @@ import {
   Shield,
   Link2,
   Users,
-  Hexagon,
-  Orbit,
-  Coins,
   CheckCircle2,
   AlertCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { MarketplaceDataItem } from "@/types/contract";
 import { Badge } from "@/components/ui/badge";
-import { weiToEth } from "@/lib/marketplace";
-import { convertEthToCurrency, formatCurrencyAmount } from "@/lib/fx";
+import { ChainIcon, detectAddressChain } from "@/components/chain-icon";
+import {
+  convertSettlementToCurrency,
+  formatCurrencyAmount,
+} from "@/lib/fx";
+import { normalizeMarketplacePrice } from "@/lib/marketplace";
 import { useCurrencyStore } from "@/stores/currency-store";
 
 interface RecordCardDetailsProps {
@@ -50,17 +51,20 @@ function RecordCardDetails({
     }
   };
 
-  const priceEth = weiToEth(dataset.price);
+  const pricing = normalizeMarketplacePrice(dataset);
   const preferredCurrency = useCurrencyStore(
     (state) => state.preferredCurrency,
   );
   const rates = useCurrencyStore((state) => state.rates);
   const equivalent =
-    preferredCurrency !== "ETH"
-      ? convertEthToCurrency(Number(priceEth), preferredCurrency, rates)
+    preferredCurrency !== pricing.settlementCurrency
+      ? convertSettlementToCurrency(
+          Number(pricing.settlementAmount),
+          preferredCurrency,
+          rates,
+        )
       : null;
-  const sellerIsEvm = /^0x[a-fA-F0-9]{40}$/.test(dataset.seller);
-  const sellerIsSolana = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(dataset.seller);
+  const sellerChain = detectAddressChain(dataset.seller);
 
   return (
     <div className="space-y-6">
@@ -121,14 +125,20 @@ function RecordCardDetails({
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-muted-foreground">Price</p>
-              <p className="text-3xl font-bold font-mono">
-                <span className="inline-flex items-center gap-1">
-                  <Coins className="h-6 w-6" />
-                  {priceEth} ETH
+              <p className="mt-1 inline-flex items-center gap-2 text-3xl font-bold font-mono">
+                <img
+                  src="/usdc-logo.svg"
+                  alt=""
+                  aria-hidden="true"
+                  className="h-7 w-7 rounded-full object-contain"
+                />
+                <span>{pricing.settlementAmount}</span>
+                <span className="text-xl font-semibold text-muted-foreground">
+                  {pricing.settlementCurrency}
                 </span>
               </p>
               {equivalent !== null && (
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-2 text-sm text-muted-foreground">
                   ~ {formatCurrencyAmount(equivalent, preferredCurrency)}
                 </p>
               )}
@@ -159,8 +169,12 @@ function RecordCardDetails({
               <p className="font-mono text-xs break-all">{dataset.id}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Price (wei)</p>
-              <p className="font-mono text-xs break-all">{dataset.price}</p>
+              <p className="text-sm text-muted-foreground">Price atomic</p>
+              <p className="font-mono text-xs break-all">{pricing.priceAtomic}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {pricing.settlementCurrency} settlement at{" "}
+                {pricing.settlementDecimals} decimals
+              </p>
             </div>
           </div>
         </CardContent>
@@ -227,15 +241,15 @@ function RecordCardDetails({
           <div>
             <p className="text-sm text-muted-foreground mb-2">Seller Address</p>
             <div className="mb-2">
-              <Badge variant="outline">
-                {sellerIsEvm ? (
+              <Badge variant="outline" className="gap-1.5">
+                {sellerChain === "evm" ? (
                   <>
-                    <Hexagon className="mr-1 h-3.5 w-3.5" />
+                    <ChainIcon chain="evm" className="h-3.5 w-3.5" />
                     Ethereum
                   </>
-                ) : sellerIsSolana ? (
+                ) : sellerChain === "solana" ? (
                   <>
-                    <Orbit className="mr-1 h-3.5 w-3.5" />
+                    <ChainIcon chain="solana" className="h-3.5 w-3.5" />
                     Solana
                   </>
                 ) : (
@@ -244,7 +258,12 @@ function RecordCardDetails({
               </Badge>
             </div>
             <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-sm">
+              {sellerChain && (
+                <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted/60">
+                  <ChainIcon chain={sellerChain} className="h-5 w-5" />
+                </div>
+              )}
+              <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm">
                 {dataset.seller}
               </code>
               <Button

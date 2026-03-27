@@ -4,7 +4,11 @@ export type PersistedUploadSession = {
   title: string;
   description: string;
   seller: string;
-  priceWei: string;
+  priceAtomic?: string;
+  settlementCurrency?: "USDC";
+  settlementDecimals?: 6;
+  /** Legacy compatibility for pre-migration drafts. */
+  priceWei?: string;
   fileName?: string;
   status?: "queued" | "running" | "completed" | "failed";
   datasetUrl?: string;

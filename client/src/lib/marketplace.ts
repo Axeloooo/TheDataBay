@@ -3,17 +3,35 @@ import {
   Contract,
   Interface,
   formatEther,
+  formatUnits,
   getAddress,
   parseEther,
+  ZeroAddress,
 } from "ethers";
+import { walletRuntime } from "@/lib/wallet/runtime";
 import { marketplaceAbi } from "@/lib/marketplaceAbi";
 import { uuidToBytes32 } from "@/lib/ids";
-import type { MarketplaceDataItem } from "@/types/contract";
+import type { MarketplaceDataItem, SettlementCurrency } from "@/types/contract";
+import { normalizeAtomicString } from "@/lib/atomic";
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS as
   | string
   | undefined;
 const errorInterface = new Interface(marketplaceAbi);
+const DEFAULT_SETTLEMENT_CURRENCY: SettlementCurrency = "USDC";
+const DEFAULT_SETTLEMENT_DECIMALS = 6;
+const erc20Abi = [
+  "function balanceOf(address owner) view returns (uint256)",
+  "function allowance(address owner,address spender) view returns (uint256)",
+  "function approve(address spender,uint256 amount) returns (bool)",
+];
+
+export type NormalizedMarketplacePrice = {
+  priceAtomic: string;
+  settlementCurrency: SettlementCurrency;
+  settlementDecimals: number;
+  settlementAmount: string;
+};
 
 function getContractAddress(): string {
   if (!CONTRACT_ADDRESS) {
@@ -31,10 +49,8 @@ function getContractAddress(): string {
 }
 
 export async function getEvmProvider(): Promise<BrowserProvider> {
-  if (!window.ethereum) {
-    throw new Error("No injected wallet found");
-  }
-  return new BrowserProvider(window.ethereum);
+  const eip1193 = await walletRuntime.getEip1193Provider();
+  return new BrowserProvider(eip1193 as ConstructorParameters<typeof BrowserProvider>[0]);
 }
 
 export async function createItemTx(params: {
@@ -42,7 +58,7 @@ export async function createItemTx(params: {
   title: string;
   description: string;
   seller: string;
-  priceWei: string;
+  priceAtomic: string;
   datasetUrl: string;
   datasetHash: string;
   signatureUrl: string;
@@ -62,7 +78,7 @@ export async function createItemTx(params: {
       const chainId = network.chainId?.toString?.() ?? String(network.chainId);
       throw new Error(
         `No contract code found at ${contractAddress} on chain ${chainId}. ` +
-          "Check MetaMask network and VITE_CONTRACT_ADDRESS deployment target."
+          "Check connected wallet network and VITE_CONTRACT_ADDRESS deployment target."
       );
     }
     const contract = new Contract(contractAddress, marketplaceAbi, signer);
@@ -78,7 +94,7 @@ export async function createItemTx(params: {
       contract: contractAddress,
       seller: signerAddress,
       itemId,
-      priceWei: params.priceWei,
+      priceAtomic: params.priceAtomic,
       datasetUrl: params.datasetUrl,
       signatureUrl: params.signatureUrl,
     });
@@ -88,7 +104,7 @@ export async function createItemTx(params: {
         params.title,
         params.description,
         params.seller,
-        params.priceWei,
+        params.priceAtomic,
         params.datasetUrl,
         params.datasetHash,
         params.signatureUrl,
@@ -103,7 +119,7 @@ export async function createItemTx(params: {
       params.title,
       params.description,
       params.seller,
-      params.priceWei,
+      params.priceAtomic,
       params.datasetUrl,
       params.datasetHash,
       params.signatureUrl,
@@ -127,16 +143,56 @@ export async function getFeeBps(): Promise<bigint> {
 
 export async function buyItemTx(
   listingIdBytes32: string,
-  priceWei: bigint,
+  priceAtomic: bigint,
 ): Promise<string> {
   try {
     const provider = await getEvmProvider();
     const signer = await provider.getSigner();
-    const contract = new Contract(getContractAddress(), marketplaceAbi, signer);
+    const contractAddress = getContractAddress();
+    const contract = new Contract(contractAddress, marketplaceAbi, signer);
     const feeBps = await contract.feeBps();
-    const fee = (priceWei * BigInt(feeBps)) / 10_000n;
-    const total = priceWei + fee;
-    const tx = await contract.buyItem(listingIdBytes32, { value: total });
+    const fee = (priceAtomic * BigInt(feeBps)) / 10_000n;
+    const total = priceAtomic + fee;
+    const settlementTokenAddress = getAddress(await contract.settlementToken());
+    if (settlementTokenAddress === ZeroAddress) {
+      throw new Error("Marketplace settlement token is not configured.");
+    }
+
+    const token = new Contract(settlementTokenAddress, erc20Abi, signer);
+    const buyerAddress = await signer.getAddress();
+    const balance = (await token.balanceOf(buyerAddress)) as bigint;
+    if (balance < total) {
+      throw new Error("Insufficient USDC balance for this purchase.");
+    }
+    const allowance = (await token.allowance(buyerAddress, contractAddress)) as bigint;
+
+    console.info("[buyItemTx] submit", {
+      contract: contractAddress,
+      settlementToken: settlementTokenAddress,
+      buyer: buyerAddress,
+      listingIdBytes32,
+      priceAtomic: priceAtomic.toString(),
+      fee: fee.toString(),
+      total: total.toString(),
+    });
+
+    if (allowance < total) {
+      // Safer approval strategy for USDT-like tokens that may require resetting allowance to 0 first.
+      // Check if we have an existing non-zero allowance that needs to be reset.
+      if (allowance > 0n) {
+        const resetTx = await token.approve(contractAddress, 0n);
+        console.info("[buyItemTx] resetting allowance", resetTx.hash);
+        await resetTx.wait();
+        console.info("[buyItemTx] allowance reset", resetTx.hash);
+      }
+      const approvalTx = await token.approve(contractAddress, total);
+      console.info("[buyItemTx] approval sent", approvalTx.hash);
+      await approvalTx.wait();
+      console.info("[buyItemTx] approval mined", approvalTx.hash);
+    }
+
+    const tx = await contract.buyItem(listingIdBytes32);
+    console.info("[buyItemTx] tx sent", tx.hash);
     const receipt = await tx.wait();
     return receipt?.hash ?? tx.hash;
   } catch (error) {
@@ -167,6 +223,61 @@ export function isSameAddress(a?: string | null, b?: string | null): boolean {
 
 export function listingIdFromItem(item: MarketplaceDataItem): string {
   return item.id;
+}
+
+function normalizeDecimals(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0 || parsed > 18) {
+    return DEFAULT_SETTLEMENT_DECIMALS;
+  }
+  return parsed;
+}
+
+function trimTrailingZeroes(value: string): string {
+  if (!value.includes(".")) return value;
+  return value.replace(/\.0+$/, "").replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.$/, "");
+}
+
+export function formatAtomicAmount(
+  amountAtomic: string | number | bigint,
+  decimals: number,
+): string {
+  try {
+    return trimTrailingZeroes(formatUnits(amountAtomic, decimals));
+  } catch {
+    return "0";
+  }
+}
+
+export function normalizeMarketplacePrice(
+  item: Pick<
+    MarketplaceDataItem,
+    "price_atomic" | "settlement_currency" | "settlement_decimals" | "price"
+  >,
+): NormalizedMarketplacePrice {
+  const priceAtomic = normalizeAtomicString(
+    item.price_atomic ?? item.price ?? 0,
+  );
+  return {
+    priceAtomic,
+    settlementCurrency:
+      item.settlement_currency === "USDC"
+        ? "USDC"
+        : DEFAULT_SETTLEMENT_CURRENCY,
+    settlementDecimals: normalizeDecimals(item.settlement_decimals),
+    settlementAmount: formatAtomicAmount(
+      priceAtomic,
+      normalizeDecimals(item.settlement_decimals),
+    ),
+  };
+}
+
+export function getSettlementDisplayCurrency(
+  item: Pick<MarketplaceDataItem, "settlement_currency">,
+): SettlementCurrency {
+  return item.settlement_currency === "USDC"
+    ? "USDC"
+    : DEFAULT_SETTLEMENT_CURRENCY;
 }
 
 function extractErrorData(error: unknown): string | null {

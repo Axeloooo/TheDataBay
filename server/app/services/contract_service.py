@@ -12,9 +12,14 @@ from typing import Any, Dict, List, Union
 
 from fastapi import HTTPException
 from ..schemas.dataset_schema import WalletType
-from ..schemas.marketplace_schema import MarketplaceDataItem
+from ..schemas.marketplace_schema import (
+    MarketplaceDataItem,
+    SETTLEMENT_CURRENCY,
+    SETTLEMENT_DECIMALS,
+)
 from web3 import Web3
 from web3.contract import Contract
+from web3.exceptions import BadFunctionCallOutput
 
 from ..config.settings import Settings
 
@@ -216,6 +221,21 @@ def _get_contract(settings: Settings) -> Contract:
         raise
 
 
+def _contract_has_code(settings: Settings) -> bool:
+    w3 = _get_web3(settings)
+    try:
+        checksum_address = Web3.to_checksum_address(settings.contract_address)
+    except ValueError as exc:
+        _raise_internal_config("Invalid CONTRACT_ADDRESS configuration", exc)
+        raise
+    try:
+        code = w3.eth.get_code(checksum_address)
+    except Exception as exc:
+        _raise_upstream("Failed to fetch contract bytecode from RPC", exc)
+        raise
+    return len(code) > 0
+
+
 def _to_hex(value: Any) -> str:
     if isinstance(value, (bytes, bytearray)):
         return Web3.to_hex(value)
@@ -259,7 +279,9 @@ def _item_view_to_schema(raw: Any) -> MarketplaceDataItem:
         title=title,
         description=description,
         seller=seller,
-        price=int(price),
+        price_atomic=str(int(price)),
+        settlement_currency=SETTLEMENT_CURRENCY,
+        settlement_decimals=SETTLEMENT_DECIMALS,
         dataset_url=dataset_url,
         dataset_hash=_to_hex(dataset_hash),
         signature_url=signature_url,
@@ -375,6 +397,10 @@ def _call_contract_read(callable_obj, operation: str):
     except HTTPException:
         raise
     except Exception as exc:
+        if isinstance(exc, BadFunctionCallOutput):
+            logger.warning(
+                "Contract read hit missing or incompatible bytecode: %s", exc
+            )
         _maybe_raise_custom_error(exc, operation)
         _raise_upstream(f"Contract read failed: {operation}", exc)
 
@@ -475,6 +501,12 @@ def get_items(start: int, count: int, settings: Settings) -> List[MarketplaceDat
         List[MarketplaceDataItem]: List of item views
     """
     logger.info("contract_service.get_items start=%s count=%s", start, count)
+    if not _contract_has_code(settings):
+        logger.warning(
+            "No Marketplace contract bytecode found at %s; returning empty paginated items list",
+            settings.contract_address,
+        )
+        return []
     raw_items = _call_contract_read(
         _get_contract(settings).functions.getItems(start, count),
         "getItems",
@@ -493,6 +525,12 @@ def get_all_items(settings: Settings) -> List[MarketplaceDataItem]:
     """
 
     logger.info("contract_service.get_all_items")
+    if not _contract_has_code(settings):
+        logger.warning(
+            "No Marketplace contract bytecode found at %s; returning empty item list",
+            settings.contract_address,
+        )
+        return []
     raw_items = _call_contract_read(
         _get_contract(settings).functions.getAllItems(),
         "getAllItems",
@@ -643,7 +681,7 @@ def create_item(
         title (str): Item title
         description (str): Item description
         seller (str): Seller address
-        price (int): Item price
+        price (int): Item price in USDC atomic units
         dataset_url (str): Dataset URL
         dataset_hash (str): Dataset hash
         signature_url (str): Signature URL
@@ -690,7 +728,7 @@ def buy_item(listing_id: str, value_wei: int, settings: Settings) -> str:
 
     Args:
         listing_id (str): Listing UUID string
-        value_wei (int): Value in Wei to send with the transaction
+        value_wei (int): Settlement payment amount in USDC atomic units
         settings (Settings): Application settings instance
 
     Returns:
@@ -721,7 +759,7 @@ def buy_item(listing_id: str, value_wei: int, settings: Settings) -> str:
         )
 
     tx = contract.functions.buyItem(item_id)
-    return _send_tx(tx, settings, value=value_wei)
+    return _send_tx(tx, settings)
 
 
 def update_dataset_url(listing_id: str, new_url: str, settings: Settings) -> str:
@@ -772,7 +810,7 @@ def update_price(listing_id: str, new_price: int, settings: Settings) -> str:
 
     Args:
         listing_id (str): Listing UUID string
-        new_price (int): New price for the item
+        new_price (int): New price for the item in USDC atomic units
         settings (Settings): Application settings instance
 
     Returns:

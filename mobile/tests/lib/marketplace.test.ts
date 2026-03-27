@@ -3,32 +3,38 @@ jest.mock("../../src/lib/appkit", () => ({
 }));
 
 import {
-  weiToEth,
+  formatSettlementAmount,
+  parseSettlementAmount,
   isSameAddress,
   truncateAddress,
   formatPurchaseCount,
 } from "../../src/lib/marketplace";
 
-describe("weiToEth", () => {
-  it("converts 1 ETH in wei", () => {
-    const oneEth = "1000000000000000000";
-    const result = parseFloat(weiToEth(oneEth));
-    expect(result).toBeCloseTo(1, 5);
+describe("parseSettlementAmount", () => {
+  it("converts 1 USDC to atomic units", () => {
+    expect(parseSettlementAmount("1", 6)).toBe("1000000");
   });
 
-  it("converts 0.5 ETH in wei", () => {
-    const halfEth = "500000000000000000";
-    const result = parseFloat(weiToEth(halfEth));
-    expect(result).toBeCloseTo(0.5, 5);
+  it("converts 0.5 USDC to atomic units", () => {
+    expect(parseSettlementAmount("0.5", 6)).toBe("500000");
   });
 
-  it('returns "0" for invalid input', () => {
-    expect(weiToEth("not-a-number")).toBe("0");
+  it("supports thousands separators", () => {
+    expect(parseSettlementAmount("1,250.25", 6)).toBe("1250250000");
   });
 
-  it("handles bigint input", () => {
-    const result = parseFloat(weiToEth(1_000_000_000_000_000_000n));
-    expect(result).toBeCloseTo(1, 5);
+  it("returns null for invalid input", () => {
+    expect(parseSettlementAmount("not-a-number", 6)).toBeNull();
+  });
+});
+
+describe("formatSettlementAmount", () => {
+  it("formats atomic units into USDC", () => {
+    expect(formatSettlementAmount("1000000", 6)).toBe("1");
+  });
+
+  it("formats fractional atomic units into USDC", () => {
+    expect(formatSettlementAmount("500000", 6)).toBe("0.5");
   });
 });
 
