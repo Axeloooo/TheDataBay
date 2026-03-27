@@ -12,7 +12,7 @@ import type { WalletConnectorType } from "@/lib/wallet/types";
 
 const RDNS_TO_WALLET: Record<string, { name: string; icon: string }> = {
   "io.metamask":         { name: "MetaMask",        icon: "/metamask-logo.svg" },
-  "xyz.rabby":           { name: "Rabby",            icon: "/rabby-logo.svg" },
+  "io.rabby":            { name: "Rabby",            icon: "/rabby-logo.svg" },
   "app.phantom":         { name: "Phantom",          icon: "/phantom-logo.svg" },
   "com.brave.wallet":    { name: "Brave Wallet",     icon: "/brave-logo.svg" },
   "com.coinbase.wallet": { name: "Coinbase Wallet",  icon: "/coinbase-logo.svg" },
@@ -95,15 +95,19 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
     }
   }, [isConnected, open, onOpenChange]);
 
+  // Only surface injected wallets that EIP-6963 actually detected in this
+  // browser. Showing undetected wallets as greyed-out is confusing — users
+  // with mobile-only wallets (Rabby, Coinbase, Trust) should use WalletConnect
+  // instead of seeing permanently disabled buttons.
   const injectedOptions: InjectedWalletOption[] = Object.entries(RDNS_TO_WALLET)
+    .filter(([rdns]) => detectedRdns.has(rdns))
     .map(([rdns, { name, icon }]) => ({
       id: "injected" as const,
       rdns,
       name,
       icon,
-      isActive: detectedRdns.has(rdns),
-    }))
-    .sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0));
+      isActive: true,
+    }));
 
   const walletOptions: WalletOption[] = [
     ...injectedOptions,
@@ -116,13 +120,20 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
     if (wallet.id === "walletconnect") {
       setSelectedWallet(wallet);
       setError(null);
+      // Close our dialog BEFORE WalletConnect opens its QR modal.
+      // Radix Dialog holds a react-remove-scroll scroll lock that intercepts
+      // wheel/touch events from all elements outside its subtree — including
+      // the WC QR modal appended to <body> — which prevents the "view all
+      // wallets" list from scrolling. Closing first releases the lock.
+      onOpenChange(false);
       try {
         await connect("walletconnect");
-        onOpenChange(false);
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Connection failed. Please try again.";
         setError(message);
+        // Reopen so the user can see the error and retry.
+        onOpenChange(true);
       }
       return;
     }
@@ -190,26 +201,17 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
         {!isConnecting && !error && (
           <div className="py-2">
             <div className="grid grid-cols-4 gap-3">
-              {walletOptions.map((wallet) => {
-                const inactive = wallet.id === "injected" && !wallet.isActive;
-                return (
-                  <button
-                    key={wallet.id === "injected" ? `injected-${(wallet as InjectedWalletOption).rdns}` : wallet.id}
-                    title={wallet.name}
-                    aria-label={wallet.name}
-                    onClick={() => void handleSelect(wallet)}
-                    disabled={inactive}
-                    className={[
-                      "flex aspect-square items-center justify-center rounded-xl border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      inactive
-                        ? "cursor-not-allowed border-border/40 bg-card/20 opacity-40"
-                        : "border-border/80 bg-card/60 hover:border-primary/40 hover:bg-accent/50",
-                    ].join(" ")}
-                  >
-                    <WalletIcon src={wallet.icon} name={wallet.name} />
-                  </button>
-                );
-              })}
+              {walletOptions.map((wallet) => (
+                <button
+                  key={wallet.id === "injected" ? `injected-${(wallet as InjectedWalletOption).rdns}` : wallet.id}
+                  title={wallet.name}
+                  aria-label={wallet.name}
+                  onClick={() => void handleSelect(wallet)}
+                  className="flex aspect-square items-center justify-center rounded-xl border border-border/80 bg-card/60 transition hover:border-primary/40 hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <WalletIcon src={wallet.icon} name={wallet.name} />
+                </button>
+              ))}
 
               {/* Solana placeholder */}
               <button
@@ -229,9 +231,14 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
               </button>
             </div>
 
-            {detectedRdns.size === 0 && (
+            {detectedRdns.size === 0 ? (
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                No browser wallets detected. Install a wallet extension or use WalletConnect.
+                No browser wallet extensions detected. Use WalletConnect to connect
+                Rabby, Coinbase, Trust, or any mobile wallet.
+              </p>
+            ) : (
+              <p className="mt-3 text-center text-xs text-muted-foreground">
+                Using a mobile wallet? Connect via WalletConnect.
               </p>
             )}
           </div>

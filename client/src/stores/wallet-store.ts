@@ -57,7 +57,10 @@ export const useWalletStore = create<WalletStore>()(
       },
 
       disconnect: async () => {
-        await walletRuntime.disconnect();
+        // Persist the disconnected state synchronously BEFORE any async work.
+        // If the user closes/refreshes the tab during the WalletConnect network
+        // call, localStorage will already reflect userDisconnected: true and the
+        // cleared address, preventing auto-reconnect on the next page load.
         set({
           address: null,
           chainId: null,
@@ -69,6 +72,7 @@ export const useWalletStore = create<WalletStore>()(
           isConnecting: false,
           userDisconnected: true,
         });
+        await walletRuntime.disconnect();
       },
 
       restoreSession: async () => {
