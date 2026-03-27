@@ -1,5 +1,22 @@
 import '@react-native-async-storage/async-storage/jest/async-storage-mock';
 
+// Mock WalletConnect / wallet runtime — these import Node built-ins that are
+// unavailable in the Jest (Node) environment and are not needed for unit tests.
+jest.mock('@walletconnect/react-native-compat', () => ({}));
+jest.mock('react-native-get-random-values', () => ({}));
+jest.mock('@/src/lib/wallet/runtime', () => ({
+  walletRuntime: {
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    awaitConnection: jest.fn(),
+    restoreSession: jest.fn(async () => null),
+    subscribeSession: jest.fn(() => () => undefined),
+    getEip1193Provider: jest.fn(),
+    switchToConfiguredChain: jest.fn(),
+    getConnectionMetadata: jest.fn(() => ({ configError: null, availableConnectors: [] })),
+  },
+}));
+
 // Mock expo-secure-store
 jest.mock('expo-secure-store', () => {
   const store: Record<string, string> = {};
