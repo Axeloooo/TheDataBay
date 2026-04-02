@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ip-factory-config
+  namespace: ip-factory
+data:
+  ENVIRONMENT: "production"
+  GITHUB_REPO_TEMPLATE: "ip-factory-template"
+  GITHUB_APP_PRIVATE_KEY_PATH: "/secrets/github-app-key/private-key.pem"
+  GITHUB_SCOPES: "read:user user:email"
+  LINKEDIN_SCOPES: "r_verify openid profile email r_profile_basicinfo"
+  LINKEDIN_VERSION: "202510"

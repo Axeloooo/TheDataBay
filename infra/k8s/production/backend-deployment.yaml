@@ -1,0 +1,178 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: ip-factory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: api
+          # Replace <ACR_LOGIN_SERVER> and <TAG> after terraform apply and docker push
+          image: <ACR_LOGIN_SERVER>/ip-factory/api:<TAG>
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: ip-factory-config
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: DATABASE_URL
+            - name: FRONTEND_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: FRONTEND_URL
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: JWT_SECRET_KEY
+            - name: INVITE_TOKEN_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: INVITE_TOKEN_SECRET
+            - name: LINKEDIN_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: LINKEDIN_CLIENT_ID
+            - name: LINKEDIN_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: LINKEDIN_CLIENT_SECRET
+            - name: LINKEDIN_REDIRECT_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: LINKEDIN_REDIRECT_URI
+            - name: GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: GITHUB_APP_ID
+            - name: GITHUB_ORG
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: GITHUB_ORG
+            - name: GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: GITHUB_CLIENT_ID
+            - name: GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: GITHUB_CLIENT_SECRET
+            - name: GITHUB_REDIRECT_URI
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: GITHUB_REDIRECT_URI
+            - name: SENDGRID_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: SENDGRID_API_KEY
+            - name: EMAIL_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: EMAIL_FROM
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: STRIPE_SECRET_KEY
+            - name: STRIPE_SUCCESS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: STRIPE_SUCCESS_URL
+            - name: STRIPE_CANCEL_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: STRIPE_CANCEL_URL
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: STRIPE_WEBHOOK_SECRET
+            - name: TOKEN_ENC_KEY_B64
+              valueFrom:
+                secretKeyRef:
+                  name: ip-factory-secrets
+                  key: TOKEN_ENC_KEY_B64
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "384Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: secrets-store
+              mountPath: /mnt/secrets-store
+              readOnly: true
+            - name: github-app-key
+              mountPath: /secrets/github-app-key
+              readOnly: true
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: ip-factory-secrets-provider
+        - name: github-app-key
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: ip-factory-github-key-provider
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: ip-factory
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

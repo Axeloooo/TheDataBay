@@ -1,0 +1,11 @@
+# cert-manager installation manifest
+# Source: https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
+#
+# To install cert-manager, run:
+#   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml
+#
+# Or download and commit the full manifest:
+#   curl -L https://github.com/cert-manager/cert-manager/releases/download/v1.14.4/cert-manager.yaml -o cert-manager.yaml
+#
+# After installation, apply the ClusterIssuer:
+#   kubectl apply -f cluster-issuer.yaml
