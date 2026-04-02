@@ -137,23 +137,30 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 
 ### Skill Selection Matrix
 
-| Skill                         | Path                                          | Primary trigger                                                          |
-| ----------------------------- | --------------------------------------------- | ------------------------------------------------------------------------ |
-| `brainstorming`               | `.agents/skills/brainstorming/`               | Any new feature, behavior change, or non-trivial redesign before coding  |
-| `systematic-debugging`        | `.agents/skills/systematic-debugging/`        | Bug investigation, failing tests, regressions, or unclear root cause     |
-| `subagent-driven-development` | `.agents/skills/subagent-driven-development/` | Multi-track work that can be safely parallelized                         |
-| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/` | `client/` React/Vite changes, performance, rendering, data fetching      |
-| `frontend-design`             | `.agents/skills/frontend-design/`             | UI-heavy pages/components requiring high design quality                  |
-| `shadcn`                      | `.agents/skills/shadcn/`                      | Add/fix/style shadcn/ui components in `client/`                          |
-| `react-state-management`      | `.agents/skills/react-state-management/`      | Zustand/global state refactors in `client/` or `mobile/`                 |
-| `typescript-advanced-types`   | `.agents/skills/typescript-advanced-types/`   | Complex TS generics, utility types, or type-level constraints            |
-| `vercel-react-native-skills`  | `.agents/skills/vercel-react-native-skills/`  | `mobile/` Expo/React Native features, perf, platform APIs                |
-| `fastapi-templates`           | `.agents/skills/fastapi-templates/`           | FastAPI route/service scaffolding, dependency injection, API structure   |
-| `api-design-principles`       | `.agents/skills/api-design-principles/`       | API contract design, endpoint semantics, request/response consistency    |
-| `solskill`                    | `.agents/skills/solskill/`                    | Solidity/Foundry contract logic, testing, and security-sensitive changes |
-| `copywriting`                 | `.agents/skills/copywriting/`                 | Marketing/product copy improvements and messaging                        |
-| `skill-creator`               | `.agents/skills/skill-creator/`               | Create/update/evaluate repository skills                                 |
-| `python-testing-patterns`     | `.agents/skills/python-testing-patterns/`     | Python test design, fixtures, mocking, and best practices                |
+| Skill                         | Path                                          | Primary trigger                                                                  |
+| ----------------------------- | --------------------------------------------- | -------------------------------------------------------------------------------- |
+| `api-design-principles`       | `.agents/skills/api-design-principles/`       | API contract design, endpoint semantics, request/response consistency            |
+| `brainstorming`               | `.agents/skills/brainstorming/`               | Any new feature, behavior change, or non-trivial redesign before coding          |
+| `copywriting`                 | `.agents/skills/copywriting/`                 | Marketing/product copy improvements and messaging                                |
+| `e2e-testing-patterns`        | `.agents/skills/e2e-testing-patterns/`        | End-to-end testing strategy, Playwright/Cypress coverage, and flaky E2E fixes    |
+| `fastapi-templates`           | `.agents/skills/fastapi-templates/`           | FastAPI route/service scaffolding, dependency injection, API structure           |
+| `frontend-design`             | `.agents/skills/frontend-design/`             | UI-heavy pages/components requiring high design quality                          |
+| `github-actions-templates`    | `.agents/skills/github-actions-templates/`    | GitHub Actions workflow setup, CI/CD automation, or reusable workflow patterns   |
+| `python-testing-patterns`     | `.agents/skills/python-testing-patterns/`     | Python test design, fixtures, mocking, and best practices                        |
+| `react-state-management`      | `.agents/skills/react-state-management/`      | Zustand/global state refactors in `client/` or `mobile/`                         |
+| `requesting-code-review`      | `.agents/skills/requesting-code-review/`      | Final verification pass before merge or when a dedicated review is requested     |
+| `shadcn`                      | `.agents/skills/shadcn/`                      | Add, fix, style, or compose shadcn/ui components in `client/`                    |
+| `skill-creator`               | `.agents/skills/skill-creator/`               | Create, update, benchmark, or package repository skills                          |
+| `solskill`                    | `.agents/skills/solskill/`                    | Solidity/Foundry contract logic, testing, and security-sensitive changes         |
+| `subagent-driven-development` | `.agents/skills/subagent-driven-development/` | Multi-track work that can be safely parallelized                                 |
+| `systematic-debugging`        | `.agents/skills/systematic-debugging/`        | Bug investigation, failing tests, regressions, or unclear root cause             |
+| `terraform-style-guide`       | `.agents/skills/terraform-style-guide/`       | Terraform authoring or review that must follow HashiCorp style conventions       |
+| `terraform-test`              | `.agents/skills/terraform-test/`              | Terraform `.tftest.hcl` creation, assertions, mocks, or test troubleshooting     |
+| `test-driven-development`     | `.agents/skills/test-driven-development/`     | Feature or bugfix implementation where tests should drive the change             |
+| `typescript-advanced-types`   | `.agents/skills/typescript-advanced-types/`   | Complex TS generics, utility types, or type-level constraints                    |
+| `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/` | `client/` React/Vite changes, performance, rendering, and data-fetching patterns |
+| `vercel-react-native-skills`  | `.agents/skills/vercel-react-native-skills/`  | `mobile/` Expo/React Native features, performance, and platform APIs             |
+| `writing-plans`               | `.agents/skills/writing-plans/`               | Specs or multi-step implementation plans that should be written before coding    |
 
 ### Recommended Skill Combinations
 
@@ -163,6 +170,13 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 - **State management changes**: `brainstorming` -> `react-state-management` (+ `typescript-advanced-types` if type-heavy)
 - **Mobile feature/perf issue**: `brainstorming` or `systematic-debugging` -> `vercel-react-native-skills`
 - **Contract feature/fix**: `brainstorming` or `systematic-debugging` -> `solskill`
+- **Implementation with tests first**: `test-driven-development` + domain skill (`fastapi-templates`, `vercel-react-best-practices`, `vercel-react-native-skills`, or `solskill`)
+- **Python backend test work**: `python-testing-patterns` + `fastapi-templates` (+ `systematic-debugging` when fixing regressions)
+- **UI flow verification**: `e2e-testing-patterns` + `frontend-design` or `vercel-react-best-practices`
+- **CI/CD automation**: `github-actions-templates` (+ `python-testing-patterns`, `e2e-testing-patterns`, or `terraform-test` depending on pipeline scope)
+- **Terraform delivery**: `terraform-style-guide` + `terraform-test`
+- **Large scoped effort**: `writing-plans` -> `subagent-driven-development` when work can be split safely
+- **Pre-merge validation**: primary implementation skills -> `requesting-code-review`
 
 ### Agent Optimization Rules
 
@@ -170,6 +184,8 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 - If multiple skills apply, prioritize in this order: **safety/debugging -> architecture/design -> framework-specific -> type/perf polish**.
 - Re-check skill guidance when task scope expands (for example from UI tweak to state refactor).
 - Match verification depth to risk: contract and backend auth/payment paths require stronger validation.
+- Prefer `test-driven-development` for implementation work and `writing-plans` when the user provides a spec or the task spans multiple coordinated steps.
+- Use `requesting-code-review` before handing off substantial work that is ready for merge or broader review.
 
 ### Anti-Patterns (Do Not Do)
 
@@ -177,3 +193,5 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 - Using only domain skills when debugging is required (skip-root-cause behavior).
 - Applying `frontend-design` for purely data/model/backend tasks.
 - Overusing `subagent-driven-development` for tightly coupled, sequential edits.
+- Skipping test-focused skills on work that clearly changes verification scope (`test-driven-development`, `python-testing-patterns`, `e2e-testing-patterns`, or `terraform-test`).
+- Reaching for `github-actions-templates` or `terraform-style-guide` outside CI/IaC work just because those tools are available.
