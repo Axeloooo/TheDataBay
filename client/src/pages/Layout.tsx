@@ -7,11 +7,12 @@ interface LayoutProps {
 
 function Layout({ children }: LayoutProps) {
   const messages = [
-    "BridgeMart is in active beta — features and APIs are evolving. Check back often.",
-    "Every dataset is AES-encrypted before it reaches IPFS. The decryption key only releases after on-chain purchase.",
-    "Tip: confirm your MetaMask network and contract address match before signing any transaction.",
-    "USDC settlement is live. Solana and additional chains are on the roadmap.",
-    "Prices display in your preferred quote currency — settlement remains USDC on-chain.",
+    "🚀 BridgeMart is in active beta — features and APIs are evolving. Check back often.",
+    "🔐 Every dataset is AES-encrypted before it reaches IPFS. The decryption key only releases after on-chain purchase.",
+    "🤖 AI agents can discover, recommend, and request purchases of datasets on your behalf.",
+    "💵 USDC settlement is live. Solana and additional chains are on the roadmap.",
+    "💱 Prices display in your preferred quote currency — settlement remains USDC on-chain.",
+    "🔗 Connect any EVM wallet — MetaMask, WalletConnect, and more — to start buying or selling datasets.",
   ];
 
   return (

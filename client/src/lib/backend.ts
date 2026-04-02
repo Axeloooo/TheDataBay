@@ -11,6 +11,7 @@ import type { JobResponse, JobStatusResponse } from "@/types/llm";
 import type { SimilaritySearchRequest, SimilaritySearchResponse } from "@/types/ai";
 import type { Agent, AgentListResponse, RecommendationListResponse, PurchaseRequest, PurchaseRequestListResponse } from "@/types/agent";
 import { normalizeAtomicString } from "@/lib/atomic";
+import { mockBackend } from "@/lib/mock-backend";
 
 type MarketplaceApiItem = Omit<
   MarketplaceDataItem,
@@ -67,7 +68,7 @@ function normalizeMarketplaceItem(item: MarketplaceApiItem): MarketplaceDataItem
   };
 }
 
-export const backend = {
+const realBackend = {
   submitEmbedBatch: (formData: FormData) =>
     apiRequest<JobResponse>("/api/v1/llm/embed/batch", {
       method: "POST",
@@ -167,3 +168,6 @@ export const backend = {
       body: JSON.stringify(payload),
     }),
 };
+
+export const backend =
+  import.meta.env.VITE_MOCK === "true" ? mockBackend : realBackend;
