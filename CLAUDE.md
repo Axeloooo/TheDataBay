@@ -154,6 +154,20 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 | `copywriting`                 | `.agents/skills/copywriting/`                 | Marketing/product copy improvements and messaging                        |
 | `skill-creator`               | `.agents/skills/skill-creator/`               | Create/update/evaluate repository skills                                 |
 | `python-testing-patterns`     | `.agents/skills/python-testing-patterns/`     | Python test design, fixtures, mocking, and best practices                |
+| `test-driven-development`     | `.agents/skills/test-driven-development/`     | Red-Green-Refactor cycle; write failing tests before implementation      |
+| `e2e-testing-patterns`        | `.agents/skills/e2e-testing-patterns/`        | Playwright/Cypress E2E tests with Page Object Model                      |
+
+## Specs & Planning
+
+Feature specs live in the Obsidian Vault at `/Users/axelsanchez/Code/Obsidian Vault/`.
+When a task references a spec, read the relevant vault note before loading any skills.
+
+| Feature                       | Vault Note                                                       |
+| ----------------------------- | ---------------------------------------------------------------- |
+| Semantic Search refactor      | `/Users/axelsanchez/Code/Obsidian Vault/Semantic Search.md`      |
+| CADC payment integration      | `/Users/axelsanchez/Code/Obsidian Vault/CADC.md`                 |
+| Backend architecture refactor | `/Users/axelsanchez/Code/Obsidian Vault/Backend Architecture.md` |
+| Dataset preview               | `/Users/axelsanchez/Code/Obsidian Vault/Dataset Preview.md`      |
 
 ### Recommended Skill Combinations
 
@@ -163,6 +177,8 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 - **State management changes**: `brainstorming` -> `react-state-management` (+ `typescript-advanced-types` if type-heavy)
 - **Mobile feature/perf issue**: `brainstorming` or `systematic-debugging` -> `vercel-react-native-skills`
 - **Contract feature/fix**: `brainstorming` or `systematic-debugging` -> `solskill`
+- **New backend service + repo + tests**: `brainstorming` -> `fastapi-templates` + `api-design-principles` + `test-driven-development` + `python-testing-patterns`
+- **E2E test suite**: `e2e-testing-patterns`
 
 ### Agent Optimization Rules
 
