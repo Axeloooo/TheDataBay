@@ -27,7 +27,7 @@ def test_root_returns_service_info_and_request_id(
         "version": "9.9.9",
         "environment": "test",
         "links": {
-            "docs": "/docs",
+            "docs": "/api/v1/docs",
             "health": "/health",
             "config": "/config",
         },

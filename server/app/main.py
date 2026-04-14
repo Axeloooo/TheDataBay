@@ -143,7 +143,7 @@ def read_root(settings: Settings = Depends(get_settings)) -> dict[str, Any]:
         "version": settings.app_version,
         "environment": settings.environment,
         "links": {
-            "docs": "/docs",
+            "docs": app.docs_url,
             "health": "/health",
             "config": "/config",
         },

@@ -2,6 +2,7 @@
 Database configuration and session management.
 """
 
+import importlib
 from functools import lru_cache
 from typing import Any, Generator
 from sqlalchemy import Engine, create_engine
@@ -27,6 +28,7 @@ def get_engine() -> Engine:
 def create_db_and_tables() -> None:
     """Create the database and tables."""
 
+    importlib.import_module("app.models")
     engine: Engine = get_engine()
     SQLModel.metadata.create_all(bind=engine)
 
