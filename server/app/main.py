@@ -144,6 +144,7 @@ def read_root(settings: Settings = Depends(get_settings)) -> dict[str, Any]:
         "environment": settings.environment,
         "links": {
             "docs": app.docs_url,
+            "redoc": app.redoc_url,
             "health": "/health",
             "config": "/config",
         },

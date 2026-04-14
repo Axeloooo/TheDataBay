@@ -17,10 +17,7 @@ class DatasetEmbedding(SQLModel, table=True):
     __tablename__ = "dataset_embeddings"
 
     listing_id: str = Field(primary_key=True)
-    embedding: Optional[list[float]] = Field(
-        default=None,
-        sa_column=Column(Vector(768), nullable=False),
-    )
+    embedding: list[float] = Field(sa_column=Column(Vector(768), nullable=False))
     created_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(

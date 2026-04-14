@@ -58,10 +58,17 @@ class Settings(BaseSettings):
     def async_database_url(self) -> str:
         """Return a postgresql+asyncpg:// URL for async SQLAlchemy usage."""
         url = self.database_url.get_secret_value()
-        if url.startswith("postgresql://"):
-            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-        if url.startswith("postgres://"):
-            return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        driver_aliases = {
+            "postgresql+psycopg3://": "postgresql+asyncpg://",
+            "postgresql+psycopg2://": "postgresql+asyncpg://",
+            "postgresql+psycopg://": "postgresql+asyncpg://",
+            "postgresql://": "postgresql+asyncpg://",
+            "postgres://": "postgresql+asyncpg://",
+        }
+
+        for prefix, async_prefix in driver_aliases.items():
+            if url.startswith(prefix):
+                return url.replace(prefix, async_prefix, 1)
         return url
 
     model_config = SettingsConfigDict(

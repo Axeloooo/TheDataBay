@@ -77,5 +77,5 @@ class BaseRepository(Generic[ModelType]):
         """
         obj = await db.get(self.model, id)
         if obj is not None:
-            await db.delete(obj)
+            db.delete(obj)
             await db.flush()

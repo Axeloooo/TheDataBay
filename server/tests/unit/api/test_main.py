@@ -28,6 +28,7 @@ def test_root_returns_service_info_and_request_id(
         "environment": "test",
         "links": {
             "docs": "/api/v1/docs",
+            "redoc": "/api/v1/redoc",
             "health": "/health",
             "config": "/config",
         },
