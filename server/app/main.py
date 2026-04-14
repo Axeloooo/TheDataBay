@@ -71,8 +71,8 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="FastAPI backend for BridgeMart AI workloads and API orchestration",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/api/v1/docs",
+    redoc_url="/api/v1/redoc",
     lifespan=lifespan,
 )
 

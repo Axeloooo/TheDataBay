@@ -54,6 +54,16 @@ class Settings(BaseSettings):
     # Database settings
     database_url: SecretStr = Field(alias="POSTGRES_URL")
 
+    @property
+    def async_database_url(self) -> str:
+        """Return a postgresql+asyncpg:// URL for async SQLAlchemy usage."""
+        url = self.database_url.get_secret_value()
+        if url.startswith("postgresql://"):
+            return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if url.startswith("postgres://"):
+            return url.replace("postgres://", "postgresql+asyncpg://", 1)
+        return url
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
