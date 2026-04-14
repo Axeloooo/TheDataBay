@@ -1,4 +1,6 @@
+import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel, Session
 
 from app.models.agent import Agent, AgentPurchaseRequest, AgentRecommendation
@@ -9,11 +11,22 @@ from app.schemas.agent_schema import (
 )
 
 
-def test_agent_response_validates_sqlmodel_and_serializes_tags_as_array():
-    engine = create_engine("sqlite://")
+@pytest.fixture
+def db_engine():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     SQLModel.metadata.create_all(engine)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
 
-    with Session(engine) as session:
+
+def test_agent_response_serializes_tags_as_array(db_engine):
+    with Session(db_engine) as session:
         agent = Agent(
             handle="research-bot",
             display_name="Research Bot",
@@ -30,11 +43,8 @@ def test_agent_response_validates_sqlmodel_and_serializes_tags_as_array():
     assert response.model_dump()["capability_tags"] == ["analysis", "ranking"]
 
 
-def test_recommendation_response_validates_sqlmodel():
-    engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
-
-    with Session(engine) as session:
+def test_recommendation_response_deserializes_json_list_fields(db_engine):
+    with Session(db_engine) as session:
         agent = Agent(handle="rec-bot", display_name="Recommendation Bot")
         session.add(agent)
         session.commit()
@@ -62,11 +72,8 @@ def test_recommendation_response_validates_sqlmodel():
     assert response.suggested_use_cases == ["forecasting", "ranking"]
 
 
-def test_purchase_request_response_validates_sqlmodel():
-    engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
-
-    with Session(engine) as session:
+def test_purchase_request_response_defaults_status_to_pending(db_engine):
+    with Session(db_engine) as session:
         agent = Agent(handle="purchase-bot", display_name="Purchase Bot")
         session.add(agent)
         session.commit()

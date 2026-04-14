@@ -1,3 +1,4 @@
+import pytest
 from datetime import datetime
 
 from sqlalchemy import create_engine
@@ -6,10 +7,18 @@ from sqlmodel import SQLModel, Session
 from app.services import dataset_key_repo
 
 
-def test_upsert_and_get_dataset_key():
-    engine = create_engine("sqlite://")
+@pytest.fixture
+def db_engine():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False})
     SQLModel.metadata.create_all(engine)
-    with Session(engine) as session:
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+def test_upsert_dataset_key_persists_record(db_engine):
+    with Session(db_engine) as session:
         record = dataset_key_repo.upsert_dataset_key(
             session=session,
             listing_id="123e4567-e89b-12d3-a456-426614174000",
@@ -19,19 +28,29 @@ def test_upsert_and_get_dataset_key():
             dataset_hash="0xhash",
         )
 
-        assert record.listing_id == "123e4567-e89b-12d3-a456-426614174000"
+    assert record.listing_id == "123e4567-e89b-12d3-a456-426614174000"
+
+
+def test_get_dataset_key_returns_persisted_record(db_engine):
+    with Session(db_engine) as session:
+        dataset_key_repo.upsert_dataset_key(
+            session=session,
+            listing_id="123e4567-e89b-12d3-a456-426614174000",
+            key_b64="key",
+            nonce_b64="nonce",
+            dataset_url="ipfs://data",
+            dataset_hash="0xhash",
+        )
 
         fetched = dataset_key_repo.get_dataset_key(
             session, "123e4567-e89b-12d3-a456-426614174000"
         )
-        assert fetched is not None
-        assert fetched.dataset_url == "ipfs://data"
+
+    assert fetched is not None
+    assert fetched.dataset_url == "ipfs://data"
 
 
-def test_upsert_dataset_key_updates_existing_record(monkeypatch):
-    engine = create_engine("sqlite://")
-    SQLModel.metadata.create_all(engine)
-
+def test_upsert_dataset_key_updates_existing_record(db_engine, monkeypatch):
     class FakeDateTime:
         current = datetime(2024, 1, 1)
 
@@ -41,7 +60,7 @@ def test_upsert_dataset_key_updates_existing_record(monkeypatch):
 
     monkeypatch.setattr(dataset_key_repo, "datetime", FakeDateTime)
 
-    with Session(engine) as session:
+    with Session(db_engine) as session:
         created = dataset_key_repo.upsert_dataset_key(
             session=session,
             listing_id="123e4567-e89b-12d3-a456-426614174000",

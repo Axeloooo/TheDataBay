@@ -71,8 +71,8 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="FastAPI backend for BridgeMart AI workloads and API orchestration",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/api/v1/docs",
+    redoc_url="/api/v1/redoc",
     lifespan=lifespan,
 )
 
@@ -143,7 +143,8 @@ def read_root(settings: Settings = Depends(get_settings)) -> dict[str, Any]:
         "version": settings.app_version,
         "environment": settings.environment,
         "links": {
-            "docs": "/docs",
+            "docs": app.docs_url,
+            "redoc": app.redoc_url,
             "health": "/health",
             "config": "/config",
         },

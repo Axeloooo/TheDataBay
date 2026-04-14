@@ -13,16 +13,23 @@ def test_create_and_get_job():
     assert job.metadata["row_count"] == 2
 
 
-def test_update_status_sets_timestamps():
+def test_update_status_to_running_sets_started_at():
     manager = JobManager()
     job_id = manager.create_job(filename="file.csv")
 
     manager.update_status(job_id, JobStatus.RUNNING)
     job = manager.get_job(job_id)
+
     assert job.started_at is not None
+
+
+def test_update_status_to_completed_sets_completed_at():
+    manager = JobManager()
+    job_id = manager.create_job(filename="file.csv")
 
     manager.update_status(job_id, JobStatus.COMPLETED)
     job = manager.get_job(job_id)
+
     assert job.completed_at is not None
 
 

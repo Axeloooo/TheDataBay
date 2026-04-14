@@ -156,6 +156,7 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 | `python-testing-patterns`     | `.agents/skills/python-testing-patterns/`     | Python test design, fixtures, mocking, and best practices                |
 | `test-driven-development`     | `.agents/skills/test-driven-development/`     | Red-Green-Refactor cycle; write failing tests before implementation      |
 | `e2e-testing-patterns`        | `.agents/skills/e2e-testing-patterns/`        | Playwright/Cypress E2E tests with Page Object Model                      |
+| `postgresql-table-design`     | `.agents/skills/postgresql-table-design/`     | PostgreSQL schema design: types, indexes, constraints, pgvector          |
 
 ## Specs & Planning
 
@@ -178,6 +179,7 @@ When a task references a spec, read the relevant vault note before loading any s
 - **Mobile feature/perf issue**: `brainstorming` or `systematic-debugging` -> `vercel-react-native-skills`
 - **Contract feature/fix**: `brainstorming` or `systematic-debugging` -> `solskill`
 - **New backend service + repo + tests**: `brainstorming` -> `fastapi-templates` + `api-design-principles` + `test-driven-development` + `python-testing-patterns`
+- **New database table or schema change**: `postgresql-table-design` (always load when writing migrations or SQLModel definitions)
 - **E2E test suite**: `e2e-testing-patterns`
 
 ### Agent Optimization Rules

@@ -60,7 +60,7 @@ pydantic-extra-types==2.11.0
 pydantic-settings==2.12.0
 pydantic_core==2.41.5
 Pygments==2.19.2
-pytest==9.0.2
+pytest==8.4.2
 pytest-cov==7.0.0
 python-dotenv==1.2.1
 python-multipart==0.0.21
@@ -91,3 +91,10 @@ watchfiles==1.1.1
 web3==7.14.1
 websockets==15.0.1
 yarl==1.22.0
+greenlet==3.4.0
+asyncpg==0.30.0
+pgvector==0.3.6
+alembic==1.15.2
+pytest-asyncio==0.26.0
+pytest-mock==3.14.0
+testcontainers==4.9.2

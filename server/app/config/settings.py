@@ -54,6 +54,23 @@ class Settings(BaseSettings):
     # Database settings
     database_url: SecretStr = Field(alias="POSTGRES_URL")
 
+    @property
+    def async_database_url(self) -> str:
+        """Return a postgresql+asyncpg:// URL for async SQLAlchemy usage."""
+        url = self.database_url.get_secret_value()
+        driver_aliases = {
+            "postgresql+psycopg3://": "postgresql+asyncpg://",
+            "postgresql+psycopg2://": "postgresql+asyncpg://",
+            "postgresql+psycopg://": "postgresql+asyncpg://",
+            "postgresql://": "postgresql+asyncpg://",
+            "postgres://": "postgresql+asyncpg://",
+        }
+
+        for prefix, async_prefix in driver_aliases.items():
+            if url.startswith(prefix):
+                return url.replace(prefix, async_prefix, 1)
+        return url
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",

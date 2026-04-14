@@ -2,42 +2,10 @@ import asyncio
 import uuid
 from types import SimpleNamespace
 
-from app.config.settings import Settings
 from app.services import agent_service
 
 
-def make_settings(**overrides) -> Settings:
-    data = {
-        "APP_NAME": "BridgeMart API",
-        "APP_VERSION": "0.1.0",
-        "ENVIRONMENT": "development",
-        "HOST": "localhost",
-        "PORT": 8080,
-        "CORS_ORIGINS": ["http://localhost:5173"],
-        "EMBEDDING_MODEL": "nomic-embed-text",
-        "MAX_FILE_SIZE_MB": 50,
-        "MAX_DATASET_ROWS": 50000,
-        "EMBEDDING_CHUNK_SIZE": 2,
-        "TOP_K": 10,
-        "K_ROWS": 2,
-        "SIMILARITY_THRESHOLD": None,
-        "CACHE_MAXSIZE": 100,
-        "PINATA_API_KEY": "k",
-        "PINATA_SECRET_KEY": "s",
-        "PINATA_GATEWAY_URL": "https://gateway.pinata.cloud",
-        "CONTRACT_ADDRESS": "0x0000000000000000000000000000000000000000",
-        "CONTRACT_ABI_PATH": "/tmp/Marketplace.json",
-        "CHAIN_ID": 31337,
-        "RPC_URL": "http://127.0.0.1:8545",
-        "SERVER_PRIVATE_KEY": "0x" + "11" * 32,
-        "POSTGRES_URL": "postgresql://user:password@localhost:5432/bridgemart",
-    }
-    data.update(overrides)
-    return Settings(_env_file=None, **data)
-
-
-def test_generate_recommendation_success(monkeypatch):
-    settings = make_settings()
+def test_generate_recommendation_success(monkeypatch, settings):
     agent_id = uuid.uuid4()
     session = object()
     datasets = [SimpleNamespace(id="0x" + "01" * 32, title="Climate Data")]
@@ -89,8 +57,7 @@ def test_generate_recommendation_success(monkeypatch):
     assert captured["suggested_use_cases"] == ["find climate datasets"]
 
 
-def test_generate_recommendation_returns_none_when_no_results(monkeypatch):
-    settings = make_settings()
+def test_generate_recommendation_returns_none_when_no_results(monkeypatch, settings):
     agent_id = uuid.uuid4()
     session = object()
 
@@ -117,8 +84,7 @@ def test_generate_recommendation_returns_none_when_no_results(monkeypatch):
     assert recommendation is None
 
 
-def test_generate_recommendation_returns_none_below_threshold(monkeypatch):
-    settings = make_settings()
+def test_generate_recommendation_returns_none_below_threshold(monkeypatch, settings):
     agent_id = uuid.uuid4()
     session = object()
     datasets = [SimpleNamespace(id="0x" + "02" * 32, title="Small Data")]
