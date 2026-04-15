@@ -14,12 +14,10 @@ read back the rows, and all writes are cleaned up in the test fixture teardown
 via explicit DELETE statements.
 """
 
-import os
 import base64
 from pathlib import Path
 
 import pytest
-import pytest_asyncio
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import NullPool

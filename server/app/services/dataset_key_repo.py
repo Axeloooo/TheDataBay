@@ -109,13 +109,12 @@ async def async_upsert_dataset_key(
                 "updated_at": now,
             },
         )
+        .returning(DatasetKey)
     )
-    await db.execute(stmt)
+    result = await db.execute(stmt)
+    row = result.scalar_one()
     await db.flush()
-    result = await db.execute(
-        select(DatasetKey).where(DatasetKey.listing_id == listing_id)
-    )
-    return result.scalar_one()
+    return row
 
 
 def get_dataset_key(session: Session, listing_id: str) -> Optional[DatasetKey]:
