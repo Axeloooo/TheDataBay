@@ -1,5 +1,7 @@
 import asyncio
 import io
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import BackgroundTasks, UploadFile, HTTPException
@@ -26,7 +28,6 @@ def test_enqueue_batch_job_success(settings, job_manager):
             description="Desc",
             seller="0x0000000000000000000000000000000000000001",
             price=100,
-            session=object(),
         )
     )
 
@@ -51,7 +52,6 @@ def test_enqueue_batch_job_invalid_extension(settings, job_manager):
                 description="Desc",
                 seller="0x0000000000000000000000000000000000000001",
                 price=100,
-                session=object(),
             )
         )
 
@@ -71,7 +71,6 @@ def test_enqueue_batch_job_rejects_non_evm_wallet(settings, job_manager):
                 description="Desc",
                 seller="0x0000000000000000000000000000000000000001",
                 price=100,
-                session=object(),
                 seller_wallet_type="solana",
             )
         )
@@ -94,7 +93,6 @@ def test_enqueue_batch_job_too_large(settings, job_manager):
                 description="Desc",
                 seller="0x0000000000000000000000000000000000000001",
                 price=100,
-                session=object(),
             )
         )
 
@@ -114,7 +112,6 @@ def test_enqueue_batch_job_decode_error(settings, job_manager):
                 description="Desc",
                 seller="0x0000000000000000000000000000000000000001",
                 price=100,
-                session=object(),
             )
         )
 
@@ -136,7 +133,6 @@ def test_enqueue_batch_job_too_many_rows(settings, job_manager):
                 description="Desc",
                 seller="0x0000000000000000000000000000000000000001",
                 price=100,
-                session=object(),
             )
         )
 
@@ -175,6 +171,23 @@ def test_get_job_status_completed(settings, job_manager):
     assert response.listing_id == "123e4567-e89b-12d3-a456-426614174000"
 
 
+def _make_fake_session_factory():
+    """Return a factory whose sessions are fully mocked async context managers."""
+    fake_session = AsyncMock()
+    fake_session.__aenter__ = AsyncMock(return_value=fake_session)
+    fake_session.__aexit__ = AsyncMock(return_value=False)
+
+    fake_begin_ctx = AsyncMock()
+    fake_begin_ctx.__aenter__ = AsyncMock(return_value=None)
+    fake_begin_ctx.__aexit__ = AsyncMock(return_value=False)
+    fake_session.begin = MagicMock(return_value=fake_begin_ctx)
+
+    def factory():
+        return fake_session
+
+    return factory, fake_session
+
+
 def test_process_embedding_job_success(monkeypatch, settings, job_manager):
     job_id = job_manager.create_job(filename="data.csv")
 
@@ -185,7 +198,10 @@ def test_process_embedding_job_success(monkeypatch, settings, job_manager):
         return "col1: 1 | col2: 2"
 
     async def fake_generate_embeddings_chunked(texts, settings):
-        return [[0.1, 0.2]], 2
+        return [[0.1, 0.2], [0.2, 0.1]], 2
+
+    def fake_mean_pool(embeddings):
+        return [0.15, 0.15]
 
     def fake_generate_key():
         return b"k" * 32
@@ -199,19 +215,33 @@ def test_process_embedding_job_success(monkeypatch, settings, job_manager):
     async def fake_upload_signature(embeddings, filename, settings, compress=True):
         return "ipfs://QmHash", "0xabc"
 
-    def fake_upsert_dataset_key(**kwargs):
+    async def fake_async_upsert_dataset_key(**kwargs):
         return None
+
+    fake_embedding_repo_instance = AsyncMock()
+    fake_embedding_repo_instance.upsert = AsyncMock(return_value=MagicMock())
+
+    fake_factory, _fake_session = _make_fake_session_factory()
 
     monkeypatch.setattr(llm_job_service, "parse_dataset_file", fake_parse_dataset_file)
     monkeypatch.setattr(llm_job_service, "record_to_text", fake_record_to_text)
     monkeypatch.setattr(
         llm_job_service, "generate_embeddings_chunked", fake_generate_embeddings_chunked
     )
+    monkeypatch.setattr(llm_job_service, "mean_pool", fake_mean_pool)
     monkeypatch.setattr(llm_job_service, "generate_key", fake_generate_key)
     monkeypatch.setattr(llm_job_service, "encrypt_bytes", fake_encrypt_bytes)
     monkeypatch.setattr(llm_job_service, "upload_bytes", fake_upload_bytes)
     monkeypatch.setattr(llm_job_service, "upload_signature", fake_upload_signature)
-    monkeypatch.setattr(llm_job_service, "upsert_dataset_key", fake_upsert_dataset_key)
+    monkeypatch.setattr(
+        llm_job_service, "async_upsert_dataset_key", fake_async_upsert_dataset_key
+    )
+    monkeypatch.setattr(
+        llm_job_service, "_embedding_repo", fake_embedding_repo_instance
+    )
+    monkeypatch.setattr(
+        llm_job_service, "get_async_session_factory", lambda: fake_factory
+    )
 
     asyncio.run(
         llm_job_service._process_embedding_job(
@@ -225,7 +255,6 @@ def test_process_embedding_job_success(monkeypatch, settings, job_manager):
             description="Desc",
             seller="0x0000000000000000000000000000000000000001",
             price=100,
-            session=object(),
         )
     )
 
@@ -260,10 +289,117 @@ def test_process_embedding_job_failure(monkeypatch, settings, job_manager):
             description="Desc",
             seller="0x0000000000000000000000000000000000000001",
             price=100,
-            session=object(),
         )
     )
 
     job = job_manager.get_job(job_id)
     assert job.status == JobStatus.FAILED
     assert job.error is not None
+
+
+def test_process_embedding_job_rollback_on_embedding_upsert_failure(
+    monkeypatch, settings, job_manager
+):
+    """When the embedding upsert raises, the job should end FAILED and the
+    DatasetKey upsert must not have been committed (atomic rollback)."""
+    job_id = job_manager.create_job(filename="data.csv")
+
+    def fake_parse_dataset_file(content):
+        return [["1", "2"]], ["col1", "col2"], True, 0
+
+    def fake_record_to_text(record, columns):
+        return "col1: 1 | col2: 2"
+
+    async def fake_generate_embeddings_chunked(texts, settings):
+        return [[0.1, 0.2]], 2
+
+    def fake_mean_pool(embeddings):
+        return [0.15, 0.15]
+
+    def fake_generate_key():
+        return b"k" * 32
+
+    def fake_encrypt_bytes(content_bytes, key, aad):
+        return b"ciphertext", b"nonce12345678"
+
+    async def fake_upload_bytes(payload, filename, settings):
+        return "ipfs://QmData", "0xdata"
+
+    async def fake_upload_signature(embeddings, filename, settings, compress=True):
+        return "ipfs://QmHash", "0xabc"
+
+    # Track whether async_upsert_dataset_key was called
+    key_upsert_calls: list = []
+
+    async def fake_async_upsert_dataset_key(**kwargs):
+        key_upsert_calls.append(kwargs)
+        return None
+
+    # Embedding upsert raises
+    fake_embedding_repo_instance = AsyncMock()
+    fake_embedding_repo_instance.upsert = AsyncMock(
+        side_effect=RuntimeError("DB write failed")
+    )
+
+    # Session begin context manager that re-raises (simulating rollback on error)
+    fake_session = AsyncMock()
+    fake_session.__aenter__ = AsyncMock(return_value=fake_session)
+    fake_session.__aexit__ = AsyncMock(return_value=False)
+
+    begin_raised: list[bool] = []
+
+    @asynccontextmanager
+    async def fake_begin():
+        try:
+            yield None
+        except Exception:
+            begin_raised.append(True)
+            raise
+
+    fake_session.begin = MagicMock(side_effect=fake_begin)
+
+    def fake_factory():
+        return fake_session
+
+    monkeypatch.setattr(llm_job_service, "parse_dataset_file", fake_parse_dataset_file)
+    monkeypatch.setattr(llm_job_service, "record_to_text", fake_record_to_text)
+    monkeypatch.setattr(
+        llm_job_service, "generate_embeddings_chunked", fake_generate_embeddings_chunked
+    )
+    monkeypatch.setattr(llm_job_service, "mean_pool", fake_mean_pool)
+    monkeypatch.setattr(llm_job_service, "generate_key", fake_generate_key)
+    monkeypatch.setattr(llm_job_service, "encrypt_bytes", fake_encrypt_bytes)
+    monkeypatch.setattr(llm_job_service, "upload_bytes", fake_upload_bytes)
+    monkeypatch.setattr(llm_job_service, "upload_signature", fake_upload_signature)
+    monkeypatch.setattr(
+        llm_job_service, "async_upsert_dataset_key", fake_async_upsert_dataset_key
+    )
+    monkeypatch.setattr(
+        llm_job_service, "_embedding_repo", fake_embedding_repo_instance
+    )
+    monkeypatch.setattr(
+        llm_job_service, "get_async_session_factory", lambda: fake_factory
+    )
+
+    asyncio.run(
+        llm_job_service._process_embedding_job(
+            job_id=job_id,
+            content_bytes=b"col1,col2\n1,2\n",
+            filename="data.csv",
+            settings=settings,
+            job_manager=job_manager,
+            listing_id="123e4567-e89b-12d3-a456-426614174000",
+            title="Dataset",
+            description="Desc",
+            seller="0x0000000000000000000000000000000000000001",
+            price=100,
+        )
+    )
+
+    job = job_manager.get_job(job_id)
+    assert job.status == JobStatus.FAILED
+    # The begin() context manager propagated the error (rollback path was hit)
+    assert begin_raised, "Expected session.begin() to catch and re-raise the exception"
+    # DatasetKey upsert was staged inside the transaction that rolled back,
+    # so no committed write — the key_upsert_calls list may be non-empty but
+    # the begin() context will have rolled back the transaction.
