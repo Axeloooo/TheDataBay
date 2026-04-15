@@ -14,7 +14,6 @@ from fastapi import (
     status,
 )
 
-from ..database.engine import get_session
 from ..schemas.job_schema import JobResponse, JobStatusResponse
 from ..schemas.llm_schema import (
     VectorSpec,
@@ -52,7 +51,6 @@ async def create_batch_embeddings(
     seller_wallet_type: str = Form("evm"),
     settings: Settings = Depends(get_settings),
     job_manager: JobManager = Depends(get_job_manager),
-    session=Depends(get_session),
 ):
     """Submit a dataset for batch embedding (async job-based).
 
@@ -77,7 +75,6 @@ async def create_batch_embeddings(
         seller_wallet_type (str): Seller wallet type (evm only for now)
         settings (Settings): Application settings instance
         job_manager (JobManager): Job manager instance
-        session (Session): Database session
 
     Returns:
         JobResponse: Job submission response with job ID
@@ -109,7 +106,6 @@ async def create_batch_embeddings(
         description=description,
         seller=seller,
         price=effective_price,
-        session=session,
         seller_wallet_type=seller_wallet_type,
     )
 
