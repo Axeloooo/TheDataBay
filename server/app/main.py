@@ -9,7 +9,9 @@ import time
 import uuid
 from typing import Any
 from fastapi import FastAPI, Depends, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from .config.settings import Settings, get_settings
 from .routers import (
     health_router,
@@ -20,6 +22,7 @@ from .routers import (
 )
 from .routers import agent_router
 from .database.engine import create_db_and_tables
+from .schemas.ai_schema import ErrorResponse
 
 settings: Settings = get_settings()
 
@@ -83,6 +86,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    """Return ErrorResponse shape for all FastAPI 422 validation failures."""
+    return JSONResponse(
+        status_code=422,
+        content=ErrorResponse(
+            error="validation_error",
+            message="Request validation failed.",
+            details={"errors": exc.errors()},
+        ).model_dump(),
+    )
 
 app.include_router(health_router.router)
 app.include_router(llm_router.router)
