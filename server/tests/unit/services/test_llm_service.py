@@ -110,3 +110,33 @@ def test_generate_embeddings_chunked_error(monkeypatch, settings):
 
     with pytest.raises(HTTPException):
         asyncio.run(llm_service.generate_embeddings_chunked(["a"], settings))
+
+
+# ---------------------------------------------------------------------------
+# mean_pool tests
+# ---------------------------------------------------------------------------
+
+
+def test_mean_pool_single_embedding_returns_same_vector():
+    result = llm_service.mean_pool([[1.0, 2.0, 3.0]])
+    assert result == [1.0, 2.0, 3.0]
+
+
+def test_mean_pool_two_identical_embeddings_returns_same_vector():
+    result = llm_service.mean_pool([[1.0, 0.0], [1.0, 0.0]])
+    assert result == [1.0, 0.0]
+
+
+def test_mean_pool_two_opposite_embeddings_returns_zero_vector():
+    result = llm_service.mean_pool([[1.0, -1.0], [-1.0, 1.0]])
+    assert result == [0.0, 0.0]
+
+
+def test_mean_pool_empty_list_raises_value_error():
+    with pytest.raises(ValueError):
+        llm_service.mean_pool([])
+
+
+def test_mean_pool_mismatched_dimensions_raises_value_error():
+    with pytest.raises(ValueError):
+        llm_service.mean_pool([[1.0, 2.0], [3.0]])

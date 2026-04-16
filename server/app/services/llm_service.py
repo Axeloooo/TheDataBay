@@ -187,6 +187,38 @@ async def generate_embeddings_chunked(
     return all_embeddings, dimension
 
 
+def mean_pool(embeddings: list[list[float]]) -> list[float]:
+    """Compute the element-wise arithmetic mean of a list of embedding vectors.
+
+    Args:
+        embeddings: Non-empty list of embedding vectors, all with the same
+                    dimension.
+
+    Returns:
+        A new list of floats representing the mean vector.
+
+    Raises:
+        ValueError: If ``embeddings`` is empty or if any row has a different
+                    dimension than the first row.
+    """
+    if not embeddings:
+        raise ValueError("embeddings list must not be empty")
+
+    dim = len(embeddings[0])
+    for i, row in enumerate(embeddings[1:], start=1):
+        if len(row) != dim:
+            raise ValueError(
+                f"Dimension mismatch: row 0 has dim {dim} but row {i} has dim {len(row)}"
+            )
+
+    n = len(embeddings)
+    result: list[float] = [0.0] * dim
+    for row in embeddings:
+        for j, val in enumerate(row):
+            result[j] += val
+    return [v / n for v in result]
+
+
 def generate_single_embedding(
     text: str,
     settings: Settings,

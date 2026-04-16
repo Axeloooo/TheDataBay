@@ -8,23 +8,28 @@ import logging
 import uuid
 
 from fastapi import BackgroundTasks, HTTPException, UploadFile
-from sqlmodel import Session
 from web3 import Web3
 
 from ..config.settings import Settings
+from ..database.async_engine import get_async_session_factory
+from ..repositories.dataset_embedding_repo import DatasetEmbeddingRepository
 from ..schemas.job_schema import JobResponse, JobStatus, JobStatusResponse
 from ..schemas.llm_schema import DatasetStats, SignatureInfo, VectorSpec
-from .dataset_key_repo import upsert_dataset_key
+from .dataset_key_repo import async_upsert_dataset_key
 from ..services.encryption_service import encrypt_bytes, generate_key
 from ..services.job_manager import JobManager
 from ..services.llm_service import (
     generate_embeddings_chunked,
+    mean_pool,
     parse_dataset_file,
     record_to_text,
 )
 from ..services.pinata_service import upload_signature, upload_bytes
 
 logger = logging.getLogger(__name__)
+
+# Module-level repository instance (can be monkeypatched in tests)
+_embedding_repo = DatasetEmbeddingRepository()
 
 
 async def enqueue_batch_job(
@@ -36,7 +41,6 @@ async def enqueue_batch_job(
     description: str,
     seller: str,
     price: int,
-    session: Session,
     seller_wallet_type: str = "evm",
 ) -> JobResponse:
     """Validate input file and enqueue async embedding job.
@@ -50,7 +54,6 @@ async def enqueue_batch_job(
         description (str): Dataset description
         seller (str): Seller EVM address
         price (int): Price in USDC atomic units
-        session (Session): Database session
         seller_wallet_type (str): Seller wallet type (evm only for now)
 
     Returns:
@@ -147,7 +150,6 @@ async def enqueue_batch_job(
         description,
         seller,
         price,
-        session,
     )
 
     return JobResponse(
@@ -209,13 +211,16 @@ async def _process_embedding_job(
     description: str,
     seller: str,
     price: int,
-    session: Session,
 ) -> None:
     """Background task to process embedding job.
 
+    The job owns its own async database session.  Both the DatasetKey upsert
+    and the DatasetEmbedding upsert are wrapped in a single ``session.begin()``
+    block so they commit atomically or both roll back on any exception.
+
     Args:
         job_id (str): Job identifier
-        content (str): File content
+        content_bytes (bytes): Raw file bytes
         filename (str): Original filename
         settings (Settings): Application settings instance
         job_manager (JobManager): Job manager instance
@@ -224,7 +229,6 @@ async def _process_embedding_job(
         description (str): Dataset description
         seller (str): Seller EVM address
         price (int): Price in USDC atomic units
-        session (Session): Database session
     """
     logger.info("llm_job.process start job_id=%s listing_id=%s", job_id, listing_id)
 
@@ -246,8 +250,11 @@ async def _process_embedding_job(
             text = record_to_text(row, column_names)
             texts.append(text)
 
-        # Generate embeddings with chunking
-        embeddings, dimension = await generate_embeddings_chunked(texts, settings)
+        # Generate per-row embeddings with chunking
+        row_embeddings, dimension = await generate_embeddings_chunked(texts, settings)
+
+        # Produce single dataset vector via mean pooling
+        dataset_vector = mean_pool(row_embeddings)
 
         # Encrypt raw dataset bytes and upload to IPFS
         aad = listing_id.encode("utf-8")
@@ -255,23 +262,32 @@ async def _process_embedding_job(
         ciphertext, nonce = encrypt_bytes(content_bytes, key, aad)
         dataset_url, dataset_hash = await upload_bytes(ciphertext, filename, settings)
 
-        # Upload signature to IPFS (unencrypted)
+        # Upload raw row embeddings as signature to IPFS (unencrypted)
         ipfs_url, signature_hash = await upload_signature(
-            embeddings, filename, settings, compress=True
+            row_embeddings, filename, settings, compress=True
         )
 
-        # Persist key material
+        # Prepare key material
         key_b64 = base64.b64encode(key).decode("utf-8")
         nonce_b64 = base64.b64encode(nonce).decode("utf-8")
 
-        upsert_dataset_key(
-            session=session,
-            listing_id=listing_id,
-            key_b64=key_b64,
-            nonce_b64=nonce_b64,
-            dataset_url=dataset_url,
-            dataset_hash=dataset_hash,
-        )
+        # Atomically persist DatasetKey + DatasetEmbedding
+        factory = get_async_session_factory()
+        async with factory() as session:
+            async with session.begin():
+                await async_upsert_dataset_key(
+                    db=session,
+                    listing_id=listing_id,
+                    key_b64=key_b64,
+                    nonce_b64=nonce_b64,
+                    dataset_url=dataset_url,
+                    dataset_hash=dataset_hash,
+                )
+                await _embedding_repo.upsert(
+                    db=session,
+                    listing_id=listing_id,
+                    embedding=dataset_vector,
+                )
 
         # Build result
         result = {
