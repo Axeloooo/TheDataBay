@@ -127,5 +127,7 @@ def test_release_key_validates_wallet_type_before_router_logic(client, monkeypat
     )
 
     assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert any(error["loc"][-1] == "wallet_type" for error in detail)
+    body = response.json()
+    assert body["error"] == "validation_error"
+    errors = body["details"]["errors"]
+    assert any(error["loc"][-1] == "wallet_type" for error in errors)

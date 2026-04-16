@@ -145,8 +145,10 @@ def test_embed_query_validates_non_empty_query(client, monkeypatch):
     response = client.post("/api/v1/llm/embed/query", json={"query": ""})
 
     assert response.status_code == 422
-    detail = response.json()["detail"]
-    assert any(error["loc"][-1] == "query" for error in detail)
+    body = response.json()
+    assert body["error"] == "validation_error"
+    errors = body["details"]["errors"]
+    assert any(error["loc"][-1] == "query" for error in errors)
 
 
 def test_get_job_status_returns_router_response(client, monkeypatch):

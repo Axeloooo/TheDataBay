@@ -3,33 +3,37 @@ import uuid
 from types import SimpleNamespace
 
 from app.services import agent_service
+from app.schemas.ai_schema import RankedDataset
 
 
-def test_generate_recommendation_success(monkeypatch, settings):
+def make_ranked(listing_id: str, title: str, score: float) -> RankedDataset:
+    return RankedDataset(
+        listing_id=listing_id,
+        title=title,
+        description="desc",
+        seller="0xSeller",
+        price_atomic=10,
+        score=score,
+        score_label="high" if score > 0.66 else ("moderate" if score > 0.33 else "low"),
+    )
+
+
+def test_generate_recommendation_success(monkeypatch):
     agent_id = uuid.uuid4()
     session = object()
-    datasets = [SimpleNamespace(id="0x" + "01" * 32, title="Climate Data")]
-    top_result = SimpleNamespace(
-        score=0.72,
-        item=SimpleNamespace(id=datasets[0].id, title=datasets[0].title),
-    )
+    top_result = make_ranked("0x" + "01" * 32, "Climate Data", 0.72)
     captured = {}
 
-    monkeypatch.setattr(agent_service, "get_all_items", lambda settings: datasets)
-
     class FakeAIService:
-        async def rank_datasets(self, query, ranked_datasets):
+        async def rank_datasets(self, query: str, limit: int = 20):
             assert query == "find climate datasets"
-            assert ranked_datasets == datasets
             return [top_result]
 
     def fake_create_recommendation(**kwargs):
         captured.update(kwargs)
         return SimpleNamespace(**kwargs)
 
-    monkeypatch.setattr(
-        agent_service, "create_recommendation", fake_create_recommendation
-    )
+    monkeypatch.setattr(agent_service, "create_recommendation", fake_create_recommendation)
 
     recommendation = asyncio.run(
         agent_service.generate_recommendation(
@@ -37,13 +41,12 @@ def test_generate_recommendation_success(monkeypatch, settings):
             query="find climate datasets",
             session=session,
             ai_service=FakeAIService(),
-            settings=settings,
         )
     )
 
     assert recommendation is not None
     assert captured["agent_id"] == agent_id
-    assert captured["listing_id"] == datasets[0].id
+    assert captured["listing_id"] == "0x" + "01" * 32
     assert captured["confidence"] == 0.72
     assert captured["similarity_score"] == 0.72
     assert "find climate datasets" in captured["rationale"]
@@ -57,16 +60,12 @@ def test_generate_recommendation_success(monkeypatch, settings):
     assert captured["suggested_use_cases"] == ["find climate datasets"]
 
 
-def test_generate_recommendation_returns_none_when_no_results(monkeypatch, settings):
+def test_generate_recommendation_returns_none_when_no_results(monkeypatch):
     agent_id = uuid.uuid4()
     session = object()
 
-    monkeypatch.setattr(agent_service, "get_all_items", lambda settings: [])
-
     class FakeAIService:
-        async def rank_datasets(self, query, ranked_datasets):
-            assert query == "nothing"
-            assert ranked_datasets == []
+        async def rank_datasets(self, query: str, limit: int = 20):
             return []
 
     monkeypatch.setattr(agent_service, "create_recommendation", lambda **kwargs: None)
@@ -77,36 +76,27 @@ def test_generate_recommendation_returns_none_when_no_results(monkeypatch, setti
             query="nothing",
             session=session,
             ai_service=FakeAIService(),
-            settings=settings,
         )
     )
 
     assert recommendation is None
 
 
-def test_generate_recommendation_returns_none_below_threshold(monkeypatch, settings):
+def test_generate_recommendation_returns_none_below_threshold(monkeypatch):
     agent_id = uuid.uuid4()
     session = object()
-    datasets = [SimpleNamespace(id="0x" + "02" * 32, title="Small Data")]
-    top_result = SimpleNamespace(
-        score=0.05,
-        item=SimpleNamespace(id=datasets[0].id, title=datasets[0].title),
-    )
+    top_result = make_ranked("0x" + "02" * 32, "Small Data", 0.05)
     create_called = {"value": False}
 
-    monkeypatch.setattr(agent_service, "get_all_items", lambda settings: datasets)
-
     class FakeAIService:
-        async def rank_datasets(self, query, ranked_datasets):
+        async def rank_datasets(self, query: str, limit: int = 20):
             return [top_result]
 
     def fake_create_recommendation(**kwargs):
         create_called["value"] = True
         return SimpleNamespace(**kwargs)
 
-    monkeypatch.setattr(
-        agent_service, "create_recommendation", fake_create_recommendation
-    )
+    monkeypatch.setattr(agent_service, "create_recommendation", fake_create_recommendation)
 
     recommendation = asyncio.run(
         agent_service.generate_recommendation(
@@ -114,7 +104,6 @@ def test_generate_recommendation_returns_none_below_threshold(monkeypatch, setti
             query="small data",
             session=session,
             ai_service=FakeAIService(),
-            settings=settings,
         )
     )
 

@@ -270,13 +270,12 @@ def test_generate_recommendation_returns_recommendation(client, monkeypatch):
         agent_router, "get_agent_by_handle", lambda session, handle: agent
     )
 
-    async def fake_generate(agent_id, query, session, resolved_ai_service, settings):
+    async def fake_generate(agent_id, query, session, resolved_ai_service):
         captured["args"] = {
             "agent_id": agent_id,
             "query": query,
             "session": session,
             "ai_service": resolved_ai_service,
-            "settings": settings,
         }
         return recommendation
 
@@ -306,7 +305,7 @@ def test_generate_recommendation_returns_404_when_no_results(client, monkeypatch
         agent_router, "get_agent_by_handle", lambda session, handle: agent
     )
 
-    async def fake_generate(agent_id, query, session, resolved_ai_service, settings):
+    async def fake_generate(agent_id, query, session, resolved_ai_service):
         return None
 
     monkeypatch.setattr(agent_router, "generate_recommendation_service", fake_generate)
