@@ -1,202 +1,198 @@
 """
-AI Service for ranking datasets based on query embeddings.
+AI Service for ranking datasets via pgvector semantic search.
 """
 
-from typing import List, OrderedDict
+import asyncio
 import logging
-import torch
-import torch.nn.functional as F
+import uuid as _uuid_mod
+from typing import Callable, Literal
+
 from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config.settings import Settings, get_settings
-
-from ..schemas.marketplace_schema import MarketplaceDataItem
-
-from ..schemas.ai_schema import RankedDataset, ScoreExplanation
+from ..repositories.dataset_embedding_repo import DatasetEmbeddingRepository
+from ..schemas.ai_schema import RankedDataset
+from ..services.contract_service import get_all_items
 from ..services.llm_service import generate_single_embedding
-from ..services.pinata_service import download_signature_embeddings
 
 logger = logging.getLogger(__name__)
 
+_SCORE_HIGH = 0.66
+_SCORE_MODERATE = 0.33
+
+
+def _clamp(score: float) -> float:
+    return max(0.0, min(1.0, score))
+
+
+def _score_label(score: float) -> Literal["high", "moderate", "low"]:
+    if score > _SCORE_HIGH:
+        return "high"
+    if score > _SCORE_MODERATE:
+        return "moderate"
+    return "low"
+
+
+def _bytes32_hex_to_uuid(hex_str: str) -> str:
+    """Recover the original UUID string from a bytes32 hex-encoded item ID.
+
+    The Marketplace contract stores listing IDs as bytes32, where the first
+    16 bytes are the UUID and the last 16 bytes are zero-padding
+    (see ``contract_service.uuid_to_bytes32``).  ``_item_view_to_schema`` calls
+    ``Web3.to_hex()`` on those 32 bytes, producing a string like
+    ``"0xa8b3f2c147b34d8e9f3e123456789abc00000000000000000000000000000000"``.
+    This helper reverses that encoding so the id can be matched against the
+    UUID string stored in ``dataset_embeddings.listing_id``.
+
+    Falls back to returning ``hex_str`` unchanged when the input is already
+    a UUID string or cannot be decoded.
+
+    Args:
+        hex_str: ``"0x"``-prefixed 64-char hex string (32 bytes).
+
+    Returns:
+        UUID-formatted string (e.g. ``"a8b3f2c1-47b3-4d8e-9f3e-123456789abc"``).
+    """
+    try:
+        raw = hex_str.removeprefix("0x")[:32]  # first 16 bytes = 32 hex chars
+        return str(_uuid_mod.UUID(hex=raw))
+    except (ValueError, AttributeError):
+        return hex_str  # passthrough — already UUID or unexpected format
+
+
+class EmbeddingError(Exception):
+    """Raised when query embedding generation fails (e.g. Ollama unavailable)."""
+
 
 class AIService:
-    """AI Service for ranking datasets based on query embeddings."""
+    """Ranks marketplace datasets against a natural-language query via pgvector ANN search."""
 
     def __init__(
         self,
+        embedding_repo: DatasetEmbeddingRepository,
+        session_factory: Callable,
+        contract_listing_fetcher: Callable,
+        embedding_fn: Callable,
         settings: Settings,
-    ):
-        """Constructor for AIService.
+    ) -> None:
+        self._embedding_repo = embedding_repo
+        self._session_factory = session_factory
+        self._contract_listing_fetcher = contract_listing_fetcher
+        self._embedding_fn = embedding_fn
+        self._settings = settings
+
+    async def rank_datasets(self, query: str, limit: int = 20) -> list[RankedDataset]:
+        """Rank marketplace datasets by cosine similarity to *query*.
+
+        1. Embeds *query* via Ollama (raises EmbeddingError on failure).
+        2. Runs pgvector ANN query via DatasetEmbeddingRepository.
+        3. Cross-references results with current on-chain contract items.
+        4. Clamps raw scores to [0, 1], derives score_label, applies threshold.
+
+        The join between pgvector results (UUID listing_id) and contract items
+        (bytes32 hex id) is normalised via ``_bytes32_hex_to_uuid``.
 
         Args:
-            settings (Settings): Application settings instance
-        """
-        self._cache: OrderedDict[str, torch.Tensor] = OrderedDict()
-        self.settings = settings
-
-    def _normalize_rows(self, X: torch.Tensor) -> torch.Tensor:
-        """Normalize rows of a tensor.
-
-        Args:
-            X (torch.Tensor): Input tensor with rows to normalize
+            query: Natural-language search query (must be non-empty).
+            limit: Maximum number of results to return (1–20).
 
         Returns:
-            torch.Tensor: Tensor with normalized rows
-        """
-        return F.normalize(X, p=2, dim=1)
+            List of RankedDataset ordered by descending similarity score.
 
-    def _get_cached_tensor(self, signature_hash: str) -> torch.Tensor | None:
-        """Retrieve cached tensor by signature hash.
-
-        Uses LRU eviction: moves accessed items to the end of the cache.
-
-        Args:
-            signature_hash (str): Signature hash used as the cache key
-
-        Returns:
-            torch.Tensor | None: Cached tensor if found, else None
-        """
-        key = signature_hash.lower()
-        if key in self._cache:
-            # Move to end (most recently used)
-            self._cache.move_to_end(key)
-            return self._cache[key]
-        return None
-
-    def _set_cached_tensor(self, signature_hash: str, X: torch.Tensor) -> None:
-        """Set cached tensor by signature hash with LRU eviction.
-
-        If cache exceeds maxsize, removes the least recently used item.
-
-        Args:
-            signature_hash (str): Signature hash used as the cache key
-            X (torch.Tensor): Tensor to cache
-        """
-        key = signature_hash.lower()
-
-        # If key exists, move to end
-        if key in self._cache:
-            self._cache.move_to_end(key)
-
-        self._cache[key] = X
-
-        # Evict least recently used if cache is full
-        if len(self._cache) > self.settings.cache_maxsize:
-            self._cache.popitem(last=False)  # Remove oldest (first) item
-
-    def _dataset_score_topk_mean(self, q: torch.Tensor, Xn: torch.Tensor) -> float:
-        """Calculate the mean of the top-k similarity scores between a query and dataset embeddings.
-
-        Args:
-            q (torch.Tensor): Normalized query tensor of shape (embedding_dim,)
-            Xn (torch.Tensor): Normalized dataset embeddings tensor of shape (num_embeddings, embedding_dim)
-
-        Returns:
-            float: Mean of the top-k similarity scores
-        """
-        sims: torch.Tensor = Xn @ q  # cosine similarities
-        k_eff: int = min(self.settings.k_rows, sims.numel())
-        topk: torch.Tensor = torch.topk(sims, k_eff).values
-        return float(topk.mean().item())
-
-    async def rank_datasets(
-        self,
-        query: str,
-        datasets: List[MarketplaceDataItem],
-    ) -> List[RankedDataset]:
-        """Rank datasets based on similarity to the query embedding.
-
-        Args:
-            query (str): Input query string
-            datasets (List[MarketplaceDataItem]): List of dataset dictionaries to rank
-
-        Returns:
-            List[RankedDataset]: List of ranked dataset results with scores and metadata
+        Raises:
+            EmbeddingError: When Ollama is unavailable or embedding fails.
         """
         logger.info(
-            "ai_service.rank_datasets start query_len=%s datasets=%s",
+            "ai_service.rank_datasets start query_len=%s limit=%s",
             len(query),
-            len(datasets),
+            limit,
         )
-        q_list, dim = generate_single_embedding(query, self.settings)
-        q: torch.Tensor = torch.tensor(q_list, dtype=torch.float32)
-        q: torch.Tensor = F.normalize(q, p=2, dim=0)
 
-        results: List[RankedDataset] = []
+        # 1. Generate query embedding (sync Ollama call — wrap exceptions)
+        try:
+            q_vec, _ = self._embedding_fn(query, self._settings)
+        except Exception as exc:
+            logger.error("ai_service.rank_datasets embedding_failed: %s", exc)
+            raise EmbeddingError(str(exc)) from exc
 
-        for ds in datasets:
-            sig_url = ds.signature_url
-            sig_hash = ds.signature_hash
+        # 2. pgvector ANN search
+        async with self._session_factory() as db:
+            hits = await self._embedding_repo.search_by_vector(db, q_vec, limit)
 
-            Xn: torch.Tensor | None = None
-            if sig_hash:
-                Xn = self._get_cached_tensor(sig_hash)
+        if not hits:
+            logger.info("ai_service.rank_datasets no pgvector hits")
+            return []
 
-            if Xn is None:
-                embeddings = await download_signature_embeddings(
-                    signature_url=sig_url,
-                    expected_signature_hash=sig_hash,
-                    compressed=True,
-                    settings=self.settings,
-                )
-                X = torch.tensor(embeddings, dtype=torch.float32)
-                if X.ndim != 2 or X.shape[1] != q.shape[0]:
-                    continue
+        # 3. Fetch current on-chain items off the event loop (sync Web3 call).
+        #    Use get_running_loop() — get_event_loop() is deprecated in Python 3.10+
+        #    and raises DeprecationWarning when called from a running async context.
+        loop = asyncio.get_running_loop()
+        contract_items = await loop.run_in_executor(
+            None, self._contract_listing_fetcher, self._settings
+        )
 
-                Xn = self._normalize_rows(X)
-                if sig_hash:
-                    self._set_cached_tensor(sig_hash, Xn)
+        # Build lookup keyed by UUID string so it matches the listing_id stored
+        # in dataset_embeddings (the contract returns bytes32 hex; normalise it).
+        item_map = {_bytes32_hex_to_uuid(item.id): item for item in contract_items}
 
-            score: float = self._dataset_score_topk_mean(q, Xn)
+        # 4. Join, clamp, filter, label
+        results: list[RankedDataset] = []
+        for listing_id, raw_score in hits:
+            item = item_map.get(listing_id)
+            if item is None:
+                # Stale pgvector hit — listing no longer on-chain
+                logger.debug("ai_service.rank_datasets stale_hit listing_id=%s", listing_id)
+                continue
+
+            score = _clamp(raw_score)
 
             if (
-                self.settings.similarity_threshold is not None
-                and score < self.settings.similarity_threshold
+                self._settings.similarity_threshold is not None
+                and score < self._settings.similarity_threshold
             ):
                 continue
 
             results.append(
                 RankedDataset(
-                    item=MarketplaceDataItem(
-                        id=ds.id,
-                        title=ds.title,
-                        description=ds.description,
-                        seller=ds.seller,
-                        price_atomic=ds.price_atomic,
-                        settlement_currency=ds.settlement_currency,
-                        settlement_decimals=ds.settlement_decimals,
-                        dataset_url=ds.dataset_url,
-                        dataset_hash=ds.dataset_hash,
-                        signature_url=ds.signature_url,
-                        signature_hash=ds.signature_hash,
-                        exists=ds.exists,
-                        purchase_count=ds.purchase_count,
-                    ),
+                    listing_id=listing_id,
+                    title=item.title,
+                    description=item.description,
+                    seller=item.seller,
+                    price_atomic=int(item.price_atomic),
                     score=score,
-                    explanation=ScoreExplanation(
-                        method="topk_mean_cosine",
-                        k_rows=self.settings.k_rows,
-                        rows_in_dataset=Xn.shape[0],
-                        dimension=dim,
-                        normalized=True,
-                    ),
+                    score_label=_score_label(score),
                 )
             )
 
-        results.sort(key=lambda r: r.score, reverse=True)
-        ranked = results[: self.settings.top_k]
-        logger.info("ai_service.rank_datasets done results=%s", len(ranked))
-        return ranked
+        logger.info("ai_service.rank_datasets done results=%s", len(results))
+        return results
 
 
 def get_ai_service(
     settings: Settings = Depends(get_settings),
 ) -> AIService:
-    """Get AIService instance.
+    """FastAPI dependency that returns a production AIService instance.
+
+    The session factory is wrapped in a closure so the async engine is
+    created lazily — avoiding import-time engine initialisation in test
+    environments that use a non-async driver.
 
     Args:
-        settings (Settings, optional): Application settings instance. Defaults to Depends(get_settings).
+        settings: Application settings (injected by FastAPI).
+
     Returns:
-        AIService: AIService instance with persistent LRU cache
+        AIService wired with production dependencies.
     """
-    return AIService(settings)
+    from ..database.async_engine import get_async_session_factory
+
+    def _session_factory() -> AsyncSession:
+        return get_async_session_factory()()
+
+    return AIService(
+        embedding_repo=DatasetEmbeddingRepository(),
+        session_factory=_session_factory,
+        contract_listing_fetcher=get_all_items,
+        embedding_fn=generate_single_embedding,
+        settings=settings,
+    )
