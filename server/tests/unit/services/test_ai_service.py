@@ -36,16 +36,6 @@ def make_item(listing_id: str, title: str = "Test Dataset") -> SimpleNamespace:
     )
 
 
-def make_session_factory(repo_hits: list[tuple[str, float]]):
-    """Return a fake async_sessionmaker that feeds *repo_hits* to search_by_vector."""
-    mock_session = MagicMock()
-
-    @asynccontextmanager
-    async def _factory():
-        yield mock_session
-
-    return _factory, mock_session
-
 
 def make_service(
     *,

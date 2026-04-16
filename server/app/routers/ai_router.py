@@ -4,7 +4,8 @@ AI router for similarity search.
 
 import logging
 import time
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 
 from ..schemas.ai_schema import (
     ErrorResponse,
@@ -51,9 +52,9 @@ async def similarity_search(
     try:
         ranked = await ai_service.rank_datasets(request.query, request.limit)
     except EmbeddingError as exc:
-        raise HTTPException(
+        return JSONResponse(
             status_code=503,
-            detail=ErrorResponse(
+            content=ErrorResponse(
                 error="embedding_unavailable",
                 message="Query embedding generation failed; Ollama may be unavailable.",
                 details={"cause": str(exc)},

@@ -109,9 +109,14 @@ class AIService:
             limit,
         )
 
-        # 1. Generate query embedding (sync Ollama call — wrap exceptions)
+        # 1. Generate query embedding.
+        #    generate_single_embedding() calls ollama.embed() — blocking I/O.
+        #    Offload to a thread so concurrent async requests are not stalled.
+        loop = asyncio.get_running_loop()
         try:
-            q_vec, _ = self._embedding_fn(query, self._settings)
+            q_vec, _ = await loop.run_in_executor(
+                None, self._embedding_fn, query, self._settings
+            )
         except Exception as exc:
             logger.error("ai_service.rank_datasets embedding_failed: %s", exc)
             raise EmbeddingError(str(exc)) from exc
@@ -125,9 +130,6 @@ class AIService:
             return []
 
         # 3. Fetch current on-chain items off the event loop (sync Web3 call).
-        #    Use get_running_loop() — get_event_loop() is deprecated in Python 3.10+
-        #    and raises DeprecationWarning when called from a running async context.
-        loop = asyncio.get_running_loop()
         contract_items = await loop.run_in_executor(
             None, self._contract_listing_fetcher, self._settings
         )

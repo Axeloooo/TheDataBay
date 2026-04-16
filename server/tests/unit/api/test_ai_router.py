@@ -120,10 +120,9 @@ def test_similarity_search_returns_503_when_embedding_fails(client):
 
     assert response.status_code == 503
     body = response.json()
-    # HTTPException wraps detail as a dict inside "detail"
-    detail = body["detail"]
-    assert detail["error"] == "embedding_unavailable"
-    assert "message" in detail
+    # JSONResponse returns ErrorResponse directly at the top level
+    assert body["error"] == "embedding_unavailable"
+    assert "message" in body
 
 
 # ---------------------------------------------------------------------------

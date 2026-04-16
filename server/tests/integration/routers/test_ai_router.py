@@ -337,6 +337,7 @@ async def test_similarity_search_503_when_embedding_fails(db_session: AsyncSessi
         app.dependency_overrides.pop(get_ai_service, None)
 
     assert response.status_code == 503
-    detail = response.json()["detail"]
-    assert detail["error"] == "embedding_unavailable"
-    assert "message" in detail
+    body = response.json()
+    # JSONResponse returns ErrorResponse directly at the top level (no "detail" wrapper)
+    assert body["error"] == "embedding_unavailable"
+    assert "message" in body
