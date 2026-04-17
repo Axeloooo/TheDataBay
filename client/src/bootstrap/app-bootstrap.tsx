@@ -26,6 +26,7 @@ export function AppBootstrap() {
   }, [theme, applyTheme]);
 
   useEffect(() => {
+    let active = true;
     let unsubscribe: (() => void) | undefined;
 
     void (async () => {
@@ -35,12 +36,14 @@ export function AppBootstrap() {
       // no session exists), preventing stale persisted addresses from keeping
       // the UI falsely connected.
       await restoreSession();
+      if (!active) return;
       unsubscribe = subscribeToRuntime();
     })();
 
     startRatesPolling();
 
     return () => {
+      active = false;
       unsubscribe?.();
       stopRatesPolling();
     };
