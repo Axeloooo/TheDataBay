@@ -25,9 +25,11 @@ function AgentProfile() {
     if (!handle) return;
     let active = true;
 
+    /* eslint-disable react-hooks/set-state-in-effect */
     setLoadingAgent(true);
     setAgentError(null);
     setNotFound(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     backend
       .getAgent(handle)
