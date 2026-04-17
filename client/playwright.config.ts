@@ -1,5 +1,9 @@
 import { defineConfig, devices } from "@playwright/test";
 
+// When E2E_BASE_URL is set (e.g. a deployed environment), skip starting the
+// local dev server — the target is already running elsewhere.
+const externalBase: string | undefined = process.env.E2E_BASE_URL;
+
 export default defineConfig({
   testDir: "./tests/e2e",
   timeout: 120_000,
@@ -10,15 +14,17 @@ export default defineConfig({
   workers: 1,
   reporter: [["html", { open: "never" }]],
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:5173",
+    baseURL: externalBase ?? "http://localhost:5173",
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: {
-    command: "npm run dev",
-    url: "http://localhost:5173",
-    reuseExistingServer: true,
-    timeout: 60_000,
-  },
+  webServer: externalBase
+    ? undefined
+    : {
+        command: "npm run dev",
+        url: "http://localhost:5173",
+        reuseExistingServer: true,
+        timeout: 60_000,
+      },
 });
