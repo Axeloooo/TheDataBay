@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import path from "path";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
@@ -15,5 +16,10 @@ export default defineConfig({
     // WalletConnect packages reference Node.js `global` — map it to the
     // browser equivalent so the app doesn't crash on import.
     global: "globalThis",
+  },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./src/test/setup.ts"],
+    globals: true,
   },
 });
