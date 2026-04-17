@@ -13,9 +13,21 @@ interface PurchaseRequestCardProps {
 }
 
 const STATUS_CONFIG = {
-  pending: { label: "Pending Review", variant: "outline" as const, icon: Clock },
-  approved: { label: "Approved", variant: "default" as const, icon: CheckCircle },
-  rejected: { label: "Rejected", variant: "destructive" as const, icon: XCircle },
+  pending: {
+    label: "Pending Review",
+    variant: "outline" as const,
+    icon: Clock,
+  },
+  approved: {
+    label: "Approved",
+    variant: "default" as const,
+    icon: CheckCircle,
+  },
+  rejected: {
+    label: "Rejected",
+    variant: "destructive" as const,
+    icon: XCircle,
+  },
 };
 
 export function PurchaseRequestCard({
@@ -30,12 +42,23 @@ export function PurchaseRequestCard({
   const canReview = request.status === "pending" && !!connectedAddress;
 
   return (
-    <div className={cn("rounded-xl border border-border/80 bg-card/65 p-4 shadow-sm", className)}>
+    <div
+      className={cn(
+        "rounded-xl border border-border/80 bg-card/65 p-4 shadow-sm",
+        className,
+      )}
+    >
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="min-w-0">
-          <p className="text-sm font-medium truncate">Dataset: {request.listing_id}</p>
+          <p className="text-sm font-medium truncate">
+            Dataset: {request.listing_id}
+          </p>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Requested by: <span className="font-mono">{request.requester_address.slice(0, 10)}...{request.requester_address.slice(-6)}</span>
+            Requested by:{" "}
+            <span className="font-mono">
+              {request.requester_address.slice(0, 10)}...
+              {request.requester_address.slice(-6)}
+            </span>
           </p>
         </div>
         <Badge variant={config.variant} className="gap-1 shrink-0">
@@ -48,7 +71,10 @@ export function PurchaseRequestCard({
 
       {request.reviewed_by && (
         <p className="text-xs text-muted-foreground mb-3">
-          Reviewed by: <span className="font-mono">{request.reviewed_by.slice(0, 10)}...{request.reviewed_by.slice(-6)}</span>
+          Reviewed by:{" "}
+          <span className="font-mono">
+            {request.reviewed_by.slice(0, 10)}...{request.reviewed_by.slice(-6)}
+          </span>
         </p>
       )}
 

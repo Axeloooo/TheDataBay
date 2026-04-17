@@ -9,8 +9,12 @@ interface DatasetRecommendationsProps {
   listingId: string;
 }
 
-export function DatasetRecommendations({ listingId }: DatasetRecommendationsProps) {
-  const [recommendations, setRecommendations] = useState<AgentRecommendation[]>([]);
+export function DatasetRecommendations({
+  listingId,
+}: DatasetRecommendationsProps) {
+  const [recommendations, setRecommendations] = useState<AgentRecommendation[]>(
+    [],
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -71,7 +75,9 @@ export function DatasetRecommendations({ listingId }: DatasetRecommendationsProp
       <div className="flex items-center gap-2 mb-3">
         <Bot className="h-4 w-4 text-muted-foreground" />
         <span className="text-sm font-medium">Agent Recommendations</span>
-        <span className="text-xs text-muted-foreground">({recommendations.length})</span>
+        <span className="text-xs text-muted-foreground">
+          ({recommendations.length})
+        </span>
       </div>
       <div className="space-y-3">
         {recommendations.map((rec) => (

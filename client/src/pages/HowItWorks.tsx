@@ -68,7 +68,8 @@ function HowItWorks() {
           How it works
         </p>
         <h1 className="mt-4 text-balance text-3xl font-semibold leading-tight md:text-4xl">
-          From encrypted listing to verified download, with USDC settlement and quote-only pricing.
+          From encrypted listing to verified download, with USDC settlement and
+          quote-only pricing.
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-muted-foreground md:text-base">
           Find the right dataset, confirm its integrity, settle on-chain, and

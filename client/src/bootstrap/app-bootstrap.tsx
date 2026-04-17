@@ -8,7 +8,9 @@ export function AppBootstrap() {
   const theme = useThemeStore((state) => state.theme);
   const applyTheme = useThemeStore((state) => state.applyTheme);
   const restoreSession = useWalletStore((state) => state.restoreSession);
-  const subscribeToRuntime = useWalletStore((state) => state.subscribeToRuntime);
+  const subscribeToRuntime = useWalletStore(
+    (state) => state.subscribeToRuntime,
+  );
   const startRatesPolling = useCurrencyStore(
     (state) => state.startRatesPolling,
   );
@@ -24,12 +26,25 @@ export function AppBootstrap() {
   }, [theme, applyTheme]);
 
   useEffect(() => {
-    void restoreSession();
-    const unsubscribe = subscribeToRuntime();
+    let active = true;
+    let unsubscribe: (() => void) | undefined;
+
+    void (async () => {
+      // Await restore so walletRuntime.currentSnapshot is populated before
+      // subscribeToRuntime registers its listener. The immediate subscribeSession
+      // fire will then carry the real session (or a cleared empty snapshot when
+      // no session exists), preventing stale persisted addresses from keeping
+      // the UI falsely connected.
+      await restoreSession();
+      if (!active) return;
+      unsubscribe = subscribeToRuntime();
+    })();
+
     startRatesPolling();
 
     return () => {
-      unsubscribe();
+      active = false;
+      unsubscribe?.();
       stopRatesPolling();
     };
   }, [restoreSession, subscribeToRuntime, startRatesPolling, stopRatesPolling]);

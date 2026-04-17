@@ -46,3 +46,5 @@ secrets.yaml
 .vscode 
 
 notes.txt
+test-results/
+playwright-report/

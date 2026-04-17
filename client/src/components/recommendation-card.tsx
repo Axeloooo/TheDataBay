@@ -10,11 +10,20 @@ interface RecommendationCardProps {
   className?: string;
 }
 
-export function RecommendationCard({ recommendation, className }: RecommendationCardProps) {
+export function RecommendationCard({
+  recommendation,
+  className,
+}: RecommendationCardProps) {
   const confidencePct = Math.round(recommendation.confidence * 100);
 
   return (
-    <div className={cn("rounded-xl border border-border/80 bg-card/65 p-4 shadow-sm", recommendation.is_retracted && "opacity-50", className)}>
+    <div
+      className={cn(
+        "rounded-xl border border-border/80 bg-card/65 p-4 shadow-sm",
+        recommendation.is_retracted && "opacity-50",
+        className,
+      )}
+    >
       {/* Always-visible AI-generated badge */}
       <div className="flex items-center justify-between mb-3">
         <Badge className="gap-1 bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
@@ -22,7 +31,9 @@ export function RecommendationCard({ recommendation, className }: Recommendation
           AI-generated
         </Badge>
         {recommendation.is_retracted && (
-          <Badge variant="destructive" className="text-xs">Retracted</Badge>
+          <Badge variant="destructive" className="text-xs">
+            Retracted
+          </Badge>
         )}
       </div>
 
@@ -43,7 +54,11 @@ export function RecommendationCard({ recommendation, className }: Recommendation
           <div
             className={cn(
               "h-full rounded-full transition-all",
-              confidencePct >= 70 ? "bg-green-500" : confidencePct >= 40 ? "bg-yellow-500" : "bg-red-400"
+              confidencePct >= 70
+                ? "bg-green-500"
+                : confidencePct >= 40
+                  ? "bg-yellow-500"
+                  : "bg-red-400",
             )}
             style={{ width: `${confidencePct}%` }}
           />
@@ -63,7 +78,9 @@ export function RecommendationCard({ recommendation, className }: Recommendation
                 Pros
               </div>
               <ul className="space-y-0.5 text-muted-foreground">
-                {recommendation.pros.map((p, i) => <li key={`${p}-${i}`}>• {p}</li>)}
+                {recommendation.pros.map((p, i) => (
+                  <li key={`${p}-${i}`}>• {p}</li>
+                ))}
               </ul>
             </div>
           )}
@@ -74,7 +91,9 @@ export function RecommendationCard({ recommendation, className }: Recommendation
                 Cons
               </div>
               <ul className="space-y-0.5 text-muted-foreground">
-                {recommendation.cons.map((c, i) => <li key={`${c}-${i}`}>• {c}</li>)}
+                {recommendation.cons.map((c, i) => (
+                  <li key={`${c}-${i}`}>• {c}</li>
+                ))}
               </ul>
             </div>
           )}

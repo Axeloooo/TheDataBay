@@ -27,15 +27,20 @@ import { useSearchStore } from "@/stores/search-store";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { useWalletStore } from "@/stores/wallet-store";
 
-
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 function Navbar() {
   const [modalOpen, setModalOpen] = useState(false);
-  const { address, isConnected, isConnecting, disconnect, chainName, walletName } =
-    useWalletStore();
+  const {
+    address,
+    isConnected,
+    isConnecting,
+    disconnect,
+    chainName,
+    walletName,
+  } = useWalletStore();
   const preferredCurrency = useCurrencyStore(
     (state) => state.preferredCurrency,
   );
@@ -222,7 +227,10 @@ function Navbar() {
                   {isConnecting ? "Connecting…" : "Connect Wallet"}
                 </span>
               </Button>
-              <WalletConnectModal open={modalOpen} onOpenChange={setModalOpen} />
+              <WalletConnectModal
+                open={modalOpen}
+                onOpenChange={setModalOpen}
+              />
             </>
           ) : (
             <div className="flex items-center gap-1.5 md:gap-2">

@@ -43,7 +43,9 @@ function Layout({ children }: LayoutProps) {
       </div>
 
       <main className="w-full pb-12">
-        <div className="mx-auto w-full max-w-7xl px-4 pt-6 md:px-6">{children}</div>
+        <div className="mx-auto w-full max-w-7xl px-4 pt-6 md:px-6">
+          {children}
+        </div>
       </main>
     </div>
   );

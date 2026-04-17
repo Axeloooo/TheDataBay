@@ -121,7 +121,8 @@ class WalletRuntimeImpl implements WalletRuntime {
       // Dynamic import keeps WalletConnect out of the initial bundle so that
       // missing Node.js polyfills (Buffer, process, etc.) don't crash the app
       // on startup — the provider is only loaded when the user connects.
-      const { EthereumProvider } = await import("@walletconnect/ethereum-provider");
+      const { EthereumProvider } =
+        await import("@walletconnect/ethereum-provider");
       const configuredChain = resolveChainId();
       const provider = await EthereumProvider.init({
         projectId: WC_PROJECT_ID!,
@@ -139,7 +140,9 @@ class WalletRuntimeImpl implements WalletRuntime {
         if (this.activeConnector !== "walletconnect") return;
         const address = normalizeFirstAccount(accounts);
         const cid = provider.chainId ?? null;
-        this.notify(buildSnapshot(address, cid, "walletconnect", "WalletConnect"));
+        this.notify(
+          buildSnapshot(address, cid, "walletconnect", "WalletConnect"),
+        );
       });
 
       provider.on("chainChanged", (cid: unknown) => {
@@ -153,7 +156,12 @@ class WalletRuntimeImpl implements WalletRuntime {
         const address =
           provider.accounts.length > 0 ? provider.accounts[0] : null;
         this.notify(
-          buildSnapshot(address, numericChainId, "walletconnect", "WalletConnect"),
+          buildSnapshot(
+            address,
+            numericChainId,
+            "walletconnect",
+            "WalletConnect",
+          ),
         );
       });
 
@@ -183,7 +191,14 @@ class WalletRuntimeImpl implements WalletRuntime {
         this.activeConnector = null;
         this.notify(buildEmptySnapshot());
       } else {
-        this.notify(buildSnapshot(address, this.currentSnapshot.chainId, "injected", "Browser Wallet"));
+        this.notify(
+          buildSnapshot(
+            address,
+            this.currentSnapshot.chainId,
+            "injected",
+            "Browser Wallet",
+          ),
+        );
       }
     });
 
@@ -209,7 +224,10 @@ class WalletRuntimeImpl implements WalletRuntime {
     this.injectedListenersAttached = true;
   }
 
-  async connect(input: { connector: WalletConnectorType; eip6963Provider?: object }): Promise<void> {
+  async connect(input: {
+    connector: WalletConnectorType;
+    eip6963Provider?: object;
+  }): Promise<void> {
     const { connector, eip6963Provider } = input;
 
     if (connector === "walletconnect") {
@@ -218,11 +236,12 @@ class WalletRuntimeImpl implements WalletRuntime {
       try {
         const wc = await this.initWcProvider();
         await wc.connect();
-        const address =
-          wc.accounts.length > 0 ? wc.accounts[0] : null;
+        const address = wc.accounts.length > 0 ? wc.accounts[0] : null;
         const cid = wc.chainId ?? null;
         this.activeConnector = "walletconnect";
-        this.notify(buildSnapshot(address, cid, "walletconnect", "WalletConnect"));
+        this.notify(
+          buildSnapshot(address, cid, "walletconnect", "WalletConnect"),
+        );
       } catch (error) {
         this.notify({ ...this.currentSnapshot, isConnecting: false });
         throw error;
@@ -278,7 +297,12 @@ class WalletRuntimeImpl implements WalletRuntime {
           const address = wc.accounts[0];
           const cid = wc.chainId ?? null;
           this.activeConnector = "walletconnect";
-          const snap = buildSnapshot(address, cid, "walletconnect", "WalletConnect");
+          const snap = buildSnapshot(
+            address,
+            cid,
+            "walletconnect",
+            "WalletConnect",
+          );
           this.notify(snap);
           return snap;
         }
@@ -301,7 +325,12 @@ class WalletRuntimeImpl implements WalletRuntime {
               : null;
           this.activeConnector = "injected";
           this.attachInjectedListeners();
-          const snap = buildSnapshot(address, cid, "injected", "Browser Wallet");
+          const snap = buildSnapshot(
+            address,
+            cid,
+            "injected",
+            "Browser Wallet",
+          );
           this.notify(snap);
           return snap;
         }
@@ -327,7 +356,8 @@ class WalletRuntimeImpl implements WalletRuntime {
   async getEip1193Provider(): Promise<unknown> {
     if (this.activeConnector === "walletconnect") {
       if (WC_CONFIG_ERROR) throw new Error(WC_CONFIG_ERROR);
-      if (!this.wcProvider) throw new Error("WalletConnect session is not active.");
+      if (!this.wcProvider)
+        throw new Error("WalletConnect session is not active.");
       return this.wcProvider;
     }
     if (this.activeConnector === "injected") {
@@ -344,7 +374,10 @@ class WalletRuntimeImpl implements WalletRuntime {
     const chainIdHex = `0x${targetChainId.toString(16)}`;
     const provider = await this.getEip1193Provider();
     const eip1193 = provider as {
-      request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
+      request: (args: {
+        method: string;
+        params?: unknown[];
+      }) => Promise<unknown>;
     };
     await eip1193.request({
       method: "wallet_switchEthereumChain",

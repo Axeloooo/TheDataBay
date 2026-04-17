@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { walletRuntime } from "@/lib/wallet/runtime";
-import type { WalletConnectorType, WalletSessionSnapshot } from "@/lib/wallet/types";
+import type {
+  WalletConnectorType,
+  WalletSessionSnapshot,
+} from "@/lib/wallet/types";
 
 export type WalletMutationKind = "buy" | "create" | "connect" | null;
 
@@ -11,7 +14,10 @@ type WalletStore = WalletSessionSnapshot & {
   transactionHash: string | null;
   transactionError: string | null;
   userDisconnected: boolean;
-  connect(connector: WalletConnectorType, eip6963Provider?: object): Promise<void>;
+  connect(
+    connector: WalletConnectorType,
+    eip6963Provider?: object,
+  ): Promise<void>;
   disconnect(): Promise<void>;
   restoreSession(): Promise<void>;
   subscribeToRuntime(): () => void;
@@ -47,7 +53,10 @@ export const useWalletStore = create<WalletStore>()(
       transactionError: null,
       userDisconnected: false,
 
-      connect: async (connector: WalletConnectorType, eip6963Provider?: object) => {
+      connect: async (
+        connector: WalletConnectorType,
+        eip6963Provider?: object,
+      ) => {
         set({ userDisconnected: false, isConnecting: true });
         try {
           await walletRuntime.connect({ connector, eip6963Provider });
@@ -97,19 +106,35 @@ export const useWalletStore = create<WalletStore>()(
       },
 
       beginMutation: (kind: WalletMutationKind) => {
-        set({ activeMutation: kind, transactionHash: null, transactionError: null });
+        set({
+          activeMutation: kind,
+          transactionHash: null,
+          transactionError: null,
+        });
       },
 
       completeMutation: (hash: string | null) => {
-        set({ activeMutation: null, transactionHash: hash, transactionError: null });
+        set({
+          activeMutation: null,
+          transactionHash: hash,
+          transactionError: null,
+        });
       },
 
       failMutation: (message: string) => {
-        set({ activeMutation: null, transactionHash: null, transactionError: message });
+        set({
+          activeMutation: null,
+          transactionHash: null,
+          transactionError: message,
+        });
       },
 
       clearMutation: () => {
-        set({ activeMutation: null, transactionHash: null, transactionError: null });
+        set({
+          activeMutation: null,
+          transactionHash: null,
+          transactionError: null,
+        });
       },
     }),
     {
@@ -125,7 +150,7 @@ export const useWalletStore = create<WalletStore>()(
           ...current,
           address: p.address ?? null,
           userDisconnected: p.userDisconnected ?? false,
-          isConnected: !!(p.address),
+          isConnected: !!p.address,
         };
       },
     },

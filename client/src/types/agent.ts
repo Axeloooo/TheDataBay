@@ -1,4 +1,7 @@
-export type AgentVerificationStatus = "unverified" | "self_attested" | "platform_verified";
+export type AgentVerificationStatus =
+  | "unverified"
+  | "self_attested"
+  | "platform_verified";
 
 export type PurchaseRequestStatus = "pending" | "approved" | "rejected";
 

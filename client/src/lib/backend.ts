@@ -8,8 +8,18 @@ import type {
 } from "@/types/contract";
 import type { KeyReleaseRequest, KeyReleaseResponse } from "@/types/dataset";
 import type { JobResponse, JobStatusResponse } from "@/types/llm";
-import type { SimilaritySearchRequest, SimilaritySearchResponse, CardViewModel } from "@/types/ai";
-import type { Agent, AgentListResponse, RecommendationListResponse, PurchaseRequest, PurchaseRequestListResponse } from "@/types/agent";
+import type {
+  SimilaritySearchRequest,
+  SimilaritySearchResponse,
+  CardViewModel,
+} from "@/types/ai";
+import type {
+  Agent,
+  AgentListResponse,
+  RecommendationListResponse,
+  PurchaseRequest,
+  PurchaseRequestListResponse,
+} from "@/types/agent";
 import { normalizeAtomicString } from "@/lib/atomic";
 import { uuidToBytes32 } from "@/lib/ids";
 
@@ -23,16 +33,19 @@ type MarketplaceApiItem = Omit<
   settlement_decimals?: unknown;
 };
 
-function normalizeMarketplaceItem(item: MarketplaceApiItem): MarketplaceDataItem {
+function normalizeMarketplaceItem(
+  item: MarketplaceApiItem,
+): MarketplaceDataItem {
   const priceAtomic = item.price_atomic ?? item.price;
   if (priceAtomic === undefined || priceAtomic === null) {
     throw new Error("Missing marketplace price from API.");
   }
 
   const rawSettlementCurrency = item.settlement_currency;
-  const settlementCurrency = rawSettlementCurrency == null
-    ? "USDC"
-    : String(rawSettlementCurrency).trim().toUpperCase();
+  const settlementCurrency =
+    rawSettlementCurrency == null
+      ? "USDC"
+      : String(rawSettlementCurrency).trim().toUpperCase();
   if (settlementCurrency !== "USDC") {
     throw new Error("Unsupported marketplace settlement currency from API.");
   }
@@ -79,12 +92,16 @@ export const backend = {
     apiRequest<JobStatusResponse>(`/api/v1/llm/jobs/${jobId}`),
 
   getMarketplaceItems: async () => {
-    const items = await apiRequest<MarketplaceApiItem[]>("/api/v1/contract/items/all");
+    const items = await apiRequest<MarketplaceApiItem[]>(
+      "/api/v1/contract/items/all",
+    );
     return items.map(normalizeMarketplaceItem);
   },
 
   getMarketplaceItem: async (listingId: string) => {
-    const item = await apiRequest<MarketplaceApiItem>(`/api/v1/contract/items/${listingId}`);
+    const item = await apiRequest<MarketplaceApiItem>(
+      `/api/v1/contract/items/${listingId}`,
+    );
     return normalizeMarketplaceItem(item);
   },
 
@@ -95,16 +112,24 @@ export const backend = {
     }),
 
   checkAccess: (listingId: string, payload: WalletAccessRequest) =>
-    apiRequest<AccessCheckResponse>(`/api/v1/contract/access/${listingId}/check`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+    apiRequest<AccessCheckResponse>(
+      `/api/v1/contract/access/${listingId}/check`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
 
-  similaritySearch: async (payload: SimilaritySearchRequest): Promise<{ query: string; results: CardViewModel[]; count: number }> => {
-    const response = await apiRequest<SimilaritySearchResponse>("/api/v1/ai/similarity-search", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+  similaritySearch: async (
+    payload: SimilaritySearchRequest,
+  ): Promise<{ query: string; results: CardViewModel[]; count: number }> => {
+    const response = await apiRequest<SimilaritySearchResponse>(
+      "/api/v1/ai/similarity-search",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
     return {
       query: response.query,
       count: response.count,
@@ -124,10 +149,13 @@ export const backend = {
   },
 
   getPurchasedItemsByWallet: async (payload: PurchasedItemsRequest) => {
-    const response = await apiRequest<PurchasedItemsResponse>("/api/v1/contract/purchases/by-wallet", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    const response = await apiRequest<PurchasedItemsResponse>(
+      "/api/v1/contract/purchases/by-wallet",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
     return {
       ...response,
       items: response.items.map((item) =>
@@ -137,43 +165,73 @@ export const backend = {
   },
 
   // Agent endpoints
-  getAgents: (params?: { search?: string; tag?: string; status?: string; offset?: number; limit?: number }) => {
+  getAgents: (params?: {
+    search?: string;
+    tag?: string;
+    status?: string;
+    offset?: number;
+    limit?: number;
+  }) => {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.set("search", params.search);
     if (params?.tag) searchParams.set("tag", params.tag);
     if (params?.status) searchParams.set("status", params.status);
-    if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
-    if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
+    if (params?.offset !== undefined)
+      searchParams.set("offset", String(params.offset));
+    if (params?.limit !== undefined)
+      searchParams.set("limit", String(params.limit));
     const qs = searchParams.toString();
     return apiRequest<AgentListResponse>(`/api/v1/agents${qs ? "?" + qs : ""}`);
   },
 
-  getAgent: (handle: string) =>
-    apiRequest<Agent>(`/api/v1/agents/${handle}`),
+  getAgent: (handle: string) => apiRequest<Agent>(`/api/v1/agents/${handle}`),
 
-  getAgentRecommendations: (handle: string, params?: { offset?: number; limit?: number }) => {
+  getAgentRecommendations: (
+    handle: string,
+    params?: { offset?: number; limit?: number },
+  ) => {
     const searchParams = new URLSearchParams();
-    if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
-    if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
+    if (params?.offset !== undefined)
+      searchParams.set("offset", String(params.offset));
+    if (params?.limit !== undefined)
+      searchParams.set("limit", String(params.limit));
     const qs = searchParams.toString();
-    return apiRequest<RecommendationListResponse>(`/api/v1/agents/${handle}/recommendations${qs ? "?" + qs : ""}`);
+    return apiRequest<RecommendationListResponse>(
+      `/api/v1/agents/${handle}/recommendations${qs ? "?" + qs : ""}`,
+    );
   },
 
   getRecommendationsForListing: (listingId: string) =>
-    apiRequest<RecommendationListResponse>(`/api/v1/recommendations/by-listing/${listingId}`),
+    apiRequest<RecommendationListResponse>(
+      `/api/v1/recommendations/by-listing/${listingId}`,
+    ),
 
-  getPurchaseRequests: (params?: { status?: string; offset?: number; limit?: number }) => {
+  getPurchaseRequests: (params?: {
+    status?: string;
+    offset?: number;
+    limit?: number;
+  }) => {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.set("status", params.status);
-    if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
-    if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
+    if (params?.offset !== undefined)
+      searchParams.set("offset", String(params.offset));
+    if (params?.limit !== undefined)
+      searchParams.set("limit", String(params.limit));
     const qs = searchParams.toString();
-    return apiRequest<PurchaseRequestListResponse>(`/api/v1/purchase-requests${qs ? "?" + qs : ""}`);
+    return apiRequest<PurchaseRequestListResponse>(
+      `/api/v1/purchase-requests${qs ? "?" + qs : ""}`,
+    );
   },
 
-  reviewPurchaseRequest: (requestId: string, payload: { status: "approved" | "rejected"; reviewed_by: string }) =>
-    apiRequest<PurchaseRequest>(`/api/v1/purchase-requests/${requestId}/review`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+  reviewPurchaseRequest: (
+    requestId: string,
+    payload: { status: "approved" | "rejected"; reviewed_by: string },
+  ) =>
+    apiRequest<PurchaseRequest>(
+      `/api/v1/purchase-requests/${requestId}/review`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
 };

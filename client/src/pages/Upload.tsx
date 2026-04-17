@@ -26,10 +26,7 @@ import { uuidToBytes32 } from "@/lib/ids";
 import { toast } from "sonner";
 import ErrorPanel from "@/components/ui/error-panel";
 import { DisplayCurrencySelector } from "@/components/display-currency-selector";
-import {
-  convertSettlementToCurrency,
-  formatCurrencyAmount,
-} from "@/lib/fx";
+import { convertSettlementToCurrency, formatCurrencyAmount } from "@/lib/fx";
 import { isSameAddress } from "@/lib/marketplace";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { useWalletStore } from "@/stores/wallet-store";
@@ -63,7 +60,9 @@ function Upload() {
   const setTitle = useUploadStore((state) => state.setTitle);
   const setDescription = useUploadStore((state) => state.setDescription);
   const setPriceUsdc = useUploadStore((state) => state.setPriceUsdc);
-  const setDisplayCurrency = useUploadStore((state) => state.setDisplayCurrency);
+  const setDisplayCurrency = useUploadStore(
+    (state) => state.setDisplayCurrency,
+  );
   const setFile = useUploadStore((state) => state.setFile);
   const setError = useUploadStore((state) => state.setError);
   const initializeUploadState = useUploadStore(
@@ -203,7 +202,10 @@ function Upload() {
             support.
           </p>
           <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <Button className="gap-2" onClick={() => void connect("walletconnect")}>
+            <Button
+              className="gap-2"
+              onClick={() => void connect("walletconnect")}
+            >
               <ChainIcon chain="evm" className="h-4 w-4" />
               Connect Ethereum Wallet
             </Button>
@@ -295,9 +297,7 @@ function Upload() {
                   )}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="display-currency">
-                    Display Currency
-                  </Label>
+                  <Label htmlFor="display-currency">Display Currency</Label>
                   <DisplayCurrencySelector
                     value={displayCurrency}
                     onChange={setDisplayCurrency}

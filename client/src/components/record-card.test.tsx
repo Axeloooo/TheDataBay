@@ -5,8 +5,9 @@ import RecordCard from "./record-card";
 import type { CardDataset } from "@/types/ai";
 
 vi.mock("@/stores/currency-store", () => ({
-  useCurrencyStore: (selector: (s: { preferredCurrency: string; rates: null }) => unknown) =>
-    selector({ preferredCurrency: "USDC", rates: null }),
+  useCurrencyStore: (
+    selector: (s: { preferredCurrency: string; rates: null }) => unknown,
+  ) => selector({ preferredCurrency: "USDC", rates: null }),
 }));
 
 const browseDataset: CardDataset = {
