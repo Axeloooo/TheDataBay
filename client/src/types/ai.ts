@@ -2,6 +2,7 @@ export type ScoreLabel = "high" | "moderate" | "low";
 
 export type SimilaritySearchRequest = {
   query: string;
+  limit?: number;
 };
 
 /** Flat ranked dataset item from the backend similarity-search endpoint. */
