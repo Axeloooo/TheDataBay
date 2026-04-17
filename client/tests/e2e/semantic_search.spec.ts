@@ -15,7 +15,8 @@ const __dirname: string = path.dirname(__filename);
 
 const WALLET_STORAGE_KEY: string = "bridgemart_wallet_v4";
 const UPLOAD_STORAGE_KEY: string = "bridgemart_upload_store_v1";
-const BACKEND_URL: string = "http://localhost:8080";
+const BACKEND_URL: string =
+  process.env.E2E_BACKEND_URL ?? "http://localhost:8080";
 
 // Standard Anvil account #0 — deterministic address, no real WalletConnect needed.
 const TEST_ADDRESS: string = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
@@ -37,14 +38,18 @@ const SEEDED_TITLE: string = "Cardio Clinical Cohort";
 // ─── Prerequisite check ───────────────────────────────────────────────────────
 
 test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
+  let status = 0;
   const reachable: boolean = await request
     .get(`${BACKEND_URL}/api/v1/contract/items/all`, { timeout: 5_000 })
-    .then((r) => r.status() < 500)
+    .then((r) => {
+      status = r.status();
+      return r.ok();
+    })
     .catch(() => false);
 
   if (!reachable) {
     throw new Error(
-      `Backend unreachable at ${BACKEND_URL}. ` +
+      `Backend not reachable at ${BACKEND_URL} (HTTP ${status || "no response"}). ` +
         "Start it before running e2e tests:\n" +
         "  cd server && uvicorn app.main:app --reload --host 0.0.0.0 --port 8080",
     );
@@ -56,33 +61,58 @@ test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
 class SemanticSearchPage {
   constructor(readonly page: Page) {}
 
-  /** Registers an init script that seeds wallet state before the first navigation. */
+  /**
+   * Registers an init script that:
+   * 1. Seeds Zustand persist state so `userDisconnected` is false (allows `restoreSession` to run).
+   * 2. Mocks `window.ethereum` so `walletRuntime.restoreSession()` finds an injected
+   *    session and updates `currentSnapshot` before `subscribeSession` fires, preventing
+   *    the store from falling back to a disconnected state.
+   */
   async seedLocalStorage(): Promise<void> {
     await this.page.addInitScript(
       ({
         walletKey,
         walletValue,
         uploadKey,
+        testAddress,
+        chainIdHex,
       }: {
         walletKey: string;
         walletValue: string;
         uploadKey: string;
+        testAddress: string;
+        chainIdHex: string;
       }) => {
         localStorage.setItem(walletKey, walletValue);
-        // Remove any persisted upload session to prevent a resumed-session banner
-        // from interfering with the upload flow assertions.
         localStorage.removeItem(uploadKey);
+
+        // Mock an injected Ethereum provider so walletRuntime.restoreSession()
+        // succeeds via eth_accounts without requiring MetaMask/WalletConnect.
+        Object.defineProperty(window, "ethereum", {
+          value: {
+            request: ({ method }: { method: string }) => {
+              if (method === "eth_accounts")
+                return Promise.resolve([testAddress]);
+              if (method === "eth_chainId") return Promise.resolve(chainIdHex);
+              return Promise.resolve(null);
+            },
+            on: () => {},
+            removeListener: () => {},
+            isMetaMask: true,
+          },
+          writable: true,
+          configurable: true,
+        });
       },
       {
         walletKey: WALLET_STORAGE_KEY,
-        // Zustand persist format: { state: <partializedState>, version: N }
-        // The wallet store's merge function derives isConnected from address,
-        // so seeding a non-null address is sufficient to render the upload form.
         walletValue: JSON.stringify({
           state: { address: TEST_ADDRESS, userDisconnected: false },
           version: 0,
         }),
         uploadKey: UPLOAD_STORAGE_KEY,
+        testAddress: TEST_ADDRESS,
+        chainIdHex: "0x7a69", // 31337 decimal — Anvil chain ID
       },
     );
   }
