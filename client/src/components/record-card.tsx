@@ -5,7 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Users, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -16,7 +16,6 @@ import { normalizeMarketplacePrice } from "@/lib/marketplace";
 import { useCurrencyStore } from "@/stores/currency-store";
 import type { CardDataset, ScoreLabel } from "@/types/ai";
 import type { VariantProps } from "class-variance-authority";
-import type { badgeVariants } from "@/components/ui/badge";
 
 type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 
