@@ -26,12 +26,22 @@ export function AppBootstrap() {
   }, [theme, applyTheme]);
 
   useEffect(() => {
-    void restoreSession();
-    const unsubscribe = subscribeToRuntime();
+    let unsubscribe: (() => void) | undefined;
+
+    void (async () => {
+      // Await restore so walletRuntime.currentSnapshot is populated before
+      // subscribeToRuntime registers its listener. The immediate subscribeSession
+      // fire will then carry the real session (or a cleared empty snapshot when
+      // no session exists), preventing stale persisted addresses from keeping
+      // the UI falsely connected.
+      await restoreSession();
+      unsubscribe = subscribeToRuntime();
+    })();
+
     startRatesPolling();
 
     return () => {
-      unsubscribe();
+      unsubscribe?.();
       stopRatesPolling();
     };
   }, [restoreSession, subscribeToRuntime, startRatesPolling, stopRatesPolling]);
