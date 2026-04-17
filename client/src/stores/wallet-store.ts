@@ -97,18 +97,8 @@ export const useWalletStore = create<WalletStore>()(
       subscribeToRuntime: () => {
         const { configError } = walletRuntime.getConnectionMetadata();
         set({ configError });
-        let initialFired = false;
         const unsubscribe = walletRuntime.subscribeSession(
           (snap: WalletSessionSnapshot) => {
-            if (!initialFired) {
-              initialFired = true;
-              // subscribeSession always fires immediately with the runtime's
-              // current snapshot, which is empty on startup (no active connector
-              // yet). Skip this initial empty notification so that a persisted
-              // address from localStorage isn't wiped before restoreSession()
-              // has a chance to confirm or replace it.
-              if (!snap.isConnected && snap.address === null) return;
-            }
             set(snap);
           },
         );
