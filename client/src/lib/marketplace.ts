@@ -50,7 +50,9 @@ function getContractAddress(): string {
 
 export async function getEvmProvider(): Promise<BrowserProvider> {
   const eip1193 = await walletRuntime.getEip1193Provider();
-  return new BrowserProvider(eip1193 as ConstructorParameters<typeof BrowserProvider>[0]);
+  return new BrowserProvider(
+    eip1193 as ConstructorParameters<typeof BrowserProvider>[0],
+  );
 }
 
 export async function createItemTx(params: {
@@ -78,16 +80,20 @@ export async function createItemTx(params: {
       const chainId = network.chainId?.toString?.() ?? String(network.chainId);
       throw new Error(
         `No contract code found at ${contractAddress} on chain ${chainId}. ` +
-          "Check connected wallet network and VITE_CONTRACT_ADDRESS deployment target."
+          "Check connected wallet network and VITE_CONTRACT_ADDRESS deployment target.",
       );
     }
     const contract = new Contract(contractAddress, marketplaceAbi, signer);
     const itemId = uuidToBytes32(params.listingId);
     if (!/^0x[0-9a-fA-F]{64}$/.test(params.datasetHash)) {
-      throw new Error("Invalid dataset hash format. Expected 0x-prefixed 32-byte hex.");
+      throw new Error(
+        "Invalid dataset hash format. Expected 0x-prefixed 32-byte hex.",
+      );
     }
     if (!/^0x[0-9a-fA-F]{64}$/.test(params.signatureHash)) {
-      throw new Error("Invalid signature hash format. Expected 0x-prefixed 32-byte hex.");
+      throw new Error(
+        "Invalid signature hash format. Expected 0x-prefixed 32-byte hex.",
+      );
     }
     console.info("[createItemTx] submit", {
       chainId: network.chainId?.toString?.() ?? String(network.chainId),
@@ -164,7 +170,10 @@ export async function buyItemTx(
     if (balance < total) {
       throw new Error("Insufficient USDC balance for this purchase.");
     }
-    const allowance = (await token.allowance(buyerAddress, contractAddress)) as bigint;
+    const allowance = (await token.allowance(
+      buyerAddress,
+      contractAddress,
+    )) as bigint;
 
     console.info("[buyItemTx] submit", {
       contract: contractAddress,
@@ -235,7 +244,10 @@ function normalizeDecimals(value: unknown): number {
 
 function trimTrailingZeroes(value: string): string {
   if (!value.includes(".")) return value;
-  return value.replace(/\.0+$/, "").replace(/(\.\d*?[1-9])0+$/, "$1").replace(/\.$/, "");
+  return value
+    .replace(/\.0+$/, "")
+    .replace(/(\.\d*?[1-9])0+$/, "$1")
+    .replace(/\.$/, "");
 }
 
 export function formatAtomicAmount(

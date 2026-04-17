@@ -174,8 +174,12 @@ export const useUploadStore = create<UploadStore>()(
         // Only migrate priceAtomic (USDC); legacy priceWei (ETH, 18 decimals) is incompatible.
         // If session has priceWei but no priceAtomic, skip migration (will force re-entry).
         if (!legacyState.priceUsdc && session.priceAtomic) {
-          const whole = BigInt(session.priceAtomic) / 10n ** BigInt(SETTLEMENT_DECIMALS);
-          const fraction = (BigInt(session.priceAtomic) % 10n ** BigInt(SETTLEMENT_DECIMALS))
+          const whole =
+            BigInt(session.priceAtomic) / 10n ** BigInt(SETTLEMENT_DECIMALS);
+          const fraction = (
+            BigInt(session.priceAtomic) %
+            10n ** BigInt(SETTLEMENT_DECIMALS)
+          )
             .toString()
             .padStart(SETTLEMENT_DECIMALS, "0");
           nextState.priceUsdc = `${whole}.${fraction}`.replace(/\.?0+$/, "");

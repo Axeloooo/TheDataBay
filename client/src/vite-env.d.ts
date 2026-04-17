@@ -9,7 +9,7 @@ declare global {
       on: (event: string, callback: (...args: any[]) => void) => void;
       removeListener: (
         event: string,
-        callback: (...args: any[]) => void
+        callback: (...args: any[]) => void,
       ) => void;
       isMetaMask?: boolean;
     };

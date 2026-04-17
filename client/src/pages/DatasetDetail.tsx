@@ -26,10 +26,7 @@ import { DatasetRecommendations } from "@/components/dataset-recommendations";
 import { toast } from "sonner";
 import { fireConfettiBurst } from "@/lib/confetti";
 import { verifyDatasetIntegrity, type IntegrityStatus } from "@/lib/integrity";
-import {
-  convertSettlementToCurrency,
-  formatCurrencyAmount,
-} from "@/lib/fx";
+import { convertSettlementToCurrency, formatCurrencyAmount } from "@/lib/fx";
 import { useWalletStore } from "@/stores/wallet-store";
 import { useCurrencyStore } from "@/stores/currency-store";
 

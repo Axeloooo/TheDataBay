@@ -20,10 +20,7 @@ import { toast } from "sonner";
 import type { MarketplaceDataItem } from "@/types/contract";
 import { Badge } from "@/components/ui/badge";
 import { ChainIcon, detectAddressChain } from "@/components/chain-icon";
-import {
-  convertSettlementToCurrency,
-  formatCurrencyAmount,
-} from "@/lib/fx";
+import { convertSettlementToCurrency, formatCurrencyAmount } from "@/lib/fx";
 import { normalizeMarketplacePrice } from "@/lib/marketplace";
 import { useCurrencyStore } from "@/stores/currency-store";
 
@@ -170,7 +167,9 @@ function RecordCardDetails({
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Price atomic</p>
-              <p className="font-mono text-xs break-all">{pricing.priceAtomic}</p>
+              <p className="font-mono text-xs break-all">
+                {pricing.priceAtomic}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {pricing.settlementCurrency} settlement at{" "}
                 {pricing.settlementDecimals} decimals

@@ -22,7 +22,11 @@ async function fetchAndHash(url: string): Promise<string> {
   return sha256Hex(data);
 }
 
-export type IntegrityStatus = "verifying" | "verified" | "failed" | "unavailable";
+export type IntegrityStatus =
+  | "verifying"
+  | "verified"
+  | "failed"
+  | "unavailable";
 
 export async function verifyDatasetIntegrity(input: {
   datasetUrl: string;

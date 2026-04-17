@@ -2,40 +2,42 @@ import {
   test,
   expect,
   type Page,
+  type Locator,
   type APIRequestContext,
 } from "@playwright/test";
 import path from "path";
 import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename: string = fileURLToPath(import.meta.url);
+const __dirname: string = path.dirname(__filename);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const WALLET_STORAGE_KEY = "bridgemart_wallet_v4";
-const UPLOAD_STORAGE_KEY = "bridgemart_upload_store_v1";
-const BACKEND_URL = "http://localhost:8080";
+const WALLET_STORAGE_KEY: string = "bridgemart_wallet_v4";
+const UPLOAD_STORAGE_KEY: string = "bridgemart_upload_store_v1";
+const BACKEND_URL: string = "http://localhost:8080";
 
 // Standard Anvil account #0 — deterministic address, no real WalletConnect needed.
-const TEST_ADDRESS = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+const TEST_ADDRESS: string = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
 
 // Resolve from this spec file: client/tests/e2e/ → server/tests/integration/services/
-const CSV_FIXTURE = path.resolve(
+const CSV_FIXTURE: string = path.resolve(
   __dirname,
   "../../../server/tests/integration/services/sample.csv",
 );
 
-const SCORE_LABELS_RE = /High match|Moderate match|Low match/;
+const SCORE_LABELS_RE: RegExp = /High match|Moderate match|Low match/;
 
 // Targets a pre-seeded marketplace listing, decoupled from the uploaded file
 // (upload flow stops at embedding completion, not on-chain listing creation).
-const SEARCH_QUERY = "cardiovascular cohort for binary risk classification";
-const SEEDED_TITLE = "Cardio Clinical Cohort";
+const SEARCH_QUERY: string =
+  "cardiovascular cohort for binary risk classification";
+const SEEDED_TITLE: string = "Cardio Clinical Cohort";
 
 // ─── Prerequisite check ───────────────────────────────────────────────────────
 
 test.beforeAll(async ({ request }: { request: APIRequestContext }) => {
-  const reachable = await request
+  const reachable: boolean = await request
     .get(`${BACKEND_URL}/api/v1/contract/items/all`, { timeout: 5_000 })
     .then((r) => r.status() < 500)
     .catch(() => false);
@@ -117,15 +119,17 @@ class SemanticSearchPage {
    * Fails immediately with a clear message if an "Operation failed" error panel appears.
    */
   async waitForJobCompletion(): Promise<void> {
-    const completed = this.page.getByText("Completed", { exact: true });
-    const errorHeading = this.page.getByRole("heading", {
+    const completed: Locator = this.page.getByText("Completed", {
+      exact: true,
+    });
+    const errorHeading: Locator = this.page.getByRole("heading", {
       name: "Operation failed",
     });
 
     await expect(completed.or(errorHeading)).toBeVisible({ timeout: 90_000 });
 
     if (await errorHeading.isVisible()) {
-      const detail = await errorHeading
+      const detail: string | null = await errorHeading
         .locator("xpath=..")
         .locator("p")
         .first()
@@ -140,12 +144,14 @@ class SemanticSearchPage {
 
   /** Asserts at least one completed-output label (Listing ID, Dataset URL, or Signature URL) is visible. */
   async assertAtLeastOneCompletedOutput(): Promise<void> {
-    const candidates = [
+    const candidates: Locator[] = [
       this.page.getByText("Listing ID", { exact: true }),
       this.page.getByText("Dataset URL", { exact: true }),
       this.page.getByText("Signature URL", { exact: true }),
     ];
-    const visibility = await Promise.all(candidates.map((l) => l.isVisible()));
+    const visibility: boolean[] = await Promise.all(
+      candidates.map((l) => l.isVisible()),
+    );
     expect(visibility.some(Boolean)).toBe(true);
   }
 
@@ -155,7 +161,7 @@ class SemanticSearchPage {
   }
 
   async runSearch(query: string): Promise<void> {
-    const input = this.page.getByPlaceholder(
+    const input: Locator = this.page.getByPlaceholder(
       "Search datasets by meaning, not keywords",
     );
     await input.fill(query);
@@ -193,7 +199,7 @@ class SemanticSearchPage {
  *   - Embeddings indexed for the seeded listings (Tasks 2–4 applied)
  */
 test("semantic search golden path", async ({ page }) => {
-  const ssp = new SemanticSearchPage(page);
+  const ssp: SemanticSearchPage = new SemanticSearchPage(page);
 
   // Seed localStorage before any navigation so the wallet store hydrates as connected.
   await ssp.seedLocalStorage();

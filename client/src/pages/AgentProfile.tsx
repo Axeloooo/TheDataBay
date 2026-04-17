@@ -13,7 +13,9 @@ function AgentProfile() {
   const { handle } = useParams<{ handle: string }>();
 
   const [agent, setAgent] = useState<Agent | null>(null);
-  const [recommendations, setRecommendations] = useState<AgentRecommendation[]>([]);
+  const [recommendations, setRecommendations] = useState<AgentRecommendation[]>(
+    [],
+  );
   const [loadingAgent, setLoadingAgent] = useState(true);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [agentError, setAgentError] = useState<string | null>(null);
@@ -99,11 +101,14 @@ function AgentProfile() {
             </Button>
           </Link>
           <div className="rounded-xl border p-8 text-center">
-            <Bot className="mx-auto h-10 w-10 mb-3 text-muted-foreground opacity-40" aria-hidden="true" />
+            <Bot
+              className="mx-auto h-10 w-10 mb-3 text-muted-foreground opacity-40"
+              aria-hidden="true"
+            />
             <p className="text-lg font-medium">Agent not found</p>
             <p className="text-sm text-muted-foreground mt-1">
-              No agent with handle{" "}
-              <span className="font-mono">@{handle}</span> exists.
+              No agent with handle <span className="font-mono">@{handle}</span>{" "}
+              exists.
             </p>
             <Link to="/agents" className="mt-4 inline-block">
               <Button variant="outline" className="mt-4 gap-2">

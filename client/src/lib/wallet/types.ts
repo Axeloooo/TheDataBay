@@ -12,11 +12,19 @@ export type WalletSessionSnapshot = {
 };
 
 export interface WalletRuntime {
-  connect(input: { connector: WalletConnectorType; eip6963Provider?: object }): Promise<void>;
+  connect(input: {
+    connector: WalletConnectorType;
+    eip6963Provider?: object;
+  }): Promise<void>;
   disconnect(): Promise<void>;
   restoreSession(): Promise<WalletSessionSnapshot | null>;
-  subscribeSession(listener: (snapshot: WalletSessionSnapshot) => void): () => void;
+  subscribeSession(
+    listener: (snapshot: WalletSessionSnapshot) => void,
+  ): () => void;
   getEip1193Provider(): Promise<unknown>;
   switchToConfiguredChain(): Promise<void>;
-  getConnectionMetadata(): { configError: string | null; availableConnectors: WalletConnectorType[] };
+  getConnectionMetadata(): {
+    configError: string | null;
+    availableConnectors: WalletConnectorType[];
+  };
 }

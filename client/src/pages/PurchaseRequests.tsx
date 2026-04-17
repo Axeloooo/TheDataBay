@@ -92,9 +92,7 @@ function PurchaseRequests() {
             )}
             <select
               value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as StatusFilter)
-              }
+              onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
               className="h-10 rounded-md border border-input bg-background px-3 text-sm w-full sm:w-48"
             >
               {STATUS_OPTIONS.map((opt) => (

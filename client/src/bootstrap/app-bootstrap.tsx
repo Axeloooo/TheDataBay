@@ -8,7 +8,9 @@ export function AppBootstrap() {
   const theme = useThemeStore((state) => state.theme);
   const applyTheme = useThemeStore((state) => state.applyTheme);
   const restoreSession = useWalletStore((state) => state.restoreSession);
-  const subscribeToRuntime = useWalletStore((state) => state.subscribeToRuntime);
+  const subscribeToRuntime = useWalletStore(
+    (state) => state.subscribeToRuntime,
+  );
   const startRatesPolling = useCurrencyStore(
     (state) => state.startRatesPolling,
   );

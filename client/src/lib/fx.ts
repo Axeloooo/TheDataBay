@@ -89,7 +89,9 @@ export async function fetchFxRates(): Promise<FxRates> {
   return rates;
 }
 
-export function loadCachedFxRates(maxAgeMs: number = DEFAULT_TTL_MS): FxRates | null {
+export function loadCachedFxRates(
+  maxAgeMs: number = DEFAULT_TTL_MS,
+): FxRates | null {
   try {
     const raw = localStorage.getItem(FX_CACHE_KEY);
     if (!raw) return null;
@@ -137,7 +139,9 @@ export function convertSettlementToCurrency(
     case "ETH":
       return usdAmount / rates.ethUsd;
     case "SOL":
-      return rates.ethSol > 0 ? usdAmount * (rates.ethSol / rates.ethUsd) : null;
+      return rates.ethSol > 0
+        ? usdAmount * (rates.ethSol / rates.ethUsd)
+        : null;
     case "CNY":
       return usdAmount * (rates.ethCny / rates.ethUsd);
     case "USDT":

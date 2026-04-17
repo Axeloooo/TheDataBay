@@ -11,7 +11,7 @@ export function decodeBase64(input: string): Uint8Array {
 function uint8ToArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(
     bytes.byteOffset,
-    bytes.byteOffset + bytes.byteLength
+    bytes.byteOffset + bytes.byteLength,
   ) as ArrayBuffer;
 }
 
@@ -21,7 +21,7 @@ export async function importAesKey(keyBytes: Uint8Array): Promise<CryptoKey> {
     uint8ToArrayBuffer(keyBytes),
     { name: "AES-GCM" },
     false,
-    ["decrypt"]
+    ["decrypt"],
   );
 }
 
@@ -39,7 +39,7 @@ export async function decryptAesGcm(params: {
       additionalData: params.aad ? uint8ToArrayBuffer(params.aad) : undefined,
     },
     cryptoKey,
-    params.ciphertext
+    params.ciphertext,
   );
 }
 

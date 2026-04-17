@@ -8,10 +8,7 @@ import {
 import { Badge, badgeVariants } from "@/components/ui/badge";
 import { Users, ArrowUpRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import {
-  convertSettlementToCurrency,
-  formatCurrencyAmount,
-} from "@/lib/fx";
+import { convertSettlementToCurrency, formatCurrencyAmount } from "@/lib/fx";
 import { normalizeMarketplacePrice } from "@/lib/marketplace";
 import { useCurrencyStore } from "@/stores/currency-store";
 import type { CardDataset, ScoreLabel } from "@/types/ai";
@@ -19,11 +16,12 @@ import type { VariantProps } from "class-variance-authority";
 
 type BadgeVariant = VariantProps<typeof badgeVariants>["variant"];
 
-const SCORE_META: Record<ScoreLabel, { label: string; variant: BadgeVariant }> = {
-  high:     { label: "High match",     variant: "success" },
-  moderate: { label: "Moderate match", variant: "warning" },
-  low:      { label: "Low match",      variant: "destructive" },
-};
+const SCORE_META: Record<ScoreLabel, { label: string; variant: BadgeVariant }> =
+  {
+    high: { label: "High match", variant: "success" },
+    moderate: { label: "Moderate match", variant: "warning" },
+    low: { label: "Low match", variant: "destructive" },
+  };
 
 interface RecordCardProps {
   dataset: CardDataset;
@@ -47,9 +45,10 @@ function RecordCard({ dataset, score, scoreLabel }: RecordCardProps) {
         )
       : null;
 
-  const scoreMeta = score !== undefined && score !== null && scoreLabel
-    ? SCORE_META[scoreLabel]
-    : null;
+  const scoreMeta =
+    score !== undefined && score !== null && scoreLabel
+      ? SCORE_META[scoreLabel]
+      : null;
 
   return (
     <Card
@@ -65,7 +64,10 @@ function RecordCard({ dataset, score, scoreLabel }: RecordCardProps) {
           </CardTitle>
           <div className="flex shrink-0 items-center gap-1.5">
             {scoreMeta && (
-              <Badge variant={scoreMeta.variant} className="rounded-full px-2 py-0.5 text-xs">
+              <Badge
+                variant={scoreMeta.variant}
+                className="rounded-full px-2 py-0.5 text-xs"
+              >
                 {scoreMeta.label}
               </Badge>
             )}

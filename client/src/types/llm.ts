@@ -1,4 +1,4 @@
-export type JobLifecycleStatus = 'queued' | 'running' | 'completed' | 'failed';
+export type JobLifecycleStatus = "queued" | "running" | "completed" | "failed";
 
 export type VectorSpec = {
   model: string;
