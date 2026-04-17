@@ -10,6 +10,7 @@ import {
 import RecordCard from "@/components/record-card";
 import { backend } from "@/lib/backend";
 import type { MarketplaceDataItem } from "@/types/contract";
+import type { CardViewModel } from "@/types/ai";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import ErrorPanel from "@/components/ui/error-panel";
@@ -18,7 +19,7 @@ import { useSearchStore } from "@/stores/search-store";
 import { useWalletStore } from "@/stores/wallet-store";
 
 function Home() {
-  const [items, setItems] = useState<MarketplaceDataItem[]>([]);
+  const [items, setItems] = useState<CardViewModel[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<MarketplaceDataItem[]>(
     [],
   );
@@ -50,13 +51,13 @@ function Home() {
           query: submittedQuery,
         });
         if (currentRequestId !== requestIdRef.current) return;
-        setItems(response.results.map((result) => result.item));
+        setItems(response.results);
         setResultCount(response.count);
       } else {
         setIsSearching(false);
         const data = await backend.getMarketplaceItems();
         if (currentRequestId !== requestIdRef.current) return;
-        setItems(data);
+        setItems(data.map((item) => ({ dataset: item })));
         setResultCount(data.length);
       }
     } catch (err) {
@@ -323,10 +324,12 @@ function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {items.map((item) => (
+            {items.map((vm) => (
               <RecordCard
-                key={item.id}
-                dataset={item}
+                key={vm.dataset.id}
+                dataset={vm.dataset}
+                score={vm.score}
+                scoreLabel={vm.scoreLabel}
               />
             ))}
           </div>

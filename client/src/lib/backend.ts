@@ -8,7 +8,7 @@ import type {
 } from "@/types/contract";
 import type { KeyReleaseRequest, KeyReleaseResponse } from "@/types/dataset";
 import type { JobResponse, JobStatusResponse } from "@/types/llm";
-import type { SimilaritySearchRequest, SimilaritySearchResponse } from "@/types/ai";
+import type { SimilaritySearchRequest, SimilaritySearchResponse, CardViewModel } from "@/types/ai";
 import type { Agent, AgentListResponse, RecommendationListResponse, PurchaseRequest, PurchaseRequestListResponse } from "@/types/agent";
 import { normalizeAtomicString } from "@/lib/atomic";
 
@@ -99,16 +99,25 @@ export const backend = {
       body: JSON.stringify(payload),
     }),
 
-  similaritySearch: async (payload: SimilaritySearchRequest) => {
+  similaritySearch: async (payload: SimilaritySearchRequest): Promise<{ query: string; results: CardViewModel[]; count: number }> => {
     const response = await apiRequest<SimilaritySearchResponse>("/api/v1/ai/similarity-search", {
       method: "POST",
       body: JSON.stringify(payload),
     });
     return {
-      ...response,
-      results: response.results.map((result) => ({
-        ...result,
-        item: normalizeMarketplaceItem(result.item as MarketplaceApiItem),
+      query: response.query,
+      count: response.count,
+      results: response.results.map((r) => ({
+        dataset: {
+          id: r.listing_id,
+          title: r.title,
+          description: r.description,
+          price_atomic: String(r.price_atomic),
+          settlement_currency: "USDC",
+          settlement_decimals: 6,
+        },
+        score: r.score,
+        scoreLabel: r.score_label,
       })),
     };
   },
