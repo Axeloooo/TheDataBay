@@ -11,6 +11,7 @@ import type { JobResponse, JobStatusResponse } from "@/types/llm";
 import type { SimilaritySearchRequest, SimilaritySearchResponse, CardViewModel } from "@/types/ai";
 import type { Agent, AgentListResponse, RecommendationListResponse, PurchaseRequest, PurchaseRequestListResponse } from "@/types/agent";
 import { normalizeAtomicString } from "@/lib/atomic";
+import { uuidToBytes32 } from "@/lib/ids";
 
 type MarketplaceApiItem = Omit<
   MarketplaceDataItem,
@@ -109,7 +110,7 @@ export const backend = {
       count: response.count,
       results: response.results.map((r) => ({
         dataset: {
-          id: r.listing_id,
+          id: uuidToBytes32(r.listing_id),
           title: r.title,
           description: r.description,
           price_atomic: String(r.price_atomic),
