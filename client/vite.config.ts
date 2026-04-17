@@ -2,6 +2,7 @@
 import path from "path";
 import tailwindcss from "@tailwindcss/vite";
 import { defineConfig } from "vite";
+import { configDefaults } from "vitest/config";
 import react from "@vitejs/plugin-react";
 
 // https://vite.dev/config/
@@ -21,6 +22,6 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./src/test/setup.ts"],
     globals: true,
-    exclude: ["tests/e2e/**", "node_modules/**"],
+    exclude: [...configDefaults.exclude, "tests/e2e/**"],
   },
 });
