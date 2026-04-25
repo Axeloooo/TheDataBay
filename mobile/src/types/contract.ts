@@ -7,6 +7,7 @@ export type MarketplaceDataItem = {
   title: string;
   description: string;
   seller: string;
+  payment_token: string;
   price_atomic: string;
   settlement_currency: MarketplaceSettlementCurrency;
   settlement_decimals: 6;

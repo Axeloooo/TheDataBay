@@ -13,13 +13,17 @@ import type {
 import type { JobResponse, JobStatusResponse } from "@/src/types/llm";
 import type {
   SimilaritySearchRequest,
+  RawSimilaritySearchResponse,
   SimilaritySearchResponse,
 } from "@/src/types/ai";
+import { uuidToBytes32 } from "@/src/lib/ids";
 
 type MarketplaceApiItem = Omit<
   MarketplaceDataItem,
-  "price_atomic" | "settlement_currency" | "settlement_decimals"
+  "payment_token" | "price_atomic" | "settlement_currency" | "settlement_decimals"
 > & {
+  payment_token?: unknown;
+  paymentToken?: unknown;
   price?: unknown;
   price_atomic?: unknown;
   settlement_currency?: unknown;
@@ -58,6 +62,10 @@ function normalizeMarketplaceItem(
   if (priceAtomic === undefined || priceAtomic === null) {
     throw new Error("Missing marketplace price from API.");
   }
+  const rawPaymentToken = item.payment_token ?? item.paymentToken;
+  if (typeof rawPaymentToken !== "string" || !rawPaymentToken.trim()) {
+    throw new Error("Missing marketplace payment token from API.");
+  }
 
   const settlementCurrency = String(item.settlement_currency ?? "USDC");
   if (settlementCurrency !== "USDC") {
@@ -71,6 +79,8 @@ function normalizeMarketplaceItem(
 
   const {
     price: _legacyPrice,
+    paymentToken: _legacyPaymentToken,
+    payment_token: _legacyPaymentTokenSnake,
     price_atomic: _legacyAtomic,
     settlement_currency: _legacyCurrency,
     settlement_decimals: _legacyDecimals,
@@ -79,6 +89,7 @@ function normalizeMarketplaceItem(
 
   return {
     ...rest,
+    payment_token: rawPaymentToken.trim(),
     price_atomic: normalizeAtomicString(priceAtomic),
     settlement_currency: "USDC",
     settlement_decimals: 6,
@@ -124,11 +135,41 @@ export const backend = {
       },
     ),
 
-  similaritySearch: (payload: SimilaritySearchRequest) =>
-    apiRequest<SimilaritySearchResponse>("/api/v1/ai/similarity-search", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+  similaritySearch: async (
+    payload: SimilaritySearchRequest,
+  ): Promise<SimilaritySearchResponse> => {
+    const response = await apiRequest<RawSimilaritySearchResponse>(
+      "/api/v1/ai/similarity-search",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+
+    return {
+      ...response,
+      results: response.results.map((result) => ({
+        item: normalizeMarketplaceItem({
+          id: uuidToBytes32(result.listing_id),
+          title: result.title,
+          description: result.description,
+          seller: result.seller,
+          payment_token: result.payment_token,
+          price_atomic: result.price_atomic,
+          settlement_currency: result.settlement_currency,
+          settlement_decimals: result.settlement_decimals,
+          dataset_url: "",
+          dataset_hash: "0x",
+          signature_url: "",
+          signature_hash: "0x",
+          exists: true,
+          purchase_count: result.purchase_count,
+        }),
+        score: result.score,
+        score_label: result.score_label,
+      })),
+    };
+  },
 
   getPurchasedItemsByWallet: async (payload: PurchasedItemsRequest) => {
     const response = await apiRequest<PurchasedItemsResponse>(

@@ -197,7 +197,11 @@ const walletRuntimeImpl: WalletRuntime = {
 
     try {
       if (provider.session?.topic) {
-        await provider.disconnect({
+        const disconnect = provider.disconnect as (params?: {
+          topic: string;
+          reason: { code: number; message: string };
+        }) => Promise<void>;
+        await disconnect({
           topic: provider.session.topic,
           reason: { code: 6000, message: "User disconnected" },
         });
