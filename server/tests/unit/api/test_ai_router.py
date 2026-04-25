@@ -17,7 +17,11 @@ def make_ranked_dataset(listing_id: str, score: float = 0.85) -> RankedDataset:
         title=f"Dataset {listing_id[-4:]}",
         description="Sample dataset",
         seller="0x0000000000000000000000000000000000000001",
+        payment_token="0x0000000000000000000000000000000000000002",
         price_atomic=100,
+        settlement_currency="USDC",
+        settlement_decimals=6,
+        purchase_count=0,
         score=score,
         score_label="high",
     )
@@ -65,6 +69,10 @@ def test_similarity_search_returns_ranked_results(client):
     assert result["score"] == 0.85
     assert result["score_label"] == "high"
     assert result["price_atomic"] == 100
+    assert result["payment_token"] == "0x0000000000000000000000000000000000000002"
+    assert result["settlement_currency"] == "USDC"
+    assert result["settlement_decimals"] == 6
+    assert result["purchase_count"] == 0
     # Old nested shape must not be present
     assert "item" not in result
     assert "explanation" not in result
