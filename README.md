@@ -95,6 +95,7 @@ Set frontend env values:
 ```bash
 VITE_API_URL=http://localhost:8000
 VITE_CONTRACT_ADDRESS=<deployed_marketplace_address>
+VITE_PAYMENT_TOKEN_ADDRESS=<accepted_usdc_token_address>
 VITE_PINATA_GATEWAY_URL=https://gateway.pinata.cloud
 ```
 
@@ -247,6 +248,7 @@ make getall
 - Verify MetaMask network is your anvil chain (`31337` by default).
 - Verify selected account matches expected seller flow for `createItem`.
 - Verify `VITE_CONTRACT_ADDRESS` points to deployed contract on the same chain.
+- Verify `VITE_PAYMENT_TOKEN_ADDRESS` points to the accepted USDC token for that deployment.
 
 ### Error: no contract code found at configured address
 
