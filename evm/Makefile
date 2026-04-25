@@ -63,7 +63,7 @@ deploy-anvil:
 		exit 1; \
 	fi; \
 	echo $$ADDR > $(ANVIL_ADDR_FILE); \
-	USDC_ADDR=$$(cast call $$ADDR "settlementToken()(address)" --rpc-url $(ANVIL_RPC_URL)); \
+	USDC_ADDR=$$(cast call $$ADDR "acceptedTokenAt(uint256)(address)" 0 --rpc-url $(ANVIL_RPC_URL)); \
 	echo $$USDC_ADDR > $(ANVIL_USDC_ADDR_FILE); \
 	echo "Saved marketplace address to $(ANVIL_ADDR_FILE): $$ADDR"; \
 	echo "Saved USDC address to $(ANVIL_USDC_ADDR_FILE): $$USDC_ADDR"
@@ -71,16 +71,47 @@ deploy-anvil:
 
 sync-local-contract-config:
 	@ADDR=$$(cat $(ANVIL_ADDR_FILE)); \
+	TOKEN=$$(cat $(ANVIL_USDC_ADDR_FILE)); \
 	echo "Syncing local config files to marketplace address $$ADDR..."; \
 	if [ -f "../infra/k8s/development/secrets.yaml" ]; then \
 		cp "../infra/k8s/development/secrets.yaml" "../infra/k8s/development/secrets.yaml.bak"; \
 		perl -0pi -e 's/CONTRACT_ADDRESS: "[^"]+"/CONTRACT_ADDRESS: "'"$$ADDR"'"/' ../infra/k8s/development/secrets.yaml; \
+		if grep -q 'PAYMENT_TOKEN_ADDRESS:' ../infra/k8s/development/secrets.yaml; then \
+			perl -0pi -e 's/PAYMENT_TOKEN_ADDRESS: "[^"]+"/PAYMENT_TOKEN_ADDRESS: "'"$$TOKEN"'"/' ../infra/k8s/development/secrets.yaml; \
+		else \
+			printf '  PAYMENT_TOKEN_ADDRESS: "%s"\\n' "$$TOKEN" >> ../infra/k8s/development/secrets.yaml; \
+		fi; \
 		echo "Updated ../infra/k8s/development/secrets.yaml"; \
 	fi; \
 	if [ -f "../server/.env" ]; then \
 		cp "../server/.env" "../server/.env.bak"; \
 		perl -0pi -e 's/CONTRACT_ADDRESS="[^"]+"/CONTRACT_ADDRESS="'"$$ADDR"'"/' ../server/.env; \
+		if grep -q '^PAYMENT_TOKEN_ADDRESS=' ../server/.env; then \
+			perl -0pi -e 's/PAYMENT_TOKEN_ADDRESS="[^"]+"/PAYMENT_TOKEN_ADDRESS="'"$$TOKEN"'"/' ../server/.env; \
+		else \
+			printf 'PAYMENT_TOKEN_ADDRESS="%s"\\n' "$$TOKEN" >> ../server/.env; \
+		fi; \
 		echo "Updated ../server/.env"; \
+	fi; \
+	if [ -f "../client/.env" ]; then \
+		cp "../client/.env" "../client/.env.bak"; \
+		perl -0pi -e 's/VITE_CONTRACT_ADDRESS="[^"]+"/VITE_CONTRACT_ADDRESS="'"$$ADDR"'"/' ../client/.env; \
+		if grep -q '^VITE_PAYMENT_TOKEN_ADDRESS=' ../client/.env; then \
+			perl -0pi -e 's/VITE_PAYMENT_TOKEN_ADDRESS="[^"]+"/VITE_PAYMENT_TOKEN_ADDRESS="'"$$TOKEN"'"/' ../client/.env; \
+		else \
+			printf 'VITE_PAYMENT_TOKEN_ADDRESS="%s"\\n' "$$TOKEN" >> ../client/.env; \
+		fi; \
+		echo "Updated ../client/.env"; \
+	fi; \
+	if [ -f "../mobile/.env" ]; then \
+		cp "../mobile/.env" "../mobile/.env.bak"; \
+		perl -0pi -e 's/CONTRACT_ADDRESS="[^"]+"/CONTRACT_ADDRESS="'"$$ADDR"'"/' ../mobile/.env; \
+		if grep -q '^PAYMENT_TOKEN_ADDRESS=' ../mobile/.env; then \
+			perl -0pi -e 's/PAYMENT_TOKEN_ADDRESS="[^"]+"/PAYMENT_TOKEN_ADDRESS="'"$$TOKEN"'"/' ../mobile/.env; \
+		else \
+			printf 'PAYMENT_TOKEN_ADDRESS="%s"\\n' "$$TOKEN" >> ../mobile/.env; \
+		fi; \
+		echo "Updated ../mobile/.env"; \
 	fi
 
 addr:
@@ -96,12 +127,13 @@ fee:
 
 getall:
 	@ADDR=$$(cat $(ANVIL_ADDR_FILE)); \
-	cast call $$ADDR "getAllItems()((bytes32,string,string,address,uint256,string,bytes32,string,bytes32,bool,uint256)[])" --rpc-url $(ANVIL_RPC_URL)
+	cast call $$ADDR "getAllItems()((bytes32,string,string,address,uint256,string,bytes32,string,bytes32,bool,uint256,address)[])" --rpc-url $(ANVIL_RPC_URL)
 
 # Create a sample item. Set these vars when running:
-# make create-item ITEM_ID=0x... SELLER=0x... PRICE_ATOMIC=1000000 DATASET_URL=... SIG_URL=... DATASET_HASH=0x... SIG_HASH=0x...
+# make create-item ITEM_ID=0x... SELLER=0x... PAYMENT_TOKEN=0x... PRICE_ATOMIC=1000000 DATASET_URL=... SIG_URL=... DATASET_HASH=0x... SIG_HASH=0x...
 create-item:
 	@ADDR=$$(cat $(ANVIL_ADDR_FILE)); \
+	TOKEN=$${PAYMENT_TOKEN:-$$(cat $(ANVIL_USDC_ADDR_FILE))}; \
 	SELLER=$${SELLER:-$$(cast wallet address --private-key $(ANVIL_PRIVATE_KEY))}; \
 	ITEM_ID=$${ITEM_ID:-0x0000000000000000000000000000000000000000000000000000000000000001}; \
 	PRICE_ATOMIC=$${PRICE_ATOMIC:-1000000}; \
@@ -113,8 +145,8 @@ create-item:
 	SIG_HASH=$${SIG_HASH:-0x0000000000000000000000000000000000000000000000000000000000000000}; \
 	echo "Creating item as owner..."; \
 	cast send $$ADDR \
-	  "createItem(bytes32,string,string,address,uint256,string,bytes32,string,bytes32)" \
-	  $$ITEM_ID "$$TITLE" "$$DESC" $$SELLER $$PRICE_ATOMIC "$$DATASET_URL" $$DATASET_HASH "$$SIG_URL" $$SIG_HASH \
+	  "createItem(bytes32,string,string,address,address,uint256,string,bytes32,string,bytes32)" \
+	  $$ITEM_ID "$$TITLE" "$$DESC" $$SELLER $$TOKEN $$PRICE_ATOMIC "$$DATASET_URL" $$DATASET_HASH "$$SIG_URL" $$SIG_HASH \
 	  --rpc-url $(ANVIL_RPC_URL) --private-key $(ANVIL_PRIVATE_KEY)
 
 # Mint mock USDC on Anvil for local testing.
@@ -128,10 +160,10 @@ mint-usdc:
 	  --rpc-url $(ANVIL_RPC_URL) --private-key $(ANVIL_PRIVATE_KEY)
 
 # Buy item by bytes32 ID. Calculates total price (price + fee) automatically and approves the marketplace.
-# make buy-item BUYER_PK=0x... PRICE_ATOMIC=1000000 ITEM_ID=0x...
+# make buy-item BUYER_PK=0x... PAYMENT_TOKEN=0x... PRICE_ATOMIC=1000000 ITEM_ID=0x...
 buy-item:
 	@ADDR=$$(cat $(ANVIL_ADDR_FILE)); \
-	TOKEN=$$(cat $(ANVIL_USDC_ADDR_FILE)); \
+	TOKEN=$${PAYMENT_TOKEN:-$$(cat $(ANVIL_USDC_ADDR_FILE))}; \
 	PRICE_ATOMIC=$${PRICE_ATOMIC:-1000000}; \
 	BUYER_PK=$${BUYER_PK:-$(ANVIL_PRIVATE_KEY)}; \
 	ITEM_ID=$${ITEM_ID:-0x0000000000000000000000000000000000000000000000000000000000000001}; \
@@ -143,7 +175,7 @@ buy-item:
 	TOTAL_PRICE=$$(echo "$$PRICE_ATOMIC + $$FEE_AMOUNT" | bc); \
 	echo "Fee amount: $$FEE_AMOUNT atomic units"; \
 	echo "Total price to pay: $$TOTAL_PRICE atomic units"; \
-	echo "Approving settlement token..."; \
+	echo "Approving payment token..."; \
 	cast send $$TOKEN "approve(address,uint256)" $$ADDR $$TOTAL_PRICE \
 	  --rpc-url $(ANVIL_RPC_URL) --private-key $$BUYER_PK > /dev/null; \
 	echo "Buying item $$ITEM_ID..."; \

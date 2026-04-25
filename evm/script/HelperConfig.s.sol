@@ -9,7 +9,9 @@ contract HelperConfig is Script {
      */
     struct NetworkConfig {
         uint256 deployKey;
-        address settlementToken;
+        address paymentToken;
+        uint8 tokenDecimals;
+        uint256 tokenMaxPrice;
         address feeRecipient;
         uint256 feeBps;
     }
@@ -19,6 +21,8 @@ contract HelperConfig is Script {
      */
     uint256 public constant DEFAULT_ANVIL_KEY = 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80;
     uint256 public constant DEFAULT_FEE_BPS = 0;
+    uint8 public constant DEFAULT_USDC_DECIMALS = 6;
+    uint256 public constant DEFAULT_USDC_MAX_PRICE = 1_000_000 * 10 ** 6;
 
     /**
      * @notice Active network configuration
@@ -46,10 +50,19 @@ contract HelperConfig is Script {
         uint256 pk = vm.envUint("SEPOLIA_PRIVATE_KEY");
         address deployer = vm.addr(pk);
 
-        address settlementToken = vm.envAddress("SEPOLIA_USDC_ADDRESS");
+        address paymentToken = vm.envAddress("SEPOLIA_USDC_ADDRESS");
+        uint8 tokenDecimals = uint8(vm.envOr("SEPOLIA_USDC_DECIMALS", uint256(DEFAULT_USDC_DECIMALS)));
+        uint256 tokenMaxPrice = vm.envOr("SEPOLIA_USDC_MAX_PRICE", DEFAULT_USDC_MAX_PRICE);
         address feeR = vm.envOr("SEPOLIA_FEE_RECIPIENT", deployer);
         uint256 feeBps = vm.envOr("SEPOLIA_FEE_BPS", uint256(250));
-        return NetworkConfig({deployKey: pk, settlementToken: settlementToken, feeRecipient: feeR, feeBps: feeBps});
+        return NetworkConfig({
+            deployKey: pk,
+            paymentToken: paymentToken,
+            tokenDecimals: tokenDecimals,
+            tokenMaxPrice: tokenMaxPrice,
+            feeRecipient: feeR,
+            feeBps: feeBps
+        });
     }
 
     /**
@@ -64,7 +77,9 @@ contract HelperConfig is Script {
 
         return NetworkConfig({
             deployKey: DEFAULT_ANVIL_KEY,
-            settlementToken: address(0),
+            paymentToken: address(0),
+            tokenDecimals: DEFAULT_USDC_DECIMALS,
+            tokenMaxPrice: DEFAULT_USDC_MAX_PRICE,
             feeRecipient: defaultFeeRecipient,
             feeBps: DEFAULT_FEE_BPS
         });

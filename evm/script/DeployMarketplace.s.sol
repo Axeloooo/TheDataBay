@@ -19,19 +19,26 @@ contract DeployMarketplace is Script {
     function run() public {
         HelperConfig config = new HelperConfig();
 
-        (uint256 deployKey, address settlementToken, address feeRecipient, uint256 feeBps) =
-            config.activeNetworkConfig();
+        (
+            uint256 deployKey,
+            address paymentToken,
+            uint8 tokenDecimals,
+            uint256 tokenMaxPrice,
+            address feeRecipient,
+            uint256 feeBps
+        ) = config.activeNetworkConfig();
 
         vm.startBroadcast(deployKey);
 
-        if (settlementToken == address(0)) {
+        if (paymentToken == address(0)) {
             mockUsdc = new MockUSDC();
-            settlementToken = address(mockUsdc);
+            paymentToken = address(mockUsdc);
             address mintRecipient = vm.envOr("ANVIL_USDC_RECIPIENT", vm.addr(deployKey));
             mockUsdc.mint(mintRecipient, 5_000_000 * 10 ** 6);
         }
 
-        marketplace = new Marketplace(vm.addr(deployKey), settlementToken, feeRecipient, feeBps);
+        marketplace =
+            new Marketplace(vm.addr(deployKey), paymentToken, tokenDecimals, tokenMaxPrice, feeRecipient, feeBps);
 
         vm.stopBroadcast();
     }

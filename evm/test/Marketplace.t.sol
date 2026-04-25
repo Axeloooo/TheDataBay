@@ -9,6 +9,7 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 contract MarketplaceTest is Test {
     Marketplace public marketplace;
     MockUSDC public usdc;
+    MockUSDC public altToken;
 
     address owner = address(0xA11CE);
     address feeRecipient = address(0xFEE);
@@ -17,6 +18,8 @@ contract MarketplaceTest is Test {
     address poorBuyer = address(0xDEAD);
 
     uint256 feeBps = 250; // 2.5%
+    uint8 constant USDC_DECIMALS = 6;
+    uint256 constant USDC_MAX_PRICE = 1_000_000 * 10 ** 6;
 
     string constant TITLE = "Test Dataset";
     string constant DESC = "Synthetic dataset for testing";
@@ -30,8 +33,10 @@ contract MarketplaceTest is Test {
 
     function setUp() public {
         usdc = new MockUSDC();
-        marketplace = new Marketplace(owner, address(usdc), feeRecipient, feeBps);
+        altToken = new MockUSDC();
+        marketplace = new Marketplace(owner, address(usdc), USDC_DECIMALS, USDC_MAX_PRICE, feeRecipient, feeBps);
         usdc.mint(buyer, 100_000_000);
+        altToken.mint(buyer, 100_000_000);
     }
 
     function _walletId(address user) internal view returns (bytes32) {
@@ -44,7 +49,18 @@ contract MarketplaceTest is Test {
         itemId = bytes32(idCounter);
         idCounter += 1;
         vm.prank(seller);
-        marketplace.createItem(itemId, TITLE, DESC, seller, PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH);
+        marketplace.createItem(
+            itemId, TITLE, DESC, seller, address(usdc), PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
+        );
+    }
+
+    function _createDefaultItemWithToken(address paymentToken) internal returns (bytes32 itemId) {
+        itemId = bytes32(idCounter);
+        idCounter += 1;
+        vm.prank(seller);
+        marketplace.createItem(
+            itemId, TITLE, DESC, seller, paymentToken, PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
+        );
     }
 
     function _buy(bytes32 itemId, address _buyer, uint256 value) internal {
@@ -54,11 +70,18 @@ contract MarketplaceTest is Test {
         marketplace.buyItem(itemId);
     }
 
+    function _buyWithToken(bytes32 itemId, address _buyer, MockUSDC token, uint256 value) internal {
+        vm.prank(_buyer);
+        token.approve(address(marketplace), value);
+        vm.prank(_buyer);
+        marketplace.buyItem(itemId);
+    }
+
     function test_createItem_requires_seller() public {
         vm.prank(address(123));
         vm.expectRevert(Marketplace.Marketplace__SellerRequired.selector);
         marketplace.createItem(
-            bytes32(uint256(1)), TITLE, DESC, seller, PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
+            bytes32(uint256(1)), TITLE, DESC, seller, address(usdc), PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
         );
     }
 
@@ -70,46 +93,154 @@ contract MarketplaceTest is Test {
         assertEq(v.description, DESC);
         assertEq(v.seller, seller);
         assertEq(v.price, PRICE);
+        assertEq(v.paymentToken, address(usdc));
+    }
+
+    function test_constructor_registers_initial_token() public view {
+        (bool enabled, uint8 decimals, uint256 maxPrice) = marketplace.acceptedTokens(address(usdc));
+        assertTrue(enabled);
+        assertEq(decimals, USDC_DECIMALS);
+        assertEq(maxPrice, USDC_MAX_PRICE);
+        assertEq(marketplace.acceptedTokenCount(), 1);
+        assertEq(marketplace.acceptedTokenAt(0), address(usdc));
+
+        address[] memory tokens = marketplace.getAcceptedTokens();
+        assertEq(tokens.length, 1);
+        assertEq(tokens[0], address(usdc));
+    }
+
+    function test_constructor_rejects_invalid_initial_token_config() public {
+        vm.expectRevert(Marketplace.Marketplace__SettlementTokenRequired.selector);
+        new Marketplace(owner, address(0), USDC_DECIMALS, USDC_MAX_PRICE, feeRecipient, feeBps);
+
+        vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__PriceExceedsMaximum.selector, 0, 0));
+        new Marketplace(owner, address(usdc), USDC_DECIMALS, 0, feeRecipient, feeBps);
+    }
+
+    function test_addAcceptedToken_registers_token_without_duplicates() public {
+        vm.prank(owner);
+        marketplace.addAcceptedToken(address(altToken), USDC_DECIMALS, USDC_MAX_PRICE);
+
+        (bool enabled, uint8 decimals, uint256 maxPrice) = marketplace.acceptedTokens(address(altToken));
+        assertTrue(enabled);
+        assertEq(decimals, USDC_DECIMALS);
+        assertEq(maxPrice, USDC_MAX_PRICE);
+        assertEq(marketplace.acceptedTokenCount(), 2);
+
+        vm.prank(owner);
+        marketplace.addAcceptedToken(address(altToken), USDC_DECIMALS, USDC_MAX_PRICE / 2);
+        assertEq(marketplace.acceptedTokenCount(), 2);
+        (enabled, decimals, maxPrice) = marketplace.acceptedTokens(address(altToken));
+        assertTrue(enabled);
+        assertEq(decimals, USDC_DECIMALS);
+        assertEq(maxPrice, USDC_MAX_PRICE / 2);
+    }
+
+    function test_addAcceptedToken_validation() public {
+        vm.prank(address(123));
+        vm.expectRevert();
+        marketplace.addAcceptedToken(address(altToken), USDC_DECIMALS, USDC_MAX_PRICE);
+
+        vm.prank(owner);
+        vm.expectRevert(Marketplace.Marketplace__SettlementTokenRequired.selector);
+        marketplace.addAcceptedToken(address(0), USDC_DECIMALS, USDC_MAX_PRICE);
+
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__PriceExceedsMaximum.selector, 0, 0));
+        marketplace.addAcceptedToken(address(altToken), USDC_DECIMALS, 0);
+    }
+
+    function test_setTokenEnabled_updates_existing_token_only() public {
+        vm.prank(owner);
+        marketplace.addAcceptedToken(address(altToken), USDC_DECIMALS, USDC_MAX_PRICE);
+
+        vm.prank(owner);
+        marketplace.setTokenEnabled(address(altToken), false);
+        (bool enabled,,) = marketplace.acceptedTokens(address(altToken));
+        assertFalse(enabled);
+
+        vm.prank(owner);
+        marketplace.setTokenEnabled(address(altToken), true);
+        (enabled,,) = marketplace.acceptedTokens(address(altToken));
+        assertTrue(enabled);
+
+        address unknownToken = address(0x1234);
+        vm.prank(owner);
+        vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__TokenNotAccepted.selector, unknownToken));
+        marketplace.setTokenEnabled(unknownToken, true);
     }
 
     function test_createItem_rejects_empty_fields() public {
         bytes32 itemId = bytes32(uint256(1));
         vm.prank(seller);
         vm.expectRevert(Marketplace.Marketplace__TitleRequired.selector);
-        marketplace.createItem(itemId, "", DESC, seller, PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH);
+        marketplace.createItem(
+            itemId, "", DESC, seller, address(usdc), PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
+        );
 
         vm.prank(seller);
         vm.expectRevert(Marketplace.Marketplace__DescriptionRequired.selector);
-        marketplace.createItem(itemId, TITLE, "", seller, PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH);
+        marketplace.createItem(
+            itemId, TITLE, "", seller, address(usdc), PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
+        );
 
         vm.prank(seller);
         vm.expectRevert(Marketplace.Marketplace__DatasetUrlRequired.selector);
-        marketplace.createItem(itemId, TITLE, DESC, seller, PRICE, "", DATASET_HASH, SIG_URL, SIG_HASH);
+        marketplace.createItem(itemId, TITLE, DESC, seller, address(usdc), PRICE, "", DATASET_HASH, SIG_URL, SIG_HASH);
 
         vm.prank(seller);
         vm.expectRevert(Marketplace.Marketplace__SignatureUrlRequired.selector);
-        marketplace.createItem(itemId, TITLE, DESC, seller, PRICE, DATASET_URL, DATASET_HASH, "", SIG_HASH);
+        marketplace.createItem(
+            itemId, TITLE, DESC, seller, address(usdc), PRICE, DATASET_URL, DATASET_HASH, "", SIG_HASH
+        );
     }
 
     function test_createItem_rejects_invalid_price() public {
         bytes32 itemId = bytes32(uint256(1));
         vm.prank(seller);
         vm.expectRevert(Marketplace.Marketplace__PriceMustBeGreaterThanZero.selector);
-        marketplace.createItem(itemId, TITLE, DESC, seller, 0, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH);
+        marketplace.createItem(
+            itemId, TITLE, DESC, seller, address(usdc), 0, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
+        );
 
-        uint256 maxPrice = marketplace.MAX_PRICE();
+        uint256 maxPrice = USDC_MAX_PRICE;
         vm.prank(seller);
         vm.expectRevert(
             abi.encodeWithSelector(Marketplace.Marketplace__PriceExceedsMaximum.selector, maxPrice + 1, maxPrice)
         );
-        marketplace.createItem(itemId, TITLE, DESC, seller, maxPrice + 1, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH);
+        marketplace.createItem(
+            itemId, TITLE, DESC, seller, address(usdc), maxPrice + 1, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
+        );
+    }
+
+    function test_createItem_rejects_unaccepted_or_disabled_token() public {
+        bytes32 itemId = bytes32(uint256(1));
+
+        vm.prank(seller);
+        vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__TokenNotAccepted.selector, address(altToken)));
+        marketplace.createItem(
+            itemId, TITLE, DESC, seller, address(altToken), PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
+        );
+
+        vm.prank(owner);
+        marketplace.addAcceptedToken(address(altToken), USDC_DECIMALS, USDC_MAX_PRICE);
+        vm.prank(owner);
+        marketplace.setTokenEnabled(address(altToken), false);
+
+        vm.prank(seller);
+        vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__TokenNotAccepted.selector, address(altToken)));
+        marketplace.createItem(
+            itemId, TITLE, DESC, seller, address(altToken), PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
+        );
     }
 
     function test_createItem_rejects_duplicate() public {
         bytes32 itemId = _createDefaultItem();
         vm.prank(seller);
         vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__ItemAlreadyExists.selector, itemId));
-        marketplace.createItem(itemId, TITLE, DESC, seller, PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH);
+        marketplace.createItem(
+            itemId, TITLE, DESC, seller, address(usdc), PRICE, DATASET_URL, DATASET_HASH, SIG_URL, SIG_HASH
+        );
     }
 
     function test_getItems_pagination() public {
@@ -211,6 +342,42 @@ contract MarketplaceTest is Test {
         assertEq(usdc.balanceOf(buyer), buyerBalanceBefore - totalPrice);
     }
 
+    function test_buyItem_uses_item_payment_token() public {
+        vm.prank(owner);
+        marketplace.addAcceptedToken(address(altToken), USDC_DECIMALS, USDC_MAX_PRICE);
+        bytes32 itemId = _createDefaultItemWithToken(address(altToken));
+        uint256 fee = (PRICE * feeBps) / 10_000;
+        uint256 totalPrice = PRICE + fee;
+        uint256 sellerBalanceBefore = altToken.balanceOf(seller);
+        uint256 feeBalanceBefore = altToken.balanceOf(feeRecipient);
+        uint256 buyerBalanceBefore = altToken.balanceOf(buyer);
+
+        _buyWithToken(itemId, buyer, altToken, totalPrice);
+
+        assertEq(altToken.balanceOf(seller), sellerBalanceBefore + PRICE);
+        assertEq(altToken.balanceOf(feeRecipient), feeBalanceBefore + fee);
+        assertEq(altToken.balanceOf(buyer), buyerBalanceBefore - totalPrice);
+        assertEq(usdc.balanceOf(seller), 0);
+        assertEq(usdc.balanceOf(feeRecipient), 0);
+    }
+
+    function test_buyItem_rejects_disabled_item_payment_token() public {
+        vm.prank(owner);
+        marketplace.addAcceptedToken(address(altToken), USDC_DECIMALS, USDC_MAX_PRICE);
+        bytes32 itemId = _createDefaultItemWithToken(address(altToken));
+        uint256 fee = (PRICE * feeBps) / 10_000;
+        uint256 totalPrice = PRICE + fee;
+
+        vm.prank(owner);
+        marketplace.setTokenEnabled(address(altToken), false);
+
+        vm.prank(buyer);
+        altToken.approve(address(marketplace), totalPrice);
+        vm.prank(buyer);
+        vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__TokenNotAccepted.selector, address(altToken)));
+        marketplace.buyItem(itemId);
+    }
+
     function test_buyItem_rejects_seller_purchase() public {
         bytes32 itemId = _createDefaultItem();
         uint256 fee = (PRICE * feeBps) / 10_000;
@@ -269,7 +436,7 @@ contract MarketplaceTest is Test {
         vm.expectRevert(Marketplace.Marketplace__PriceMustBeGreaterThanZero.selector);
         marketplace.updatePrice(itemId, 0);
 
-        uint256 maxPrice = marketplace.MAX_PRICE();
+        uint256 maxPrice = USDC_MAX_PRICE;
         vm.prank(seller);
         vm.expectRevert(
             abi.encodeWithSelector(Marketplace.Marketplace__PriceExceedsMaximum.selector, maxPrice + 1, maxPrice)
@@ -281,6 +448,19 @@ contract MarketplaceTest is Test {
 
         vm.prank(seller);
         vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__ItemFrozen.selector, itemId));
+        marketplace.updatePrice(itemId, 2_000_000);
+    }
+
+    function test_updatePrice_rejects_disabled_item_payment_token() public {
+        vm.prank(owner);
+        marketplace.addAcceptedToken(address(altToken), USDC_DECIMALS, USDC_MAX_PRICE);
+        bytes32 itemId = _createDefaultItemWithToken(address(altToken));
+
+        vm.prank(owner);
+        marketplace.setTokenEnabled(address(altToken), false);
+
+        vm.prank(seller);
+        vm.expectRevert(abi.encodeWithSelector(Marketplace.Marketplace__TokenNotAccepted.selector, address(altToken)));
         marketplace.updatePrice(itemId, 2_000_000);
     }
 
