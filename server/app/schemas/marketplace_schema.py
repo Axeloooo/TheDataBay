@@ -2,7 +2,6 @@
 Pydantic schemas for Marketplace endpoints.
 """
 
-from typing import Literal
 from pydantic import BaseModel, Field
 
 SETTLEMENT_CURRENCY = "USDC"
@@ -18,8 +17,9 @@ class MarketplaceDataItem(BaseModel):
     title: str = Field(..., description="Title of the data item")
     description: str = Field(..., description="Description of the data item")
     seller: str = Field(..., description="Seller address")
+    payment_token: str = Field(..., description="ERC-20 token used for payment")
     price_atomic: str = Field(..., description="Price in settlement token atomic units")
-    settlement_currency: Literal["USDC"] = Field(
+    settlement_currency: str = Field(
         default=SETTLEMENT_CURRENCY, description="Settlement currency for purchases"
     )
     settlement_decimals: int = Field(

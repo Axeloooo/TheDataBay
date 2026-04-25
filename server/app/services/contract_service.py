@@ -6,6 +6,7 @@ import json
 import logging
 import re
 import uuid
+from collections.abc import Mapping
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict, List, Union
@@ -36,13 +37,16 @@ CUSTOM_ERROR_MAP = {
     "0x714224a9": (400, "Description is required."),
     "0xa36746a8": (400, "Dataset URL is required."),
     "0x9cb0e89c": (400, "Signature URL is required."),
-    "0x9b9f01b2": (400, "Invalid payment amount."),
     "0xfecaeeb9": (400, "Already has access."),
-    "0x3a06d369": (500, "Transfer failed."),
     "0x2f71df15": (400, "Invalid fee bps."),
     "0xecc6ecf4": (400, "Fee recipient required."),
+    "0x5b62b0b8": (400, "Settlement token required."),
+    "0x0fc4fb8a": (400, "Token is not accepted."),
     "0x2f82c416": (403, "Seller required for this action."),
+    "0xa71d74d8": (400, "Seller cannot buy own item."),
     "0x59efb1b4": (400, "Item is frozen after purchase."),
+    "0x3f300bfd": (400, "Insufficient token allowance."),
+    "0x2f01e7fc": (400, "Insufficient token balance."),
 }
 
 CUSTOM_ERROR_REGEX = re.compile(r"custom error (0x[0-9a-fA-F]{8})")
@@ -242,12 +246,65 @@ def _to_hex(value: Any) -> str:
     return str(value)
 
 
-def _item_view_to_schema(raw: Any) -> MarketplaceDataItem:
-    if isinstance(raw, dict):
+def _payment_token_from_settings(settings: Settings) -> str | None:
+    if not settings.payment_token_address:
+        return None
+    try:
+        return Web3.to_checksum_address(settings.payment_token_address)
+    except ValueError as exc:
+        _raise_internal_config("Invalid PAYMENT_TOKEN_ADDRESS configuration", exc)
+        raise
+
+
+def _settlement_currency_for_token(payment_token: str, settings: Settings | None) -> str:
+    if settings is None:
+        return SETTLEMENT_CURRENCY
+    configured_token = _payment_token_from_settings(settings)
+    try:
+        token = Web3.to_checksum_address(payment_token)
+    except ValueError:
+        return str(payment_token)
+    if configured_token is None:
+        return token
+    return SETTLEMENT_CURRENCY if token == configured_token else token
+
+
+def _settlement_decimals_for_token(
+    payment_token: str,
+    contract: Contract | None,
+    token_config_cache: dict[str, int] | None,
+) -> int:
+    if contract is None:
+        return SETTLEMENT_DECIMALS
+    try:
+        token = Web3.to_checksum_address(payment_token)
+    except ValueError:
+        return SETTLEMENT_DECIMALS
+    if token == "0x0000000000000000000000000000000000000000":
+        return SETTLEMENT_DECIMALS
+    if token_config_cache is not None and token in token_config_cache:
+        return token_config_cache[token]
+    config = _call_contract_read(
+        contract.functions.acceptedTokens(token), "acceptedTokens"
+    )
+    decimals = int(config[1])
+    if token_config_cache is not None:
+        token_config_cache[token] = decimals
+    return decimals
+
+
+def _item_view_to_schema(
+    raw: Any,
+    settings: Settings | None = None,
+    contract: Contract | None = None,
+    token_config_cache: dict[str, int] | None = None,
+) -> MarketplaceDataItem:
+    if isinstance(raw, Mapping):
         item_id = raw.get("itemId") or raw.get("item_id") or raw.get("id")
         title = raw.get("title")
         description = raw.get("description")
         seller = raw.get("seller")
+        payment_token = raw.get("paymentToken") or raw.get("payment_token")
         price = raw.get("price")
         dataset_url = raw.get("datasetUrl") or raw.get("dataset_url")
         dataset_hash = raw.get("datasetHash") or raw.get("dataset_hash")
@@ -272,16 +329,21 @@ def _item_view_to_schema(raw: Any) -> MarketplaceDataItem:
             signature_hash,
             exists,
             purchase_count,
+            *rest,
         ) = raw
+        payment_token = rest[0] if rest else "0x0000000000000000000000000000000000000000"
 
     return MarketplaceDataItem(
         id=_to_hex(item_id),
         title=title,
         description=description,
         seller=seller,
+        payment_token=payment_token,
         price_atomic=str(int(price)),
-        settlement_currency=SETTLEMENT_CURRENCY,
-        settlement_decimals=SETTLEMENT_DECIMALS,
+        settlement_currency=_settlement_currency_for_token(payment_token, settings),
+        settlement_decimals=_settlement_decimals_for_token(
+            payment_token, contract, token_config_cache
+        ),
         dataset_url=dataset_url,
         dataset_hash=_to_hex(dataset_hash),
         signature_url=signature_url,
@@ -415,10 +477,16 @@ def max_price(settings: Settings) -> int:
         int: Maximum price allowed for listings
     """
 
-    return _call_contract_read(
-        _get_contract(settings).functions.MAX_PRICE(),
-        "MAX_PRICE",
+    contract = _get_contract(settings)
+    token = _payment_token_from_settings(settings)
+    if token is None:
+        token = _call_contract_read(
+            contract.functions.acceptedTokenAt(0), "acceptedTokenAt"
+        )
+    config = _call_contract_read(
+        contract.functions.acceptedTokens(token), "acceptedTokens"
     )
+    return int(config[2])
 
 
 def fee_bps(settings: Settings) -> int:
@@ -482,11 +550,12 @@ def get_item_view(listing_id: str, settings: Settings) -> MarketplaceDataItem:
 
     logger.info("contract_service.get_item_view listing_id=%s", listing_id)
     item_id = uuid_to_bytes32(listing_id)
+    contract = _get_contract(settings)
     raw = _call_contract_read(
-        _get_contract(settings).functions.getItemView(item_id),
+        contract.functions.getItemView(item_id),
         "getItemView",
     )
-    return _item_view_to_schema(raw)
+    return _item_view_to_schema(raw, settings=settings, contract=contract)
 
 
 def get_items(start: int, count: int, settings: Settings) -> List[MarketplaceDataItem]:
@@ -507,11 +576,21 @@ def get_items(start: int, count: int, settings: Settings) -> List[MarketplaceDat
             settings.contract_address,
         )
         return []
+    contract = _get_contract(settings)
     raw_items = _call_contract_read(
-        _get_contract(settings).functions.getItems(start, count),
+        contract.functions.getItems(start, count),
         "getItems",
     )
-    return [_item_view_to_schema(item) for item in raw_items]
+    token_config_cache: dict[str, int] = {}
+    return [
+        _item_view_to_schema(
+            item,
+            settings=settings,
+            contract=contract,
+            token_config_cache=token_config_cache,
+        )
+        for item in raw_items
+    ]
 
 
 def get_all_items(settings: Settings) -> List[MarketplaceDataItem]:
@@ -531,11 +610,21 @@ def get_all_items(settings: Settings) -> List[MarketplaceDataItem]:
             settings.contract_address,
         )
         return []
+    contract = _get_contract(settings)
     raw_items = _call_contract_read(
-        _get_contract(settings).functions.getAllItems(),
+        contract.functions.getAllItems(),
         "getAllItems",
     )
-    return [_item_view_to_schema(item) for item in raw_items]
+    token_config_cache: dict[str, int] = {}
+    return [
+        _item_view_to_schema(
+            item,
+            settings=settings,
+            contract=contract,
+            token_config_cache=token_config_cache,
+        )
+        for item in raw_items
+    ]
 
 
 def get_purchased_items_by_wallet(
@@ -630,7 +719,7 @@ def get_purchased_items_by_wallet(
         raw = _call_contract_read(
             contract.functions.getItemView(item_id), "getItemView"
         )
-        items.append(_item_view_to_schema(raw))
+        items.append(_item_view_to_schema(raw, settings=settings, contract=contract))
 
     wallet_id_hex = Web3.to_hex(wallet_id(wallet_type_str, address, settings))
     logger.info(
@@ -667,6 +756,7 @@ def create_item(
     title: str,
     description: str,
     seller: str,
+    payment_token: str,
     price: int,
     dataset_url: str,
     dataset_hash: str,
@@ -681,7 +771,8 @@ def create_item(
         title (str): Item title
         description (str): Item description
         seller (str): Seller address
-        price (int): Item price in USDC atomic units
+        payment_token (str): ERC-20 token address used for payment
+        price (int): Item price in settlement token atomic units
         dataset_url (str): Dataset URL
         dataset_hash (str): Dataset hash
         signature_url (str): Signature URL
@@ -705,6 +796,10 @@ def create_item(
     except ValueError as exc:
         _raise_bad_request("Invalid seller EVM address", exc)
     try:
+        payment_token_address = Web3.to_checksum_address(payment_token)
+    except ValueError as exc:
+        _raise_bad_request("Invalid payment token EVM address", exc)
+    try:
         dataset_hash_bytes = Web3.to_bytes(hexstr=dataset_hash)
         signature_hash_bytes = Web3.to_bytes(hexstr=signature_hash)
     except Exception as exc:
@@ -714,6 +809,7 @@ def create_item(
         title,
         description,
         seller_address,
+        payment_token_address,
         price,
         dataset_url,
         dataset_hash_bytes,

@@ -161,7 +161,11 @@ class AIService:
                     title=item.title,
                     description=item.description,
                     seller=item.seller,
+                    payment_token=item.payment_token,
                     price_atomic=int(item.price_atomic),
+                    settlement_currency=item.settlement_currency,
+                    settlement_decimals=int(item.settlement_decimals),
+                    purchase_count=int(item.purchase_count),
                     score=score,
                     score_label=_score_label(score),
                 )
