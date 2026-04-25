@@ -17,6 +17,9 @@ import { normalizeAtomicString } from "@/lib/atomic";
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS as
   | string
   | undefined;
+const PAYMENT_TOKEN_ADDRESS = import.meta.env.VITE_PAYMENT_TOKEN_ADDRESS as
+  | string
+  | undefined;
 const errorInterface = new Interface(marketplaceAbi);
 const DEFAULT_SETTLEMENT_CURRENCY: SettlementCurrency = "USDC";
 const DEFAULT_SETTLEMENT_DECIMALS = 6;
@@ -48,6 +51,28 @@ function getContractAddress(): string {
   }
 }
 
+export function getPaymentTokenAddress(): string {
+  if (!PAYMENT_TOKEN_ADDRESS) {
+    throw new Error("Missing VITE_PAYMENT_TOKEN_ADDRESS");
+  }
+  const normalized = PAYMENT_TOKEN_ADDRESS.trim();
+  if (!normalized) {
+    throw new Error("VITE_PAYMENT_TOKEN_ADDRESS is empty");
+  }
+  try {
+    const address = getAddress(normalized);
+    if (address === ZeroAddress) {
+      throw new Error("VITE_PAYMENT_TOKEN_ADDRESS cannot be zero.");
+    }
+    return address;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("cannot be zero")) {
+      throw error;
+    }
+    throw new Error(`Invalid VITE_PAYMENT_TOKEN_ADDRESS: ${normalized}`);
+  }
+}
+
 export async function getEvmProvider(): Promise<BrowserProvider> {
   const eip1193 = await walletRuntime.getEip1193Provider();
   return new BrowserProvider(
@@ -60,6 +85,7 @@ export async function createItemTx(params: {
   title: string;
   description: string;
   seller: string;
+  paymentToken: string;
   priceAtomic: string;
   datasetUrl: string;
   datasetHash: string;
@@ -73,6 +99,10 @@ export async function createItemTx(params: {
     const signerAddress = await signer.getAddress();
     if (!isSameAddress(signerAddress, params.seller)) {
       throw new Error("Connected wallet does not match seller address.");
+    }
+    const paymentToken = getAddress(params.paymentToken);
+    if (paymentToken === ZeroAddress) {
+      throw new Error("Payment token is not configured.");
     }
     const contractAddress = getContractAddress();
     const code = await provider.getCode(contractAddress);
@@ -99,6 +129,7 @@ export async function createItemTx(params: {
       chainId: network.chainId?.toString?.() ?? String(network.chainId),
       contract: contractAddress,
       seller: signerAddress,
+      paymentToken,
       itemId,
       priceAtomic: params.priceAtomic,
       datasetUrl: params.datasetUrl,
@@ -110,6 +141,7 @@ export async function createItemTx(params: {
         params.title,
         params.description,
         params.seller,
+        paymentToken,
         params.priceAtomic,
         params.datasetUrl,
         params.datasetHash,
@@ -125,6 +157,7 @@ export async function createItemTx(params: {
       params.title,
       params.description,
       params.seller,
+      paymentToken,
       params.priceAtomic,
       params.datasetUrl,
       params.datasetHash,
@@ -150,6 +183,7 @@ export async function getFeeBps(): Promise<bigint> {
 export async function buyItemTx(
   listingIdBytes32: string,
   priceAtomic: bigint,
+  paymentTokenAddress: string,
 ): Promise<string> {
   try {
     const provider = await getEvmProvider();
@@ -159,12 +193,12 @@ export async function buyItemTx(
     const feeBps = await contract.feeBps();
     const fee = (priceAtomic * BigInt(feeBps)) / 10_000n;
     const total = priceAtomic + fee;
-    const settlementTokenAddress = getAddress(await contract.settlementToken());
-    if (settlementTokenAddress === ZeroAddress) {
-      throw new Error("Marketplace settlement token is not configured.");
+    const paymentToken = getAddress(paymentTokenAddress);
+    if (paymentToken === ZeroAddress) {
+      throw new Error("Marketplace payment token is not configured.");
     }
 
-    const token = new Contract(settlementTokenAddress, erc20Abi, signer);
+    const token = new Contract(paymentToken, erc20Abi, signer);
     const buyerAddress = await signer.getAddress();
     const balance = (await token.balanceOf(buyerAddress)) as bigint;
     if (balance < total) {
@@ -177,7 +211,7 @@ export async function buyItemTx(
 
     console.info("[buyItemTx] submit", {
       contract: contractAddress,
-      settlementToken: settlementTokenAddress,
+      paymentToken,
       buyer: buyerAddress,
       listingIdBytes32,
       priceAtomic: priceAtomic.toString(),

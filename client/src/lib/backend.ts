@@ -25,8 +25,10 @@ import { uuidToBytes32 } from "@/lib/ids";
 
 type MarketplaceApiItem = Omit<
   MarketplaceDataItem,
-  "price_atomic" | "settlement_currency" | "settlement_decimals"
+  "payment_token" | "price_atomic" | "settlement_currency" | "settlement_decimals"
 > & {
+  payment_token?: unknown;
+  paymentToken?: unknown;
   price?: unknown;
   price_atomic?: unknown;
   settlement_currency?: unknown;
@@ -39,6 +41,10 @@ function normalizeMarketplaceItem(
   const priceAtomic = item.price_atomic ?? item.price;
   if (priceAtomic === undefined || priceAtomic === null) {
     throw new Error("Missing marketplace price from API.");
+  }
+  const rawPaymentToken = item.payment_token ?? item.paymentToken;
+  if (typeof rawPaymentToken !== "string" || !rawPaymentToken.trim()) {
+    throw new Error("Missing marketplace payment token from API.");
   }
 
   const rawSettlementCurrency = item.settlement_currency;
@@ -69,12 +75,15 @@ function normalizeMarketplaceItem(
 
   const rest = { ...item };
   delete rest.price;
+  delete rest.paymentToken;
+  delete rest.payment_token;
   delete rest.price_atomic;
   delete rest.settlement_currency;
   delete rest.settlement_decimals;
 
   return {
     ...rest,
+    payment_token: rawPaymentToken.trim(),
     price_atomic: normalizeAtomicString(priceAtomic),
     settlement_currency: "USDC",
     settlement_decimals: 6,
@@ -138,9 +147,11 @@ export const backend = {
           id: uuidToBytes32(r.listing_id),
           title: r.title,
           description: r.description,
+          payment_token: r.payment_token,
           price_atomic: String(r.price_atomic),
-          settlement_currency: "USDC",
-          settlement_decimals: 6,
+          settlement_currency: r.settlement_currency,
+          settlement_decimals: r.settlement_decimals,
+          purchase_count: r.purchase_count,
         },
         score: r.score,
         scoreLabel: r.score_label,

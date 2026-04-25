@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { toast } from "sonner";
 import { backend } from "@/lib/backend";
-import { createItemTx } from "@/lib/marketplace";
+import { createItemTx, getPaymentTokenAddress } from "@/lib/marketplace";
 import { uuidToBytes32 } from "@/lib/ids";
 import { fireConfettiBurst } from "@/lib/confetti";
 import type { DisplayCurrency } from "@/lib/fx";
@@ -440,6 +440,7 @@ export const useUploadStore = create<UploadStore>()(
             description:
               state.persistedSession?.description ?? state.description,
             seller: address,
+            paymentToken: getPaymentTokenAddress(),
             priceAtomic: effectivePriceAtomic,
             datasetUrl: currentDatasetUrl,
             datasetHash: currentDatasetHash,

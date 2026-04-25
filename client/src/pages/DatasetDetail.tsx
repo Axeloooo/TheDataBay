@@ -329,7 +329,7 @@ function DatasetDetail() {
                 setIsBuying(true);
                 try {
                   const priceAtomic = BigInt(pricing.priceAtomic);
-                  await buyItemTx(id, priceAtomic);
+                  await buyItemTx(id, priceAtomic, dataset.payment_token);
                   setIsPurchased(true);
                   toast.success("Purchase successful", {
                     description: "Access granted for this dataset.",
