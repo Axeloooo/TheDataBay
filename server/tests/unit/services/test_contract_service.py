@@ -4,6 +4,7 @@ from types import SimpleNamespace
 import pytest
 from hexbytes import HexBytes
 from web3 import Web3
+from web3.datastructures import AttributeDict
 
 from app.services import contract_service
 
@@ -116,6 +117,207 @@ def test_call_contract_read_translates_unknown_custom_error_selector():
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Contract reverted (0xdeadbeef). operation=feeBps"
+
+
+def test_item_view_to_schema_includes_payment_token():
+    item_id = bytes.fromhex("01" * 32)
+    payment_token = "0x0000000000000000000000000000000000000002"
+
+    item = contract_service._item_view_to_schema(
+        (
+            item_id,
+            "Dataset",
+            "desc",
+            "0x0000000000000000000000000000000000000001",
+            100,
+            "ipfs://dataset",
+            bytes.fromhex("11" * 32),
+            "ipfs://signature",
+            bytes.fromhex("22" * 32),
+            True,
+            0,
+            payment_token,
+        )
+    )
+
+    assert item.payment_token == payment_token
+    assert item.price_atomic == "100"
+
+
+def test_item_view_to_schema_decodes_web3_attribute_dict():
+    item_id = bytes.fromhex("02" * 32)
+    payment_token = "0x0000000000000000000000000000000000000002"
+
+    item = contract_service._item_view_to_schema(
+        AttributeDict(
+            {
+                "itemId": item_id,
+                "title": "Dataset",
+                "description": "desc",
+                "seller": "0x0000000000000000000000000000000000000001",
+                "price": 100,
+                "datasetUrl": "ipfs://dataset",
+                "datasetHash": bytes.fromhex("11" * 32),
+                "signatureUrl": "ipfs://signature",
+                "signatureHash": bytes.fromhex("22" * 32),
+                "exists": True,
+                "purchaseCount": 0,
+                "paymentToken": payment_token,
+            }
+        )
+    )
+
+    assert item.id == Web3.to_hex(item_id)
+    assert item.payment_token == payment_token
+    assert item.price_atomic == "100"
+
+
+def test_item_view_to_schema_uses_token_config_metadata(settings):
+    item_id = bytes.fromhex("03" * 32)
+    payment_token = Web3.to_checksum_address(
+        "0x0000000000000000000000000000000000000003"
+    )
+    configured_settings = settings.model_copy(
+        update={
+            "payment_token_address": "0x0000000000000000000000000000000000000002"
+        }
+    )
+
+    class FakeCall:
+        def call(self):
+            return (True, 18, 10**24)
+
+    class FakeFunctions:
+        def acceptedTokens(self, token):
+            assert token == payment_token
+            return FakeCall()
+
+    item = contract_service._item_view_to_schema(
+        AttributeDict(
+            {
+                "itemId": item_id,
+                "title": "Dataset",
+                "description": "desc",
+                "seller": "0x0000000000000000000000000000000000000001",
+                "price": 100,
+                "datasetUrl": "ipfs://dataset",
+                "datasetHash": bytes.fromhex("11" * 32),
+                "signatureUrl": "ipfs://signature",
+                "signatureHash": bytes.fromhex("22" * 32),
+                "exists": True,
+                "purchaseCount": 0,
+                "paymentToken": payment_token,
+            }
+        ),
+        settings=configured_settings,
+        contract=SimpleNamespace(functions=FakeFunctions()),
+        token_config_cache={},
+    )
+
+    assert item.settlement_currency == payment_token
+    assert item.settlement_decimals == 18
+
+
+def test_item_view_to_schema_without_configured_payment_token_returns_token_address(settings):
+    item_id = bytes.fromhex("04" * 32)
+    payment_token = Web3.to_checksum_address(
+        "0x0000000000000000000000000000000000000004"
+    )
+    unconfigured_settings = settings.model_copy(update={"payment_token_address": ""})
+
+    item = contract_service._item_view_to_schema(
+        AttributeDict(
+            {
+                "itemId": item_id,
+                "title": "Dataset",
+                "description": "desc",
+                "seller": "0x0000000000000000000000000000000000000001",
+                "price": 100,
+                "datasetUrl": "ipfs://dataset",
+                "datasetHash": bytes.fromhex("11" * 32),
+                "signatureUrl": "ipfs://signature",
+                "signatureHash": bytes.fromhex("22" * 32),
+                "exists": True,
+                "purchaseCount": 0,
+                "paymentToken": payment_token,
+            }
+        ),
+        settings=unconfigured_settings,
+    )
+
+    assert item.settlement_currency == payment_token
+    assert item.settlement_decimals == 6
+
+
+def test_max_price_reads_first_accepted_token_config(monkeypatch, settings):
+    captured = {}
+
+    class FakeCall:
+        def __init__(self, result):
+            self._result = result
+
+        def call(self):
+            return self._result
+
+    class FakeFunctions:
+        def acceptedTokenAt(self, index):
+            captured["accepted_token_at"] = index
+            return FakeCall("0x0000000000000000000000000000000000000002")
+
+        def acceptedTokens(self, token):
+            captured["accepted_tokens"] = token
+            return FakeCall((True, 6, 123456))
+
+    monkeypatch.setattr(
+        contract_service,
+        "_get_contract",
+        lambda _settings: SimpleNamespace(functions=FakeFunctions()),
+    )
+
+    unconfigured_settings = settings.model_copy(update={"payment_token_address": ""})
+
+    assert contract_service.max_price(unconfigured_settings) == 123456
+    assert captured == {
+        "accepted_token_at": 0,
+        "accepted_tokens": "0x0000000000000000000000000000000000000002",
+    }
+
+
+def test_max_price_prefers_configured_payment_token(monkeypatch, settings):
+    configured_settings = settings.model_copy(
+        update={
+            "payment_token_address": "0x0000000000000000000000000000000000000002"
+        }
+    )
+    captured = {}
+
+    class FakeCall:
+        def __init__(self, result):
+            self._result = result
+
+        def call(self):
+            return self._result
+
+    class FakeFunctions:
+        def acceptedTokenAt(self, index):
+            raise AssertionError("configured payment token should be used")
+
+        def acceptedTokens(self, token):
+            captured["accepted_tokens"] = token
+            return FakeCall((True, 6, 987654))
+
+    monkeypatch.setattr(
+        contract_service,
+        "_get_contract",
+        lambda _settings: SimpleNamespace(functions=FakeFunctions()),
+    )
+
+    assert contract_service.max_price(configured_settings) == 987654
+    assert captured == {
+        "accepted_tokens": Web3.to_checksum_address(
+            "0x0000000000000000000000000000000000000002"
+        )
+    }
 
 
 def test_get_purchased_items_by_wallet_non_evm_rejected(settings):
@@ -482,6 +684,7 @@ def test_create_item_rejects_invalid_hash_format(monkeypatch, settings):
             title="Dataset",
             description="desc",
             seller="0x0000000000000000000000000000000000000001",
+            payment_token="0x0000000000000000000000000000000000000002",
             price=100,
             dataset_url="ipfs://dataset",
             dataset_hash="not-a-hash",
@@ -492,6 +695,103 @@ def test_create_item_rejects_invalid_hash_format(monkeypatch, settings):
 
     assert exc_info.value.status_code == 400
     assert exc_info.value.detail == "Invalid dataset/signature hash format"
+
+
+def test_create_item_normalizes_payment_token_and_sends_tx(monkeypatch, settings):
+    captured = {}
+    tx_object = object()
+
+    class FakeFunctions:
+        def createItem(
+            self,
+            item_id,
+            title,
+            description,
+            seller,
+            payment_token,
+            price,
+            dataset_url,
+            dataset_hash,
+            signature_url,
+            signature_hash,
+        ):
+            captured["create_item_args"] = (
+                item_id,
+                title,
+                description,
+                seller,
+                payment_token,
+                price,
+                dataset_url,
+                dataset_hash,
+                signature_url,
+                signature_hash,
+            )
+            return tx_object
+
+    monkeypatch.setattr(
+        contract_service,
+        "_get_contract",
+        lambda _settings: SimpleNamespace(functions=FakeFunctions()),
+    )
+
+    def fake_send_tx(function, resolved_settings):
+        captured["send_tx_args"] = (function, resolved_settings)
+        return "0x" + "ee" * 32
+
+    monkeypatch.setattr(contract_service, "_send_tx", fake_send_tx)
+
+    tx_hash = contract_service.create_item(
+        listing_id=LISTING_ID,
+        title="Dataset",
+        description="desc",
+        seller="0x0000000000000000000000000000000000000001",
+        payment_token="0x0000000000000000000000000000000000000002",
+        price=100,
+        dataset_url="ipfs://dataset",
+        dataset_hash="0x" + "11" * 32,
+        signature_url="ipfs://signature",
+        signature_hash="0x" + "22" * 32,
+        settings=settings,
+    )
+
+    assert tx_hash == "0x" + "ee" * 32
+    args = captured["create_item_args"]
+    assert args[0] == contract_service.uuid_to_bytes32(LISTING_ID)
+    assert args[3] == Web3.to_checksum_address(
+        "0x0000000000000000000000000000000000000001"
+    )
+    assert args[4] == Web3.to_checksum_address(
+        "0x0000000000000000000000000000000000000002"
+    )
+    assert args[5] == 100
+    assert captured["send_tx_args"] == (tx_object, settings)
+
+
+def test_create_item_rejects_invalid_payment_token(monkeypatch, settings):
+    monkeypatch.setattr(
+        contract_service,
+        "_get_contract",
+        lambda _settings: SimpleNamespace(functions=SimpleNamespace()),
+    )
+
+    with pytest.raises(contract_service.HTTPException) as exc_info:
+        contract_service.create_item(
+            listing_id=LISTING_ID,
+            title="Dataset",
+            description="desc",
+            seller="0x0000000000000000000000000000000000000001",
+            payment_token="not-an-address",
+            price=100,
+            dataset_url="ipfs://dataset",
+            dataset_hash="0x" + "11" * 32,
+            signature_url="ipfs://signature",
+            signature_hash="0x" + "22" * 32,
+            settings=settings,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail == "Invalid payment token EVM address"
 
 
 def test_update_signature_rejects_invalid_hash_format(monkeypatch, settings):
