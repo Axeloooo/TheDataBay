@@ -59,6 +59,7 @@ jest.mock('expo-constants', () => ({
       extra: {
         apiUrl: 'http://localhost:8080',
         pinataGatewayUrl: 'https://gateway.pinata.cloud',
+        paymentTokenAddress: '0x0000000000000000000000000000000000000001',
       },
     },
   },

@@ -11,6 +11,7 @@ export const ENV = {
     readExtra("pinataGatewayUrl") || "https://gateway.pinata.cloud",
   WALLETCONNECT_PROJECT_ID: readExtra("walletConnectProjectId"),
   CONTRACT_ADDRESS: readExtra("contractAddress"),
+  PAYMENT_TOKEN_ADDRESS: readExtra("paymentTokenAddress"),
   CHAIN_ID: Number.parseInt(readExtra("chainId") || "31337", 10),
   RPC_URL: readExtra("rpcUrl") || "http://127.0.0.1:8545",
   EXPLORER_URL: readExtra("explorerUrl"),
@@ -24,6 +25,9 @@ export function getMissingWalletConfig(): string[] {
   }
   if (!ENV.CONTRACT_ADDRESS) {
     missing.push("contractAddress");
+  }
+  if (!ENV.PAYMENT_TOKEN_ADDRESS) {
+    missing.push("paymentTokenAddress");
   }
   if (!Number.isFinite(ENV.CHAIN_ID) || ENV.CHAIN_ID <= 0) {
     missing.push("chainId");
