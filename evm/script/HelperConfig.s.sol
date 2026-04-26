@@ -9,9 +9,12 @@ contract HelperConfig is Script {
      */
     struct NetworkConfig {
         uint256 deployKey;
-        address paymentToken;
-        uint8 tokenDecimals;
-        uint256 tokenMaxPrice;
+        address usdcToken;
+        uint8 usdcDecimals;
+        uint256 usdcMaxPrice;
+        address cadcToken;
+        uint8 cadcDecimals;
+        uint256 cadcMaxPrice;
         address feeRecipient;
         uint256 feeBps;
     }
@@ -23,6 +26,8 @@ contract HelperConfig is Script {
     uint256 public constant DEFAULT_FEE_BPS = 0;
     uint8 public constant DEFAULT_USDC_DECIMALS = 6;
     uint256 public constant DEFAULT_USDC_MAX_PRICE = 1_000_000 * 10 ** 6;
+    uint8 public constant DEFAULT_CADC_DECIMALS = 18;
+    uint256 public constant DEFAULT_CADC_MAX_PRICE = 1_000_000 * 10 ** 18;
 
     /**
      * @notice Active network configuration
@@ -50,19 +55,24 @@ contract HelperConfig is Script {
         uint256 pk = vm.envUint("SEPOLIA_PRIVATE_KEY");
         address deployer = vm.addr(pk);
 
-        address paymentToken = vm.envAddress("SEPOLIA_USDC_ADDRESS");
-        uint8 tokenDecimals = uint8(vm.envOr("SEPOLIA_USDC_DECIMALS", uint256(DEFAULT_USDC_DECIMALS)));
-        uint256 tokenMaxPrice = vm.envOr("SEPOLIA_USDC_MAX_PRICE", DEFAULT_USDC_MAX_PRICE);
-        address feeR = vm.envOr("SEPOLIA_FEE_RECIPIENT", deployer);
-        uint256 feeBps = vm.envOr("SEPOLIA_FEE_BPS", uint256(250));
         return NetworkConfig({
             deployKey: pk,
-            paymentToken: paymentToken,
-            tokenDecimals: tokenDecimals,
-            tokenMaxPrice: tokenMaxPrice,
-            feeRecipient: feeR,
-            feeBps: feeBps
+            usdcToken: vm.envOr("SEPOLIA_USDC_ADDRESS", address(0)),
+            usdcDecimals: uint8(vm.envOr("SEPOLIA_USDC_DECIMALS", uint256(DEFAULT_USDC_DECIMALS))),
+            usdcMaxPrice: vm.envOr("SEPOLIA_USDC_MAX_PRICE", DEFAULT_USDC_MAX_PRICE),
+            cadcToken: vm.envOr("SEPOLIA_CADC_ADDRESS", address(0)),
+            cadcDecimals: uint8(vm.envOr("SEPOLIA_CADC_DECIMALS", uint256(DEFAULT_CADC_DECIMALS))),
+            cadcMaxPrice: vm.envOr("SEPOLIA_CADC_MAX_PRICE", DEFAULT_CADC_MAX_PRICE),
+            feeRecipient: vm.envOr("SEPOLIA_FEE_RECIPIENT", deployer),
+            feeBps: vm.envOr("SEPOLIA_FEE_BPS", uint256(250))
         });
+    }
+
+    /**
+     * @dev Returns the active network configuration as a struct for scripts and tests.
+     */
+    function getActiveNetworkConfig() public view returns (NetworkConfig memory) {
+        return activeNetworkConfig;
     }
 
     /**
@@ -77,9 +87,12 @@ contract HelperConfig is Script {
 
         return NetworkConfig({
             deployKey: DEFAULT_ANVIL_KEY,
-            paymentToken: address(0),
-            tokenDecimals: DEFAULT_USDC_DECIMALS,
-            tokenMaxPrice: DEFAULT_USDC_MAX_PRICE,
+            usdcToken: address(0),
+            usdcDecimals: DEFAULT_USDC_DECIMALS,
+            usdcMaxPrice: DEFAULT_USDC_MAX_PRICE,
+            cadcToken: address(0),
+            cadcDecimals: DEFAULT_CADC_DECIMALS,
+            cadcMaxPrice: DEFAULT_CADC_MAX_PRICE,
             feeRecipient: defaultFeeRecipient,
             feeBps: DEFAULT_FEE_BPS
         });

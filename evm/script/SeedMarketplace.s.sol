@@ -31,7 +31,7 @@ contract SeedMarketplace is Script {
 
     function _seed(address marketplaceAddress) internal {
         HelperConfig config = new HelperConfig();
-        (uint256 deployKey,,,,,) = config.activeNetworkConfig();
+        (uint256 deployKey,,,,,,,,) = config.activeNetworkConfig();
         address seller = vm.addr(deployKey);
 
         Marketplace marketplace = Marketplace(marketplaceAddress);
