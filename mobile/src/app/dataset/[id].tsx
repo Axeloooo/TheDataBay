@@ -181,10 +181,6 @@ export default function DatasetDetailScreen() {
     beginMutation("buy");
 
     try {
-      if (dataset.settlement_currency !== "USDC" || dataset.settlement_decimals !== 6) {
-        throw new Error("Unsupported settlement metadata from API.");
-      }
-
       const txHash = await buyItemTx(
         dataset.id,
         dataset.price_atomic,

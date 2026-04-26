@@ -21,6 +21,9 @@ const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS as
 const PAYMENT_TOKEN_ADDRESS = import.meta.env.VITE_PAYMENT_TOKEN_ADDRESS as
   | string
   | undefined;
+const CADC_TOKEN_ADDRESS = import.meta.env.VITE_CADC_TOKEN_ADDRESS as
+  | string
+  | undefined;
 const errorInterface = new Interface(marketplaceAbi);
 const DEFAULT_SETTLEMENT_CURRENCY: SettlementCurrency = "USDC";
 const DEFAULT_SETTLEMENT_DECIMALS = 6;
@@ -75,6 +78,39 @@ export function getPaymentTokenAddress(): string {
       throw error;
     }
     throw new Error(`Invalid VITE_PAYMENT_TOKEN_ADDRESS: ${normalized}`);
+  }
+}
+
+export function getCadcTokenAddress(): string {
+  if (!CADC_TOKEN_ADDRESS) {
+    throw new Error("Missing VITE_CADC_TOKEN_ADDRESS");
+  }
+  const normalized = CADC_TOKEN_ADDRESS.trim();
+  if (!normalized) {
+    throw new Error("VITE_CADC_TOKEN_ADDRESS is empty");
+  }
+  try {
+    const address = getAddress(normalized);
+    if (address === ZeroAddress) {
+      throw new Error("VITE_CADC_TOKEN_ADDRESS cannot be zero.");
+    }
+    return address;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("cannot be zero")) {
+      throw error;
+    }
+    throw new Error(`Invalid VITE_CADC_TOKEN_ADDRESS: ${normalized}`);
+  }
+}
+
+export function getPaymentTokenAddressForCurrency(
+  currency: SettlementCurrency,
+): string {
+  switch (currency) {
+    case "USDC":
+      return getPaymentTokenAddress();
+    case "CADC":
+      return getCadcTokenAddress();
   }
 }
 

@@ -1,6 +1,7 @@
 import { apiRequest } from "@/src/lib/api";
 import type {
   MarketplaceDataItem,
+  MarketplaceSettlementCurrency,
   AccessCheckResponse,
   WalletAccessRequest,
   PurchasedItemsRequest,
@@ -67,15 +68,21 @@ function normalizeMarketplaceItem(
     throw new Error("Missing marketplace payment token from API.");
   }
 
-  const settlementCurrency = String(item.settlement_currency ?? "USDC");
-  if (settlementCurrency !== "USDC") {
-    throw new Error("Unsupported marketplace settlement currency from API.");
-  }
+  const SUPPORTED_CURRENCIES: MarketplaceSettlementCurrency[] = ["USDC", "CADC"];
+  const rawCurrency = String(item.settlement_currency ?? "USDC").trim().toUpperCase();
+  const settlementCurrency = SUPPORTED_CURRENCIES.includes(
+    rawCurrency as MarketplaceSettlementCurrency,
+  )
+    ? (rawCurrency as MarketplaceSettlementCurrency)
+    : "USDC";
 
-  const settlementDecimals = Number(item.settlement_decimals ?? 6);
-  if (settlementDecimals !== 6) {
-    throw new Error("Unsupported marketplace settlement decimals from API.");
-  }
+  const EXPECTED_DECIMALS: Record<MarketplaceSettlementCurrency, number> = {
+    USDC: 6,
+    CADC: 18,
+  };
+  const settlementDecimals = Number(
+    item.settlement_decimals ?? EXPECTED_DECIMALS[settlementCurrency],
+  );
 
   const {
     price: _legacyPrice,
@@ -91,8 +98,8 @@ function normalizeMarketplaceItem(
     ...rest,
     payment_token: rawPaymentToken.trim(),
     price_atomic: normalizeAtomicString(priceAtomic),
-    settlement_currency: "USDC",
-    settlement_decimals: 6,
+    settlement_currency: settlementCurrency,
+    settlement_decimals: settlementDecimals,
   };
 }
 

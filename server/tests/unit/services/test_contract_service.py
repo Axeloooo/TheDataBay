@@ -214,11 +214,11 @@ def test_item_view_to_schema_uses_token_config_metadata(settings):
         token_config_cache={},
     )
 
-    assert item.settlement_currency == payment_token
+    assert item.settlement_currency == "USDC"
     assert item.settlement_decimals == 18
 
 
-def test_item_view_to_schema_without_configured_payment_token_returns_token_address(settings):
+def test_item_view_to_schema_without_configured_payment_token_returns_usdc_fallback(settings):
     item_id = bytes.fromhex("04" * 32)
     payment_token = Web3.to_checksum_address(
         "0x0000000000000000000000000000000000000004"
@@ -245,7 +245,7 @@ def test_item_view_to_schema_without_configured_payment_token_returns_token_addr
         settings=unconfigured_settings,
     )
 
-    assert item.settlement_currency == payment_token
+    assert item.settlement_currency == "USDC"
     assert item.settlement_decimals == 6
 
 
@@ -268,12 +268,12 @@ def test_settlement_currency_for_token_resolves_usdc_address(settings):
     assert result == "USDC"
 
 
-def test_settlement_currency_for_token_returns_raw_address_for_unknown_token(settings):
+def test_settlement_currency_for_token_returns_usdc_for_unknown_token(settings):
     unknown_address = Web3.to_checksum_address("0x0000000000000000000000000000000000000077")
 
     result = contract_service._settlement_currency_for_token(unknown_address, settings)
 
-    assert result == unknown_address
+    assert result == "USDC"
 
 
 def test_max_price_reads_first_accepted_token_config(monkeypatch, settings):

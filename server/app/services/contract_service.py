@@ -273,9 +273,9 @@ def _settlement_currency_for_token(payment_token: str, settings: Settings | None
         return "USDC"
     try:
         token = Web3.to_checksum_address(payment_token)
-    except ValueError:
-        return str(payment_token)
-    return _token_symbol_table(settings).get(token, token)
+    except (ValueError, TypeError):
+        return "USDC"
+    return _token_symbol_table(settings).get(token, "USDC")
 
 
 def _settlement_decimals_for_token(
@@ -287,7 +287,7 @@ def _settlement_decimals_for_token(
         return TOKEN_DECIMALS["USDC"]
     try:
         token = Web3.to_checksum_address(payment_token)
-    except ValueError:
+    except (ValueError, TypeError):
         return TOKEN_DECIMALS["USDC"]
     if token == "0x0000000000000000000000000000000000000000":
         return TOKEN_DECIMALS["USDC"]
@@ -313,7 +313,7 @@ def _item_view_to_schema(
         title = raw.get("title")
         description = raw.get("description")
         seller = raw.get("seller")
-        payment_token = raw.get("paymentToken") or raw.get("payment_token")
+        payment_token = raw.get("paymentToken") or raw.get("payment_token") or "0x0000000000000000000000000000000000000000"
         price = raw.get("price")
         dataset_url = raw.get("datasetUrl") or raw.get("dataset_url")
         dataset_hash = raw.get("datasetHash") or raw.get("dataset_hash")
