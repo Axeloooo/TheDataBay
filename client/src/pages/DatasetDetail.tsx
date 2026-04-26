@@ -207,6 +207,10 @@ function DatasetDetail() {
     () => (dataset ? normalizeMarketplacePrice(dataset) : null),
     [dataset],
   );
+  const settlementLogo =
+    pricing?.settlementCurrency === "CADC"
+      ? "/cadc-logo.svg"
+      : "/usdc-logo.svg";
   const canBuy = dataset ? !isSameAddress(dataset.seller, address) : false;
   const quoteEquivalent =
     pricing && quoteCurrency !== pricing.settlementCurrency
@@ -214,6 +218,7 @@ function DatasetDetail() {
           Number(pricing.settlementAmount),
           quoteCurrency,
           rates,
+          pricing.settlementCurrency,
         )
       : null;
 
@@ -299,7 +304,7 @@ function DatasetDetail() {
               buttonClassName="h-8"
             />
             <p className="mt-2 max-w-xs">
-              Quotes only. Settlement stays in USDC at{" "}
+              Quotes only. Settlement uses the listing's token at{" "}
               {pricing?.settlementDecimals ?? 6} decimals.
             </p>
           </div>
@@ -353,13 +358,13 @@ function DatasetDetail() {
               ) : (
                 <>
                   <img
-                    src="/usdc-logo.svg"
+                    src={settlementLogo}
                     alt=""
                     aria-hidden="true"
                     className="h-4 w-4 rounded-full object-contain"
                   />
                   <ShoppingCart className="h-4 w-4" />
-                  Buy with USDC ({pricing?.settlementAmount ?? "0"} USDC
+                  Buy with {pricing?.settlementCurrency ?? "USDC"} ({pricing?.settlementAmount ?? "0"} {pricing?.settlementCurrency ?? "USDC"}
                   {quoteEquivalent !== null
                     ? ` • ~${formatCurrencyAmount(quoteEquivalent, quoteCurrency)}`
                     : ""}

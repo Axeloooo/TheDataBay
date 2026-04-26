@@ -10,8 +10,8 @@ function Layout({ children }: LayoutProps) {
     "BridgeMart is in active beta — features and APIs are evolving. Check back often.",
     "Every dataset is AES-encrypted before it reaches IPFS. The decryption key only releases after on-chain purchase.",
     "Tip: confirm your MetaMask network and contract address match before signing any transaction.",
-    "USDC settlement is live. Solana and additional chains are on the roadmap.",
-    "Prices display in your preferred quote currency — settlement remains USDC on-chain.",
+    "On-chain settlement is live. Solana and additional chains are on the roadmap.",
+    "Prices display in your preferred quote currency — settlement uses each listing's configured token.",
   ];
 
   return (

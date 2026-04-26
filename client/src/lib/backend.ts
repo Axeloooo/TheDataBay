@@ -22,6 +22,8 @@ import type {
 } from "@/types/agent";
 import { normalizeAtomicString } from "@/lib/atomic";
 import { uuidToBytes32 } from "@/lib/ids";
+import { SETTLEMENT_TOKENS } from "@/types/contract";
+import type { SettlementCurrency } from "@/types/contract";
 
 type MarketplaceApiItem = Omit<
   MarketplaceDataItem,
@@ -48,29 +50,40 @@ function normalizeMarketplaceItem(
   }
 
   const rawSettlementCurrency = item.settlement_currency;
-  const settlementCurrency =
+  const normalizedCurrencyStr =
     rawSettlementCurrency == null
       ? "USDC"
       : String(rawSettlementCurrency).trim().toUpperCase();
-  if (settlementCurrency !== "USDC") {
-    throw new Error("Unsupported marketplace settlement currency from API.");
+
+  const isValidCurrency = (s: string): s is SettlementCurrency =>
+    s in SETTLEMENT_TOKENS;
+
+  if (!isValidCurrency(normalizedCurrencyStr)) {
+    throw new Error(
+      `Unsupported marketplace settlement currency from API: ${normalizedCurrencyStr}`,
+    );
   }
+  const settlementCurrency: SettlementCurrency = normalizedCurrencyStr;
+
   if (
     rawSettlementCurrency != null &&
-    String(rawSettlementCurrency) !== "USDC" &&
-    settlementCurrency === "USDC"
+    String(rawSettlementCurrency) !== settlementCurrency
   ) {
-    // Soft warning: backend returned USDC in a non-canonical format (e.g., wrong case/whitespace).
-    // This keeps the UI resilient while still surfacing potential backend drift.
+    // Soft warning: backend returned currency in a non-canonical format (e.g., wrong case/whitespace).
     console.warn(
-      "Non-canonical marketplace settlement currency from API; normalized to USDC:",
+      "Non-canonical marketplace settlement currency from API; normalized to",
+      settlementCurrency,
+      "from:",
       rawSettlementCurrency,
     );
   }
 
-  const settlementDecimals = Number(item.settlement_decimals ?? 6);
-  if (settlementDecimals !== 6) {
-    throw new Error("Unsupported marketplace settlement decimals from API.");
+  const expectedDecimals = SETTLEMENT_TOKENS[settlementCurrency].decimals;
+  const settlementDecimals = Number(item.settlement_decimals ?? expectedDecimals);
+  if (settlementDecimals !== expectedDecimals) {
+    console.warn(
+      `Unexpected settlement decimals from API for ${settlementCurrency}: expected ${expectedDecimals}, got ${settlementDecimals}`,
+    );
   }
 
   const rest = { ...item };
@@ -85,8 +98,8 @@ function normalizeMarketplaceItem(
     ...rest,
     payment_token: rawPaymentToken.trim(),
     price_atomic: normalizeAtomicString(priceAtomic),
-    settlement_currency: "USDC",
-    settlement_decimals: 6,
+    settlement_currency: settlementCurrency,
+    settlement_decimals: settlementDecimals,
   };
 }
 

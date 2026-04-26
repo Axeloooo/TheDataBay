@@ -36,12 +36,15 @@ function RecordCard({ dataset, score, scoreLabel }: RecordCardProps) {
   );
   const rates = useCurrencyStore((state) => state.rates);
   const pricing = normalizeMarketplacePrice(dataset);
+  const logoSrc =
+    pricing.settlementCurrency === "CADC" ? "/cadc-logo.svg" : "/usdc-logo.svg";
   const equivalent =
     preferredCurrency !== pricing.settlementCurrency
       ? convertSettlementToCurrency(
           Number(pricing.settlementAmount),
           preferredCurrency,
           rates,
+          pricing.settlementCurrency,
         )
       : null;
 
@@ -94,7 +97,7 @@ function RecordCard({ dataset, score, scoreLabel }: RecordCardProps) {
           >
             <span className="inline-flex items-center gap-1">
               <img
-                src="/usdc-logo.svg"
+                src={logoSrc}
                 alt=""
                 aria-hidden="true"
                 className="h-3.5 w-3.5 rounded-full object-contain"

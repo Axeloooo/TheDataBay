@@ -1,3 +1,5 @@
+import type { SettlementCurrency } from "@/types/contract";
+
 export type ScoreLabel = "high" | "moderate" | "low";
 
 export type SimilaritySearchRequest = {
@@ -13,7 +15,7 @@ export type RankedDataset = {
   seller: string;
   payment_token: string;
   price_atomic: number;
-  settlement_currency: string;
+  settlement_currency: SettlementCurrency;
   settlement_decimals: number;
   purchase_count: number;
   score: number;
@@ -34,7 +36,7 @@ export type CardDataset = {
   payment_token?: string;
   price_atomic?: string;
   price?: string | number | bigint;
-  settlement_currency?: string;
+  settlement_currency?: SettlementCurrency;
   settlement_decimals?: number;
   purchase_count?: number;
 };

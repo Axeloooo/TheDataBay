@@ -12,6 +12,7 @@ import { walletRuntime } from "@/lib/wallet/runtime";
 import { marketplaceAbi } from "@/lib/marketplaceAbi";
 import { uuidToBytes32 } from "@/lib/ids";
 import type { MarketplaceDataItem, SettlementCurrency } from "@/types/contract";
+import { SETTLEMENT_TOKENS } from "@/types/contract";
 import { normalizeAtomicString } from "@/lib/atomic";
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS as
@@ -23,6 +24,10 @@ const PAYMENT_TOKEN_ADDRESS = import.meta.env.VITE_PAYMENT_TOKEN_ADDRESS as
 const errorInterface = new Interface(marketplaceAbi);
 const DEFAULT_SETTLEMENT_CURRENCY: SettlementCurrency = "USDC";
 const DEFAULT_SETTLEMENT_DECIMALS = 6;
+
+function settlementDecimalsForCurrency(currency: SettlementCurrency): number {
+  return SETTLEMENT_TOKENS[currency].decimals;
+}
 const erc20Abi = [
   "function balanceOf(address owner) view returns (uint256)",
   "function allowance(address owner,address spender) view returns (uint256)",
@@ -202,7 +207,7 @@ export async function buyItemTx(
     const buyerAddress = await signer.getAddress();
     const balance = (await token.balanceOf(buyerAddress)) as bigint;
     if (balance < total) {
-      throw new Error("Insufficient USDC balance for this purchase.");
+      throw new Error("Insufficient token balance for this purchase.");
     }
     const allowance = (await token.allowance(
       buyerAddress,
@@ -304,26 +309,29 @@ export function normalizeMarketplacePrice(
   const priceAtomic = normalizeAtomicString(
     item.price_atomic ?? item.price ?? 0,
   );
+  const settlementCurrency: SettlementCurrency =
+    item.settlement_currency === "USDC" || item.settlement_currency === "CADC"
+      ? item.settlement_currency
+      : DEFAULT_SETTLEMENT_CURRENCY;
+  const settlementDecimals =
+    item.settlement_decimals !== undefined
+      ? normalizeDecimals(item.settlement_decimals)
+      : settlementDecimalsForCurrency(settlementCurrency);
   return {
     priceAtomic,
-    settlementCurrency:
-      item.settlement_currency === "USDC"
-        ? "USDC"
-        : DEFAULT_SETTLEMENT_CURRENCY,
-    settlementDecimals: normalizeDecimals(item.settlement_decimals),
-    settlementAmount: formatAtomicAmount(
-      priceAtomic,
-      normalizeDecimals(item.settlement_decimals),
-    ),
+    settlementCurrency,
+    settlementDecimals,
+    settlementAmount: formatAtomicAmount(priceAtomic, settlementDecimals),
   };
 }
 
 export function getSettlementDisplayCurrency(
   item: Pick<MarketplaceDataItem, "settlement_currency">,
 ): SettlementCurrency {
-  return item.settlement_currency === "USDC"
-    ? "USDC"
-    : DEFAULT_SETTLEMENT_CURRENCY;
+  if (item.settlement_currency === "USDC" || item.settlement_currency === "CADC") {
+    return item.settlement_currency;
+  }
+  return DEFAULT_SETTLEMENT_CURRENCY;
 }
 
 function extractErrorData(error: unknown): string | null {

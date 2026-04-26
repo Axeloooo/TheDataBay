@@ -7,6 +7,8 @@ import { uuidToBytes32 } from "@/lib/ids";
 import { fireConfettiBurst } from "@/lib/confetti";
 import type { DisplayCurrency } from "@/lib/fx";
 import { parseUnits } from "ethers";
+import { SETTLEMENT_TOKENS } from "@/types/contract";
+import type { SettlementCurrency } from "@/types/contract";
 import type { JobResponse, JobStatusResponse } from "@/types/llm";
 import {
   clearUploadSession,
@@ -21,6 +23,7 @@ type UploadStore = {
   title: string;
   description: string;
   priceUsdc: string;
+  settlementCurrency: SettlementCurrency;
   displayCurrency: DisplayCurrency;
   file: File | null;
   job: JobResponse | null;
@@ -35,6 +38,7 @@ type UploadStore = {
   setTitle: (value: string) => void;
   setDescription: (value: string) => void;
   setPriceUsdc: (value: string) => void;
+  setSettlementCurrency: (value: SettlementCurrency) => void;
   setDisplayCurrency: (value: DisplayCurrency) => void;
   setFile: (value: File | null) => void;
   setError: (value: string | null) => void;
@@ -47,13 +51,19 @@ type UploadStore = {
   createItemOnChain: (address: string | null) => Promise<string | null>;
 };
 
-const STORAGE_KEY = "bridgemart_upload_store_v1";
-const SETTLEMENT_DECIMALS = 6;
+const STORAGE_KEY = "bridgemart_upload_store_v2";
 
-function parsePriceAtomic(priceUsdc: string): string | null {
-  if (!priceUsdc) return null;
+function settlementDecimalsFor(currency: SettlementCurrency): number {
+  return SETTLEMENT_TOKENS[currency].decimals;
+}
+
+function parsePriceAtomic(
+  priceStr: string,
+  currency: SettlementCurrency = "USDC",
+): string | null {
+  if (!priceStr) return null;
   try {
-    return parseUnits(priceUsdc, SETTLEMENT_DECIMALS).toString();
+    return parseUnits(priceStr, settlementDecimalsFor(currency)).toString();
   } catch {
     return null;
   }
@@ -119,6 +129,7 @@ export const useUploadStore = create<UploadStore>()(
       title: "",
       description: "",
       priceUsdc: "",
+      settlementCurrency: "USDC" as SettlementCurrency,
       displayCurrency: "USDC",
       file: null,
       job: null,
@@ -133,6 +144,7 @@ export const useUploadStore = create<UploadStore>()(
       setTitle: (value) => set({ title: value }),
       setDescription: (value) => set({ description: value }),
       setPriceUsdc: (value) => set({ priceUsdc: value }),
+      setSettlementCurrency: (value) => set({ settlementCurrency: value }),
       setDisplayCurrency: (value) => set({ displayCurrency: value }),
       setFile: (value) => set({ file: value }),
       setError: (value) => set({ error: value }),
@@ -171,18 +183,22 @@ export const useUploadStore = create<UploadStore>()(
         if (!state.description) {
           nextState.description = session.description;
         }
-        // Only migrate priceAtomic (USDC); legacy priceWei (ETH, 18 decimals) is incompatible.
+        // Only migrate priceAtomic; legacy priceWei (ETH, 18 decimals) is incompatible.
         // If session has priceWei but no priceAtomic, skip migration (will force re-entry).
         if (!legacyState.priceUsdc && session.priceAtomic) {
+          const sessionCurrency: SettlementCurrency =
+            session.settlementCurrency === "CADC" ? "CADC" : "USDC";
+          const sessionDecimals = settlementDecimalsFor(sessionCurrency);
           const whole =
-            BigInt(session.priceAtomic) / 10n ** BigInt(SETTLEMENT_DECIMALS);
+            BigInt(session.priceAtomic) / 10n ** BigInt(sessionDecimals);
           const fraction = (
             BigInt(session.priceAtomic) %
-            10n ** BigInt(SETTLEMENT_DECIMALS)
+            10n ** BigInt(sessionDecimals)
           )
             .toString()
-            .padStart(SETTLEMENT_DECIMALS, "0");
+            .padStart(sessionDecimals, "0");
           nextState.priceUsdc = `${whole}.${fraction}`.replace(/\.?0+$/, "");
+          nextState.settlementCurrency = sessionCurrency;
         }
         if (!hasDraft) {
           nextState.displayCurrency = preferredCurrency;
@@ -247,7 +263,10 @@ export const useUploadStore = create<UploadStore>()(
           });
           return;
         }
-        const priceAtomic = parsePriceAtomic(legacyState.priceUsdc ?? "");
+        const priceAtomic = parsePriceAtomic(
+          legacyState.priceUsdc ?? "",
+          state.settlementCurrency,
+        );
         if (!priceAtomic) {
           set({ error: "Enter a valid price." });
           return;
@@ -259,8 +278,11 @@ export const useUploadStore = create<UploadStore>()(
         formData.append("description", state.description);
         formData.append("seller", address);
         formData.append("price_atomic", priceAtomic);
-        formData.append("settlement_currency", "USDC");
-        formData.append("settlement_decimals", String(SETTLEMENT_DECIMALS));
+        formData.append("settlement_currency", state.settlementCurrency);
+        formData.append(
+          "settlement_decimals",
+          String(settlementDecimalsFor(state.settlementCurrency)),
+        );
         // Legacy compatibility while the backend finishes the migration.
         formData.append("price", priceAtomic);
         formData.append("seller_wallet_type", "evm");
@@ -276,8 +298,8 @@ export const useUploadStore = create<UploadStore>()(
             description: state.description,
             seller: address,
             priceAtomic,
-            settlementCurrency: "USDC",
-            settlementDecimals: SETTLEMENT_DECIMALS,
+            settlementCurrency: state.settlementCurrency,
+            settlementDecimals: settlementDecimalsFor(state.settlementCurrency),
             fileName: state.file.name,
             status: "queued",
             createdAt: new Date().toISOString(),
@@ -477,6 +499,7 @@ export const useUploadStore = create<UploadStore>()(
         title: state.title,
         description: state.description,
         priceUsdc: state.priceUsdc,
+        settlementCurrency: state.settlementCurrency,
         displayCurrency: state.displayCurrency,
         job: state.job,
         jobStatus: state.jobStatus,
@@ -490,11 +513,18 @@ export const useUploadStore = create<UploadStore>()(
         state.isCreating = false;
         state.error = null;
         state.pollTimerId = null;
+        // Migration: default settlementCurrency if missing from older persisted state.
+        if (!state.settlementCurrency) {
+          state.settlementCurrency = "USDC";
+        }
       },
     },
   ),
 );
 
-export function selectUploadPriceAtomic(priceUsdc: string): string | null {
-  return parsePriceAtomic(priceUsdc);
+export function selectUploadPriceAtomic(
+  priceUsdc: string,
+  currency: SettlementCurrency = "USDC",
+): string | null {
+  return parsePriceAtomic(priceUsdc, currency);
 }

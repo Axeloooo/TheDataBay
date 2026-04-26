@@ -26,6 +26,7 @@ import { uuidToBytes32 } from "@/lib/ids";
 import { toast } from "sonner";
 import ErrorPanel from "@/components/ui/error-panel";
 import { DisplayCurrencySelector } from "@/components/display-currency-selector";
+import { SettlementCurrencySelector } from "@/components/settlement-currency-selector";
 import { convertSettlementToCurrency, formatCurrencyAmount } from "@/lib/fx";
 import { isSameAddress } from "@/lib/marketplace";
 import { useCurrencyStore } from "@/stores/currency-store";
@@ -47,6 +48,7 @@ function Upload() {
   const title = useUploadStore((state) => state.title);
   const description = useUploadStore((state) => state.description);
   const priceUsdc = useUploadStore((state) => state.priceUsdc);
+  const settlementCurrency = useUploadStore((state) => state.settlementCurrency);
   const displayCurrency = useUploadStore((state) => state.displayCurrency);
   const file = useUploadStore((state) => state.file);
   const job = useUploadStore((state) => state.job);
@@ -60,6 +62,9 @@ function Upload() {
   const setTitle = useUploadStore((state) => state.setTitle);
   const setDescription = useUploadStore((state) => state.setDescription);
   const setPriceUsdc = useUploadStore((state) => state.setPriceUsdc);
+  const setSettlementCurrency = useUploadStore(
+    (state) => state.setSettlementCurrency,
+  );
   const setDisplayCurrency = useUploadStore(
     (state) => state.setDisplayCurrency,
   );
@@ -138,16 +143,21 @@ function Upload() {
   }, [computedStatus]);
 
   const priceAtomic = useMemo(
-    () => selectUploadPriceAtomic(priceUsdc),
-    [priceUsdc],
+    () => selectUploadPriceAtomic(priceUsdc, settlementCurrency),
+    [priceUsdc, settlementCurrency],
   );
 
   const priceEquivalent = useMemo(() => {
-    if (!priceUsdc || displayCurrency === "USDC") return null;
-    const usdcValue = Number(priceUsdc);
-    if (!Number.isFinite(usdcValue)) return null;
-    return convertSettlementToCurrency(usdcValue, displayCurrency, rates);
-  }, [displayCurrency, priceUsdc, rates]);
+    if (!priceUsdc || displayCurrency === settlementCurrency) return null;
+    const priceValue = Number(priceUsdc);
+    if (!Number.isFinite(priceValue)) return null;
+    return convertSettlementToCurrency(
+      priceValue,
+      displayCurrency,
+      rates,
+      settlementCurrency,
+    );
+  }, [displayCurrency, priceUsdc, rates, settlementCurrency]);
 
   const currentListingId =
     jobStatus?.listing_id ?? persistedSession?.listingId ?? null;
@@ -195,7 +205,7 @@ function Upload() {
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Listing requires an EVM wallet signature. Connect your wallet to
-            upload, encrypt, and publish USDC-settled datasets on-chain.
+            upload, encrypt, and publish datasets on-chain.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             Solana wallet connection is planned for upcoming cross-chain
@@ -224,8 +234,7 @@ function Upload() {
         <div className="mb-8">
           <h1 className="text-4xl font-bold mb-2">Sell Your Dataset</h1>
           <p className="text-muted-foreground">
-            List your dataset with embeddings on the marketplace and settle
-            sales in USDC.
+            List your dataset with embeddings on the marketplace.
           </p>
         </div>
 
@@ -277,9 +286,20 @@ function Upload() {
                   onChange={(event) => setDescription(event.target.value)}
                 />
               </div>
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="price">Price (USDC)</Label>
+                  <Label htmlFor="settlement-token">Settlement Token</Label>
+                  <SettlementCurrencySelector
+                    value={settlementCurrency}
+                    onChange={setSettlementCurrency}
+                    buttonClassName="w-full justify-between"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Token buyers will pay with on-chain.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="price">Price ({settlementCurrency})</Label>
                   <Input
                     id="price"
                     type="number"
@@ -305,7 +325,7 @@ function Upload() {
                     buttonClassName="w-full justify-between"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Quotes only. Settlement stays in USDC on-chain.
+                    Quotes only. Settlement token is fixed at listing time.
                   </p>
                 </div>
               </div>

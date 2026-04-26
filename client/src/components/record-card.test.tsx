@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import RecordCard from "./record-card";
 import type { CardDataset } from "@/types/ai";
+import { normalizeMarketplacePrice } from "@/lib/marketplace";
 
 vi.mock("@/stores/currency-store", () => ({
   useCurrencyStore: (
@@ -27,6 +28,16 @@ const searchDataset: CardDataset = {
   price_atomic: "2000000",
   settlement_currency: "USDC",
   settlement_decimals: 6,
+};
+
+const cadcDataset: CardDataset = {
+  id: "ghi-789",
+  title: "Canadian Market Data",
+  description: "Aggregated CAD-denominated market data.",
+  price_atomic: "5000000000000000000",
+  settlement_currency: "CADC",
+  settlement_decimals: 18,
+  purchase_count: 7,
 };
 
 function renderCard(props: Parameters<typeof RecordCard>[0]) {
@@ -82,5 +93,85 @@ describe("RecordCard score badge", () => {
   it("search result without purchase_count shows no purchases line", () => {
     renderCard({ dataset: searchDataset, score: 0.7, scoreLabel: "high" });
     expect(screen.queryByText(/purchases/)).toBeNull();
+  });
+});
+
+describe("RecordCard settlement token logo", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("renders usdc-logo.svg for USDC listing", () => {
+    const { container } = renderCard({ dataset: browseDataset });
+    const imgs = container.querySelectorAll("img");
+    const settlementLogo = Array.from(imgs).find((img) =>
+      img.src.includes("usdc-logo.svg"),
+    );
+    expect(settlementLogo).toBeDefined();
+  });
+
+  it("renders cadc-logo.svg for CADC listing", () => {
+    const { container } = renderCard({ dataset: cadcDataset });
+    const imgs = container.querySelectorAll("img");
+    const cadcLogo = Array.from(imgs).find((img) =>
+      img.src.includes("cadc-logo.svg"),
+    );
+    expect(cadcLogo).toBeDefined();
+  });
+
+  it("shows CADC purchase_count", () => {
+    renderCard({ dataset: cadcDataset });
+    expect(screen.getByText(/7 purchases/)).toBeInTheDocument();
+  });
+});
+
+describe("normalizeMarketplacePrice", () => {
+  it("returns USDC with 6 decimals for USDC item", () => {
+    const result = normalizeMarketplacePrice({
+      price_atomic: "5000000",
+      settlement_currency: "USDC",
+      settlement_decimals: 6,
+    });
+    expect(result.settlementCurrency).toBe("USDC");
+    expect(result.settlementDecimals).toBe(6);
+    expect(result.settlementAmount).toBe("5");
+  });
+
+  it("returns CADC with 18 decimals for CADC item", () => {
+    const result = normalizeMarketplacePrice({
+      price_atomic: "5000000000000000000",
+      settlement_currency: "CADC",
+      settlement_decimals: 18,
+    });
+    expect(result.settlementCurrency).toBe("CADC");
+    expect(result.settlementDecimals).toBe(18);
+    expect(result.settlementAmount).toBe("5");
+  });
+
+  it("falls back to USDC and 6 decimals when currency is missing", () => {
+    const result = normalizeMarketplacePrice({
+      price_atomic: "1000000",
+    });
+    expect(result.settlementCurrency).toBe("USDC");
+    expect(result.settlementDecimals).toBe(6);
+    expect(result.settlementAmount).toBe("1");
+  });
+
+  it("derives CADC decimals (18) from currency when settlement_decimals is missing", () => {
+    const result = normalizeMarketplacePrice({
+      price_atomic: "1000000000000000000",
+      settlement_currency: "CADC",
+    });
+    expect(result.settlementCurrency).toBe("CADC");
+    expect(result.settlementDecimals).toBe(18);
+    expect(result.settlementAmount).toBe("1");
+  });
+
+  it("falls back to USDC for unknown currency", () => {
+    const result = normalizeMarketplacePrice({
+      price_atomic: "2000000",
+      settlement_currency: "XYZ" as "USDC",
+    });
+    expect(result.settlementCurrency).toBe("USDC");
   });
 });

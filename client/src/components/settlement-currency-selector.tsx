@@ -6,30 +6,33 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import { DISPLAY_CURRENCY_OPTIONS, type DisplayCurrency } from "@/lib/fx";
+import type { SettlementCurrency } from "@/types/contract";
 
-interface DisplayCurrencySelectorProps {
-  value: DisplayCurrency;
-  onChange: (currency: DisplayCurrency) => void;
+const SETTLEMENT_OPTIONS: { currency: SettlementCurrency; icon: string }[] = [
+  { currency: "USDC", icon: "/usdc-logo.svg" },
+  { currency: "CADC", icon: "/cadc-logo.svg" },
+];
+
+interface SettlementCurrencySelectorProps {
+  value: SettlementCurrency;
+  onChange: (currency: SettlementCurrency) => void;
   className?: string;
   buttonClassName?: string;
   menuClassName?: string;
   compact?: boolean;
-  title?: string;
 }
 
-export function DisplayCurrencySelector({
+export function SettlementCurrencySelector({
   value,
   onChange,
   className,
   buttonClassName,
   menuClassName,
   compact = false,
-  title = "Display currency",
-}: DisplayCurrencySelectorProps) {
+}: SettlementCurrencySelectorProps) {
   const selected =
-    DISPLAY_CURRENCY_OPTIONS.find((option) => option.code === value) ??
-    DISPLAY_CURRENCY_OPTIONS[0];
+    SETTLEMENT_OPTIONS.find((option) => option.currency === value) ??
+    SETTLEMENT_OPTIONS[0];
 
   return (
     <DropdownMenu>
@@ -42,7 +45,7 @@ export function DisplayCurrencySelector({
             buttonClassName,
             className,
           )}
-          title={`${title} - quotes only, settlement uses the listing's token`}
+          title="Settlement token — the on-chain currency buyers will pay in"
         >
           <img
             src={selected.icon}
@@ -50,20 +53,20 @@ export function DisplayCurrencySelector({
             aria-hidden="true"
             className="h-4 w-4 shrink-0 rounded-sm object-contain"
           />
-          <span>{selected.code}</span>
+          <span>{selected.currency}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
         className={cn("min-w-[140px]", menuClassName)}
       >
-        {DISPLAY_CURRENCY_OPTIONS.map((option) => (
+        {SETTLEMENT_OPTIONS.map((option) => (
           <DropdownMenuItem
-            key={option.code}
-            onClick={() => onChange(option.code)}
+            key={option.currency}
+            onClick={() => onChange(option.currency)}
             className={cn(
               "gap-2 text-xs",
-              value === option.code ? "bg-accent" : "",
+              value === option.currency ? "bg-accent" : "",
             )}
           >
             <img
@@ -72,8 +75,8 @@ export function DisplayCurrencySelector({
               aria-hidden="true"
               className="h-4 w-4 shrink-0 rounded-sm object-contain"
             />
-            <span>{option.code}</span>
-            {value === option.code && (
+            <span>{option.currency}</span>
+            {value === option.currency && (
               <span className="ml-auto text-xs">✓</span>
             )}
           </DropdownMenuItem>

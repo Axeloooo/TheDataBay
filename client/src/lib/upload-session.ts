@@ -5,8 +5,8 @@ export type PersistedUploadSession = {
   description: string;
   seller: string;
   priceAtomic?: string;
-  settlementCurrency?: "USDC";
-  settlementDecimals?: 6;
+  settlementCurrency?: "USDC" | "CADC";
+  settlementDecimals?: number;
   /** Legacy compatibility for pre-migration drafts. */
   priceWei?: string;
   fileName?: string;

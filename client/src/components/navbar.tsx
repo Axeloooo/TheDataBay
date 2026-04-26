@@ -95,7 +95,7 @@ function Navbar() {
               BridgeMart
             </div>
             <div className="truncate text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-              USDC-settled dataset exchange
+              On-chain dataset exchange
             </div>
           </div>
         </Link>
@@ -268,7 +268,7 @@ function Navbar() {
       {ratesUnavailable && (
         <p className="mt-2 text-right text-[11px] font-medium text-muted-foreground">
           Live FX feed unavailable; quote conversions may be approximate, but
-          settlement remains in USDC.
+          settlement is fixed to the listing's token.
         </p>
       )}
     </div>
