@@ -22,11 +22,15 @@ import type {
 } from "@/types/agent";
 import { normalizeAtomicString } from "@/lib/atomic";
 import { uuidToBytes32 } from "@/lib/ids";
+import { SETTLEMENT_TOKENS } from "@/types/contract";
+import type { SettlementCurrency } from "@/types/contract";
 
 type MarketplaceApiItem = Omit<
   MarketplaceDataItem,
-  "price_atomic" | "settlement_currency" | "settlement_decimals"
+  "payment_token" | "price_atomic" | "settlement_currency" | "settlement_decimals"
 > & {
+  payment_token?: unknown;
+  paymentToken?: unknown;
   price?: unknown;
   price_atomic?: unknown;
   settlement_currency?: unknown;
@@ -40,44 +44,62 @@ function normalizeMarketplaceItem(
   if (priceAtomic === undefined || priceAtomic === null) {
     throw new Error("Missing marketplace price from API.");
   }
+  const rawPaymentToken = item.payment_token ?? item.paymentToken;
+  if (typeof rawPaymentToken !== "string" || !rawPaymentToken.trim()) {
+    throw new Error("Missing marketplace payment token from API.");
+  }
 
   const rawSettlementCurrency = item.settlement_currency;
-  const settlementCurrency =
+  const normalizedCurrencyStr =
     rawSettlementCurrency == null
       ? "USDC"
       : String(rawSettlementCurrency).trim().toUpperCase();
-  if (settlementCurrency !== "USDC") {
-    throw new Error("Unsupported marketplace settlement currency from API.");
+
+  const isValidCurrency = (s: string): s is SettlementCurrency =>
+    s in SETTLEMENT_TOKENS;
+
+  if (!isValidCurrency(normalizedCurrencyStr)) {
+    throw new Error(
+      `Unsupported marketplace settlement currency from API: ${normalizedCurrencyStr}`,
+    );
   }
+  const settlementCurrency: SettlementCurrency = normalizedCurrencyStr;
+
   if (
     rawSettlementCurrency != null &&
-    String(rawSettlementCurrency) !== "USDC" &&
-    settlementCurrency === "USDC"
+    String(rawSettlementCurrency) !== settlementCurrency
   ) {
-    // Soft warning: backend returned USDC in a non-canonical format (e.g., wrong case/whitespace).
-    // This keeps the UI resilient while still surfacing potential backend drift.
+    // Soft warning: backend returned currency in a non-canonical format (e.g., wrong case/whitespace).
     console.warn(
-      "Non-canonical marketplace settlement currency from API; normalized to USDC:",
+      "Non-canonical marketplace settlement currency from API; normalized to",
+      settlementCurrency,
+      "from:",
       rawSettlementCurrency,
     );
   }
 
-  const settlementDecimals = Number(item.settlement_decimals ?? 6);
-  if (settlementDecimals !== 6) {
-    throw new Error("Unsupported marketplace settlement decimals from API.");
+  const expectedDecimals = SETTLEMENT_TOKENS[settlementCurrency].decimals;
+  const settlementDecimals = Number(item.settlement_decimals ?? expectedDecimals);
+  if (settlementDecimals !== expectedDecimals) {
+    console.warn(
+      `Unexpected settlement decimals from API for ${settlementCurrency}: expected ${expectedDecimals}, got ${settlementDecimals}`,
+    );
   }
 
   const rest = { ...item };
   delete rest.price;
+  delete rest.paymentToken;
+  delete rest.payment_token;
   delete rest.price_atomic;
   delete rest.settlement_currency;
   delete rest.settlement_decimals;
 
   return {
     ...rest,
+    payment_token: rawPaymentToken.trim(),
     price_atomic: normalizeAtomicString(priceAtomic),
-    settlement_currency: "USDC",
-    settlement_decimals: 6,
+    settlement_currency: settlementCurrency,
+    settlement_decimals: settlementDecimals,
   };
 }
 
@@ -138,9 +160,11 @@ export const backend = {
           id: uuidToBytes32(r.listing_id),
           title: r.title,
           description: r.description,
+          payment_token: r.payment_token,
           price_atomic: String(r.price_atomic),
-          settlement_currency: "USDC",
-          settlement_decimals: 6,
+          settlement_currency: r.settlement_currency,
+          settlement_decimals: r.settlement_decimals,
+          purchase_count: r.purchase_count,
         },
         score: r.score,
         scoreLabel: r.score_label,

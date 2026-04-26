@@ -12,7 +12,11 @@ def make_ranked(listing_id: str, title: str, score: float) -> RankedDataset:
         title=title,
         description="desc",
         seller="0xSeller",
+        payment_token="0x0000000000000000000000000000000000000002",
         price_atomic=10,
+        settlement_currency="USDC",
+        settlement_decimals=6,
+        purchase_count=0,
         score=score,
         score_label="high" if score > 0.66 else ("moderate" if score > 0.33 else "low"),
     )

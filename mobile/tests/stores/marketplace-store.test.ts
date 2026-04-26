@@ -18,6 +18,7 @@ const mockItems: MarketplaceDataItem[] = [
     title: "Test Dataset",
     description: "A test dataset",
     seller: "0xdeadbeef",
+    payment_token: "0x0000000000000000000000000000000000000001",
     price_atomic: "1000000",
     settlement_currency: "USDC",
     settlement_decimals: 6,

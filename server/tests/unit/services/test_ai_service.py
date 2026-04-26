@@ -32,7 +32,11 @@ def make_item(listing_id: str, title: str = "Test Dataset") -> SimpleNamespace:
         title=title,
         description="A test dataset",
         seller="0xSeller",
+        payment_token="0x0000000000000000000000000000000000000002",
         price_atomic="100",
+        settlement_currency="USDC",
+        settlement_decimals=6,
+        purchase_count=0,
     )
 
 
@@ -67,6 +71,7 @@ def make_service(
         "PINATA_SECRET_KEY": "s",
         "PINATA_GATEWAY_URL": "https://gateway.pinata.cloud",
         "CONTRACT_ADDRESS": "0x" + "0" * 40,
+        "PAYMENT_TOKEN_ADDRESS": "0x0000000000000000000000000000000000000002",
         "CONTRACT_ABI_PATH": "/tmp/Marketplace.json",
         "CHAIN_ID": 31337,
         "RPC_URL": "http://127.0.0.1:8545",
@@ -430,6 +435,10 @@ def test_ranked_dataset_fields_are_mapped_correctly():
     assert r.title == "Climate Data"
     assert r.description == "Climate measurements"
     assert r.seller == "0xSellerAddr"
+    assert r.payment_token == "0x0000000000000000000000000000000000000002"
     assert r.price_atomic == 250          # int, not str
+    assert r.settlement_currency == "USDC"
+    assert r.settlement_decimals == 6
+    assert r.purchase_count == 0
     assert isinstance(r.score, float)
     assert r.score_label in ("high", "moderate", "low")

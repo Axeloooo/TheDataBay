@@ -1,5 +1,6 @@
 export type DisplayCurrency =
   | "USDC"
+  | "CADC"
   | "USD"
   | "CAD"
   | "MXN"
@@ -16,6 +17,7 @@ export type DisplayCurrencyOption = {
 
 export const DISPLAY_CURRENCY_OPTIONS = [
   { code: "USDC", icon: "/usdc-logo.svg" },
+  { code: "CADC", icon: "/cadc-logo.svg" },
   { code: "USD", icon: "/usa-flag.svg" },
   { code: "CAD", icon: "/canada-flag.svg" },
   { code: "MXN", icon: "/mexico-flag.svg" },
@@ -32,6 +34,7 @@ export type FxRates = {
   ethEur: number;
   ethMxn: number;
   ethUsdc: number;
+  ethCadc: number;
   ethSol: number;
   ethCny: number;
   ethUsdt: number;
@@ -43,7 +46,7 @@ const DEFAULT_TTL_MS = 60_000;
 
 export async function fetchFxRates(): Promise<FxRates> {
   const response = await fetch(
-    "https://api.coingecko.com/api/v3/simple/price?ids=ethereum,solana,usd-coin&vs_currencies=usd,cad,eur,mxn,cny",
+    "https://api.coingecko.com/api/v3/simple/price?ids=ethereum,solana,usd-coin,cad-coin&vs_currencies=usd,cad,eur,mxn,cny",
   );
   if (!response.ok) {
     throw new Error(`FX request failed (${response.status})`);
@@ -59,6 +62,7 @@ export async function fetchFxRates(): Promise<FxRates> {
     };
     solana?: { usd?: number };
     "usd-coin"?: { usd?: number };
+    "cad-coin"?: { usd?: number };
   };
 
   const ethUsd = data.ethereum?.usd ?? 0;
@@ -68,6 +72,8 @@ export async function fetchFxRates(): Promise<FxRates> {
   const ethCny = data.ethereum?.cny ?? 0;
   const solUsd = data.solana?.usd ?? 0;
   const usdcUsd = data["usd-coin"]?.usd ?? 1;
+  // CADC is pegged 1:1 to CAD; try cad-coin rate, fall back to ethCad
+  const cadcUsd = data["cad-coin"]?.usd ?? 0;
 
   if (ethUsd <= 0 || ethCad <= 0 || ethEur <= 0 || ethMxn <= 0 || ethCny <= 0) {
     throw new Error("FX payload missing ETH rates");
@@ -78,6 +84,8 @@ export async function fetchFxRates(): Promise<FxRates> {
     ethCad,
     ethEur,
     ethUsdc: usdcUsd > 0 ? ethUsd / usdcUsd : ethUsd,
+    // ethCadc: ETH priced in CADC. CADC ≈ 1 CAD, so use ethCad as fallback.
+    ethCadc: cadcUsd > 0 ? ethUsd / cadcUsd : ethCad,
     ethSol: solUsd > 0 ? ethUsd / solUsd : 0,
     ethMxn,
     ethCny,
@@ -104,6 +112,7 @@ export function loadCachedFxRates(
       !Number.isFinite(parsed.ethMxn) ||
       !Number.isFinite(parsed.ethCny) ||
       !Number.isFinite(parsed.ethUsdc) ||
+      !Number.isFinite(parsed.ethCadc) ||
       !Number.isFinite(parsed.ethSol) ||
       !Number.isFinite(parsed.ethUsdt)
     ) {
@@ -120,14 +129,50 @@ export function convertSettlementToCurrency(
   settlementAmount: number,
   currency: DisplayCurrency,
   rates: FxRates | null,
+  settlementCurrency: "USDC" | "CADC" = "USDC",
 ): number | null {
   if (!Number.isFinite(settlementAmount)) return null;
-  if (currency === "USDC") return settlementAmount;
+  // If the display currency matches the settlement currency, no conversion needed.
+  if (currency === settlementCurrency) return settlementAmount;
   if (!rates) return null;
 
+  if (settlementCurrency === "CADC") {
+    // CADC is pegged 1:1 to CAD; cadAmount is the base for conversions.
+    const cadAmount = settlementAmount;
+    const cadToUsd = rates.ethUsd / rates.ethCad;
+    switch (currency) {
+      case "CADC":
+        return cadAmount;
+      case "USDC":
+      case "USD":
+        return cadAmount * cadToUsd;
+      case "CAD":
+        return cadAmount;
+      case "MXN":
+        return cadAmount * cadToUsd * (rates.ethMxn / rates.ethUsd);
+      case "EUR":
+        return cadAmount * cadToUsd * (rates.ethEur / rates.ethUsd);
+      case "ETH":
+        return cadAmount / rates.ethCad;
+      case "SOL":
+        return rates.ethSol > 0
+          ? (cadAmount / rates.ethCad) * rates.ethSol
+          : null;
+      case "CNY":
+        return cadAmount * cadToUsd * (rates.ethCny / rates.ethUsd);
+      case "USDT":
+        return cadAmount * cadToUsd;
+      default:
+        return null;
+    }
+  }
+
+  // Default: settlementCurrency === "USDC", settlementAmount is in USD-equivalent.
   const usdAmount = settlementAmount;
 
   switch (currency) {
+    case "CADC":
+      return usdAmount * (rates.ethCad / rates.ethUsd);
     case "USD":
       return usdAmount;
     case "CAD":
@@ -171,6 +216,8 @@ export function convertEthToCurrency(
       return ethAmount * rates.ethUsd;
     case "USDC":
       return ethAmount * rates.ethUsdc;
+    case "CADC":
+      return ethAmount * rates.ethCadc;
     case "CAD":
       return ethAmount * rates.ethCad;
     case "MXN":
@@ -195,6 +242,7 @@ export function formatCurrencyAmount(
   if (
     currency === "ETH" ||
     currency === "USDC" ||
+    currency === "CADC" ||
     currency === "SOL" ||
     currency === "USDT"
   ) {

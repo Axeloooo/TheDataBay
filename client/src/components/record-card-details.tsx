@@ -49,6 +49,8 @@ function RecordCardDetails({
   };
 
   const pricing = normalizeMarketplacePrice(dataset);
+  const logoSrc =
+    pricing.settlementCurrency === "CADC" ? "/cadc-logo.svg" : "/usdc-logo.svg";
   const preferredCurrency = useCurrencyStore(
     (state) => state.preferredCurrency,
   );
@@ -59,6 +61,7 @@ function RecordCardDetails({
           Number(pricing.settlementAmount),
           preferredCurrency,
           rates,
+          pricing.settlementCurrency,
         )
       : null;
   const sellerChain = detectAddressChain(dataset.seller);
@@ -124,7 +127,7 @@ function RecordCardDetails({
               <p className="text-sm text-muted-foreground">Price</p>
               <p className="mt-1 inline-flex items-center gap-2 text-3xl font-bold font-mono">
                 <img
-                  src="/usdc-logo.svg"
+                  src={logoSrc}
                   alt=""
                   aria-hidden="true"
                   className="h-7 w-7 rounded-full object-contain"

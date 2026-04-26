@@ -1,14 +1,24 @@
 import type { WalletType } from "@/types/dataset";
 
-export type SettlementCurrency = "USDC";
+export type SettlementCurrency = "USDC" | "CADC";
+
+export type SettlementToken =
+  | { currency: "USDC"; decimals: 6 }
+  | { currency: "CADC"; decimals: 18 };
+
+export const SETTLEMENT_TOKENS: Record<SettlementCurrency, SettlementToken> = {
+  USDC: { currency: "USDC", decimals: 6 },
+  CADC: { currency: "CADC", decimals: 18 },
+};
 
 export type MarketplaceDataItem = {
   id: string;
   title: string;
   description: string;
   seller: string;
+  payment_token: string;
   price_atomic?: string;
-  settlement_currency?: SettlementCurrency | (string & {});
+  settlement_currency?: SettlementCurrency;
   settlement_decimals?: number;
   /**
    * Legacy compatibility for pre-migration listings.

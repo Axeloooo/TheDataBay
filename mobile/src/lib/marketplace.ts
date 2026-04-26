@@ -33,6 +33,18 @@ function getContractAddress(): string {
   }
 }
 
+export function getPaymentTokenAddress(): string {
+  if (!ENV.PAYMENT_TOKEN_ADDRESS) {
+    throw new Error("Missing Expo extra paymentTokenAddress.");
+  }
+
+  const paymentToken = getAddress(ENV.PAYMENT_TOKEN_ADDRESS);
+  if (paymentToken === "0x0000000000000000000000000000000000000000") {
+    throw new Error("Payment token is not configured.");
+  }
+  return paymentToken;
+}
+
 function normalizeListingId(listingId: string): string {
   return /^0x[0-9a-fA-F]{64}$/.test(listingId)
     ? listingId
@@ -53,7 +65,7 @@ function trimTrailingZeros(value: string): string {
 export async function getEvmProvider() {
   const eip1193 = await walletRuntime.getEip1193Provider();
   const provider = new BrowserProvider(
-    eip1193 as Parameters<typeof BrowserProvider>[0],
+    eip1193 as ConstructorParameters<typeof BrowserProvider>[0],
   );
   const network = await provider.getNetwork();
 
@@ -77,6 +89,7 @@ export async function createItemTx(params: {
   title: string;
   description: string;
   seller: string;
+  paymentToken: string;
   priceAtomic: string;
   datasetUrl: string;
   datasetHash: string;
@@ -94,12 +107,14 @@ export async function createItemTx(params: {
 
     const contract = new Contract(getContractAddress(), marketplaceAbi, signer);
     const itemId = normalizeListingId(params.listingId);
+    const paymentToken = getAddress(params.paymentToken);
 
     await contract.createItem.staticCall(
       itemId,
       params.title,
       params.description,
       params.seller,
+      paymentToken,
       params.priceAtomic,
       params.datasetUrl,
       params.datasetHash,
@@ -112,6 +127,7 @@ export async function createItemTx(params: {
       params.title,
       params.description,
       params.seller,
+      paymentToken,
       params.priceAtomic,
       params.datasetUrl,
       params.datasetHash,
@@ -129,6 +145,7 @@ export async function createItemTx(params: {
 export async function buyItemTx(
   listingId: string,
   priceAtomic: string | bigint,
+  paymentTokenAddress: string,
 ) {
   try {
     const provider = await getEvmProvider();
@@ -139,16 +156,16 @@ export async function buyItemTx(
     const fee = (normalizedPrice * feeBps) / 10_000n;
     const total = normalizedPrice + fee;
 
-    const tokenAddress = getAddress((await contract.settlementToken()) as string);
-    const settlementToken = new Contract(tokenAddress, erc20Abi, signer);
+    const paymentToken = getAddress(paymentTokenAddress);
+    const token = new Contract(paymentToken, erc20Abi, signer);
     const buyerAddress = await signer.getAddress();
-    const allowance = (await settlementToken.allowance(
+    const allowance = (await token.allowance(
       buyerAddress,
       getContractAddress(),
     )) as bigint;
 
     if (allowance < total) {
-      const approvalTx = await settlementToken.approve(getContractAddress(), total);
+      const approvalTx = await token.approve(getContractAddress(), total);
       await approvalTx.wait();
     }
 

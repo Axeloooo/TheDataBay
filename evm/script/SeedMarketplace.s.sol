@@ -31,10 +31,11 @@ contract SeedMarketplace is Script {
 
     function _seed(address marketplaceAddress) internal {
         HelperConfig config = new HelperConfig();
-        (uint256 deployKey,,,) = config.activeNetworkConfig();
+        (uint256 deployKey,,,,,,,,) = config.activeNetworkConfig();
         address seller = vm.addr(deployKey);
 
         Marketplace marketplace = Marketplace(marketplaceAddress);
+        address paymentToken = vm.envOr("SEED_PAYMENT_TOKEN", marketplace.acceptedTokenAt(0));
         SeedItem[] memory items = _loadItems();
 
         vm.startBroadcast(deployKey);
@@ -47,6 +48,7 @@ contract SeedMarketplace is Script {
                 seller,
                 item.title,
                 item.description,
+                paymentToken,
                 vm.parseUint(item.price_atomic),
                 item.dataset_url,
                 vm.parseBytes32(item.dataset_hash),
@@ -130,6 +132,7 @@ contract SeedMarketplace is Script {
         address seller,
         string memory title,
         string memory description,
+        address paymentToken,
         uint256 price,
         string memory datasetUrl,
         bytes32 datasetHash,
@@ -137,7 +140,16 @@ contract SeedMarketplace is Script {
         bytes32 signatureHash
     ) internal {
         marketplace.createItem(
-            itemId, title, description, seller, price, datasetUrl, datasetHash, signatureUrl, signatureHash
+            itemId,
+            title,
+            description,
+            seller,
+            paymentToken,
+            price,
+            datasetUrl,
+            datasetHash,
+            signatureUrl,
+            signatureHash
         );
 
         console2.log("Created item:");

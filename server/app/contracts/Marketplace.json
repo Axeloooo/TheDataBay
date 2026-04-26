@@ -8,9 +8,19 @@
         "internalType": "address"
       },
       {
-        "name": "_settlementToken",
+        "name": "initialPaymentToken",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "initialTokenDecimals",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "initialTokenMaxPrice",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
         "name": "_feeRecipient",
@@ -27,11 +37,30 @@
   },
   {
     "type": "function",
-    "name": "MAX_PRICE",
+    "name": "acceptedTokenAt",
+    "inputs": [
+      {
+        "name": "index",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "acceptedTokenCount",
     "inputs": [],
     "outputs": [
       {
-        "name": "",
+        "name": "count",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -40,16 +69,55 @@
   },
   {
     "type": "function",
-    "name": "SETTLEMENT_DECIMALS",
-    "inputs": [],
-    "outputs": [
+    "name": "acceptedTokens",
+    "inputs": [
       {
         "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "enabled",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "decimals",
         "type": "uint8",
         "internalType": "uint8"
+      },
+      {
+        "name": "maxPrice",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "addAcceptedToken",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "decimals",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "maxPrice",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -85,6 +153,11 @@
       },
       {
         "name": "seller",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "paymentToken",
         "type": "address",
         "internalType": "address"
       },
@@ -145,6 +218,19 @@
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getAcceptedTokens",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "tokens",
+        "type": "address[]",
+        "internalType": "address[]"
       }
     ],
     "stateMutability": "view"
@@ -213,6 +299,11 @@
             "name": "purchaseCount",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
           }
         ]
       }
@@ -289,6 +380,11 @@
             "name": "purchaseCount",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
           }
         ]
       }
@@ -370,6 +466,11 @@
             "name": "purchaseCount",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
           }
         ]
       }
@@ -458,16 +559,21 @@
   },
   {
     "type": "function",
-    "name": "settlementToken",
-    "inputs": [],
-    "outputs": [
+    "name": "setTokenEnabled",
+    "inputs": [
       {
-        "name": "",
+        "name": "token",
         "type": "address",
-        "internalType": "contract IERC20"
+        "internalType": "address"
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "internalType": "bool"
       }
     ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -614,6 +720,12 @@
         "internalType": "address"
       },
       {
+        "name": "paymentToken",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
         "name": "price",
         "type": "uint256",
         "indexed": false,
@@ -671,6 +783,12 @@
       },
       {
         "name": "buyer",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "paymentToken",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -773,6 +891,37 @@
         "type": "bytes32",
         "indexed": false,
         "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "TokenConfigUpdated",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "enabled",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "decimals",
+        "type": "uint8",
+        "indexed": false,
+        "internalType": "uint8"
+      },
+      {
+        "name": "maxPrice",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -934,6 +1083,17 @@
     "type": "error",
     "name": "Marketplace__TitleRequired",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "Marketplace__TokenNotAccepted",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
   },
   {
     "type": "error",

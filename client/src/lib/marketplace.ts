@@ -12,14 +12,25 @@ import { walletRuntime } from "@/lib/wallet/runtime";
 import { marketplaceAbi } from "@/lib/marketplaceAbi";
 import { uuidToBytes32 } from "@/lib/ids";
 import type { MarketplaceDataItem, SettlementCurrency } from "@/types/contract";
+import { SETTLEMENT_TOKENS } from "@/types/contract";
 import { normalizeAtomicString } from "@/lib/atomic";
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS as
   | string
   | undefined;
+const PAYMENT_TOKEN_ADDRESS = import.meta.env.VITE_PAYMENT_TOKEN_ADDRESS as
+  | string
+  | undefined;
+const CADC_TOKEN_ADDRESS = import.meta.env.VITE_CADC_TOKEN_ADDRESS as
+  | string
+  | undefined;
 const errorInterface = new Interface(marketplaceAbi);
 const DEFAULT_SETTLEMENT_CURRENCY: SettlementCurrency = "USDC";
 const DEFAULT_SETTLEMENT_DECIMALS = 6;
+
+function settlementDecimalsForCurrency(currency: SettlementCurrency): number {
+  return SETTLEMENT_TOKENS[currency].decimals;
+}
 const erc20Abi = [
   "function balanceOf(address owner) view returns (uint256)",
   "function allowance(address owner,address spender) view returns (uint256)",
@@ -48,6 +59,61 @@ function getContractAddress(): string {
   }
 }
 
+export function getPaymentTokenAddress(): string {
+  if (!PAYMENT_TOKEN_ADDRESS) {
+    throw new Error("Missing VITE_PAYMENT_TOKEN_ADDRESS");
+  }
+  const normalized = PAYMENT_TOKEN_ADDRESS.trim();
+  if (!normalized) {
+    throw new Error("VITE_PAYMENT_TOKEN_ADDRESS is empty");
+  }
+  try {
+    const address = getAddress(normalized);
+    if (address === ZeroAddress) {
+      throw new Error("VITE_PAYMENT_TOKEN_ADDRESS cannot be zero.");
+    }
+    return address;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("cannot be zero")) {
+      throw error;
+    }
+    throw new Error(`Invalid VITE_PAYMENT_TOKEN_ADDRESS: ${normalized}`);
+  }
+}
+
+export function getCadcTokenAddress(): string {
+  if (!CADC_TOKEN_ADDRESS) {
+    throw new Error("Missing VITE_CADC_TOKEN_ADDRESS");
+  }
+  const normalized = CADC_TOKEN_ADDRESS.trim();
+  if (!normalized) {
+    throw new Error("VITE_CADC_TOKEN_ADDRESS is empty");
+  }
+  try {
+    const address = getAddress(normalized);
+    if (address === ZeroAddress) {
+      throw new Error("VITE_CADC_TOKEN_ADDRESS cannot be zero.");
+    }
+    return address;
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("cannot be zero")) {
+      throw error;
+    }
+    throw new Error(`Invalid VITE_CADC_TOKEN_ADDRESS: ${normalized}`);
+  }
+}
+
+export function getPaymentTokenAddressForCurrency(
+  currency: SettlementCurrency,
+): string {
+  switch (currency) {
+    case "USDC":
+      return getPaymentTokenAddress();
+    case "CADC":
+      return getCadcTokenAddress();
+  }
+}
+
 export async function getEvmProvider(): Promise<BrowserProvider> {
   const eip1193 = await walletRuntime.getEip1193Provider();
   return new BrowserProvider(
@@ -60,6 +126,7 @@ export async function createItemTx(params: {
   title: string;
   description: string;
   seller: string;
+  paymentToken: string;
   priceAtomic: string;
   datasetUrl: string;
   datasetHash: string;
@@ -73,6 +140,10 @@ export async function createItemTx(params: {
     const signerAddress = await signer.getAddress();
     if (!isSameAddress(signerAddress, params.seller)) {
       throw new Error("Connected wallet does not match seller address.");
+    }
+    const paymentToken = getAddress(params.paymentToken);
+    if (paymentToken === ZeroAddress) {
+      throw new Error("Payment token is not configured.");
     }
     const contractAddress = getContractAddress();
     const code = await provider.getCode(contractAddress);
@@ -99,6 +170,7 @@ export async function createItemTx(params: {
       chainId: network.chainId?.toString?.() ?? String(network.chainId),
       contract: contractAddress,
       seller: signerAddress,
+      paymentToken,
       itemId,
       priceAtomic: params.priceAtomic,
       datasetUrl: params.datasetUrl,
@@ -110,6 +182,7 @@ export async function createItemTx(params: {
         params.title,
         params.description,
         params.seller,
+        paymentToken,
         params.priceAtomic,
         params.datasetUrl,
         params.datasetHash,
@@ -125,6 +198,7 @@ export async function createItemTx(params: {
       params.title,
       params.description,
       params.seller,
+      paymentToken,
       params.priceAtomic,
       params.datasetUrl,
       params.datasetHash,
@@ -150,6 +224,7 @@ export async function getFeeBps(): Promise<bigint> {
 export async function buyItemTx(
   listingIdBytes32: string,
   priceAtomic: bigint,
+  paymentTokenAddress: string,
 ): Promise<string> {
   try {
     const provider = await getEvmProvider();
@@ -159,16 +234,16 @@ export async function buyItemTx(
     const feeBps = await contract.feeBps();
     const fee = (priceAtomic * BigInt(feeBps)) / 10_000n;
     const total = priceAtomic + fee;
-    const settlementTokenAddress = getAddress(await contract.settlementToken());
-    if (settlementTokenAddress === ZeroAddress) {
-      throw new Error("Marketplace settlement token is not configured.");
+    const paymentToken = getAddress(paymentTokenAddress);
+    if (paymentToken === ZeroAddress) {
+      throw new Error("Marketplace payment token is not configured.");
     }
 
-    const token = new Contract(settlementTokenAddress, erc20Abi, signer);
+    const token = new Contract(paymentToken, erc20Abi, signer);
     const buyerAddress = await signer.getAddress();
     const balance = (await token.balanceOf(buyerAddress)) as bigint;
     if (balance < total) {
-      throw new Error("Insufficient USDC balance for this purchase.");
+      throw new Error("Insufficient token balance for this purchase.");
     }
     const allowance = (await token.allowance(
       buyerAddress,
@@ -177,7 +252,7 @@ export async function buyItemTx(
 
     console.info("[buyItemTx] submit", {
       contract: contractAddress,
-      settlementToken: settlementTokenAddress,
+      paymentToken,
       buyer: buyerAddress,
       listingIdBytes32,
       priceAtomic: priceAtomic.toString(),
@@ -270,26 +345,29 @@ export function normalizeMarketplacePrice(
   const priceAtomic = normalizeAtomicString(
     item.price_atomic ?? item.price ?? 0,
   );
+  const settlementCurrency: SettlementCurrency =
+    item.settlement_currency === "USDC" || item.settlement_currency === "CADC"
+      ? item.settlement_currency
+      : DEFAULT_SETTLEMENT_CURRENCY;
+  const settlementDecimals =
+    item.settlement_decimals !== undefined
+      ? normalizeDecimals(item.settlement_decimals)
+      : settlementDecimalsForCurrency(settlementCurrency);
   return {
     priceAtomic,
-    settlementCurrency:
-      item.settlement_currency === "USDC"
-        ? "USDC"
-        : DEFAULT_SETTLEMENT_CURRENCY,
-    settlementDecimals: normalizeDecimals(item.settlement_decimals),
-    settlementAmount: formatAtomicAmount(
-      priceAtomic,
-      normalizeDecimals(item.settlement_decimals),
-    ),
+    settlementCurrency,
+    settlementDecimals,
+    settlementAmount: formatAtomicAmount(priceAtomic, settlementDecimals),
   };
 }
 
 export function getSettlementDisplayCurrency(
   item: Pick<MarketplaceDataItem, "settlement_currency">,
 ): SettlementCurrency {
-  return item.settlement_currency === "USDC"
-    ? "USDC"
-    : DEFAULT_SETTLEMENT_CURRENCY;
+  if (item.settlement_currency === "USDC" || item.settlement_currency === "CADC") {
+    return item.settlement_currency;
+  }
+  return DEFAULT_SETTLEMENT_CURRENCY;
 }
 
 function extractErrorData(error: unknown): string | null {

@@ -132,11 +132,11 @@ function Home() {
               Semantic data marketplace
             </p>
             <h1 className="text-balance text-3xl font-semibold leading-tight md:text-4xl">
-              Discover verifiable datasets and settle with USDC on-chain.
+              Discover verifiable datasets with transparent on-chain settlement.
             </h1>
             <p className="max-w-xl text-sm text-muted-foreground md:text-base">
               BridgeMart combines semantic search, encrypted IPFS delivery, and
-              USDC settlement so teams can source AI-ready data with transparent
+              on-chain settlement so teams can source AI-ready data with transparent
               provenance and quote-only pricing.
             </p>
 
@@ -151,7 +151,7 @@ function Home() {
                     and search listings.
                   </li>
                   <li>
-                    2. Review quote-only prices and settle purchases in USDC.
+                    2. Review quote-only prices and settle purchases on-chain.
                   </li>
                   <li>
                     3. Approve agent purchase requests only after you verify the
@@ -209,7 +209,7 @@ function Home() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Settlement
               </p>
-              <p className="mt-1 text-2xl font-semibold">USDC</p>
+              <p className="mt-1 text-2xl font-semibold">On-chain</p>
             </div>
           </div>
         </div>
@@ -270,7 +270,8 @@ function Home() {
                 >
                   <p className="font-semibold line-clamp-1">{item.title}</p>
                   <p className="mt-1 text-muted-foreground">
-                    {normalizeMarketplacePrice(item).settlementAmount} USDC
+                    {normalizeMarketplacePrice(item).settlementAmount}{" "}
+                    {normalizeMarketplacePrice(item).settlementCurrency}
                   </p>
                   <p className="mt-2 inline-flex items-center gap-1 text-primary">
                     Open listing
