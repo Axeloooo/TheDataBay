@@ -249,6 +249,33 @@ def test_item_view_to_schema_without_configured_payment_token_returns_token_addr
     assert item.settlement_decimals == 6
 
 
+def test_settlement_currency_for_token_resolves_cadc_address(settings):
+    cadc_address = "0x0000000000000000000000000000000000000099"
+    configured_settings = settings.model_copy(
+        update={"cadc_token_address": cadc_address}
+    )
+
+    result = contract_service._settlement_currency_for_token(cadc_address, configured_settings)
+
+    assert result == "CADC"
+
+
+def test_settlement_currency_for_token_resolves_usdc_address(settings):
+    usdc_address = settings.payment_token_address
+
+    result = contract_service._settlement_currency_for_token(usdc_address, settings)
+
+    assert result == "USDC"
+
+
+def test_settlement_currency_for_token_returns_raw_address_for_unknown_token(settings):
+    unknown_address = Web3.to_checksum_address("0x0000000000000000000000000000000000000077")
+
+    result = contract_service._settlement_currency_for_token(unknown_address, settings)
+
+    assert result == unknown_address
+
+
 def test_max_price_reads_first_accepted_token_config(monkeypatch, settings):
     captured = {}
 

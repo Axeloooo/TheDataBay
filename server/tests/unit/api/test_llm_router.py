@@ -60,7 +60,30 @@ def test_create_batch_embeddings_requires_price(client, monkeypatch):
     assert response.json() == {"detail": "price_atomic is required."}
 
 
-def test_create_batch_embeddings_rejects_non_usdc_settlement(client, monkeypatch):
+def test_create_batch_embeddings_accepts_cadc_settlement(client, monkeypatch):
+    async def fake_enqueue_batch_job(**kwargs):
+        return JobResponse(job_id="job-cadc", status="queued", listing_id="listing-cadc")
+
+    monkeypatch.setattr(llm_router, "enqueue_batch_job", fake_enqueue_batch_job)
+
+    response = client.post(
+        "/api/v1/llm/embed/batch",
+        data={
+            "title": "Retail Data",
+            "description": "Point of sale records",
+            "seller": "0x0000000000000000000000000000000000000001",
+            "price_atomic": "250",
+            "settlement_currency": "CADC",
+            "settlement_decimals": "18",
+        },
+        files={"file": ("retail.csv", b"id,total\n1,20\n", "text/csv")},
+    )
+
+    assert response.status_code == 202
+    assert response.json()["job_id"] == "job-cadc"
+
+
+def test_create_batch_embeddings_rejects_unknown_settlement_currency(client, monkeypatch):
     async def fail_enqueue_batch_job(**kwargs):
         raise AssertionError(
             "enqueue_batch_job should not be called for unsupported settlement currency"
@@ -75,21 +98,22 @@ def test_create_batch_embeddings_rejects_non_usdc_settlement(client, monkeypatch
             "description": "Point of sale records",
             "seller": "0x0000000000000000000000000000000000000001",
             "price_atomic": "250",
-            "settlement_currency": "ETH",
+            "settlement_currency": "XYZ",
+            "settlement_decimals": "6",
         },
         files={"file": ("retail.csv", b"id,total\n1,20\n", "text/csv")},
     )
 
     assert response.status_code == 400
-    assert response.json() == {"detail": "Only USDC settlement is supported."}
+    assert "Unsupported settlement_currency 'XYZ'" in response.json()["detail"]
+    assert "CADC" in response.json()["detail"]
+    assert "USDC" in response.json()["detail"]
 
 
-def test_create_batch_embeddings_rejects_invalid_settlement_decimals(
-    client, monkeypatch
-):
+def test_create_batch_embeddings_rejects_mismatched_decimals_for_usdc(client, monkeypatch):
     async def fail_enqueue_batch_job(**kwargs):
         raise AssertionError(
-            "enqueue_batch_job should not be called for invalid settlement decimals"
+            "enqueue_batch_job should not be called for mismatched settlement decimals"
         )
 
     monkeypatch.setattr(llm_router, "enqueue_batch_job", fail_enqueue_batch_job)
@@ -101,13 +125,39 @@ def test_create_batch_embeddings_rejects_invalid_settlement_decimals(
             "description": "Point of sale records",
             "seller": "0x0000000000000000000000000000000000000001",
             "price_atomic": "250",
+            "settlement_currency": "USDC",
             "settlement_decimals": "18",
         },
         files={"file": ("retail.csv", b"id,total\n1,20\n", "text/csv")},
     )
 
     assert response.status_code == 400
-    assert response.json() == {"detail": "Settlement decimals must equal 6 for USDC."}
+    assert response.json() == {"detail": "settlement_decimals must equal 6 for USDC."}
+
+
+def test_create_batch_embeddings_rejects_mismatched_decimals_for_cadc(client, monkeypatch):
+    async def fail_enqueue_batch_job(**kwargs):
+        raise AssertionError(
+            "enqueue_batch_job should not be called for mismatched settlement decimals"
+        )
+
+    monkeypatch.setattr(llm_router, "enqueue_batch_job", fail_enqueue_batch_job)
+
+    response = client.post(
+        "/api/v1/llm/embed/batch",
+        data={
+            "title": "Retail Data",
+            "description": "Point of sale records",
+            "seller": "0x0000000000000000000000000000000000000001",
+            "price_atomic": "250",
+            "settlement_currency": "CADC",
+            "settlement_decimals": "6",
+        },
+        files={"file": ("retail.csv", b"id,total\n1,20\n", "text/csv")},
+    )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "settlement_decimals must equal 18 for CADC."}
 
 
 def test_embed_query_returns_vector_payload(client, monkeypatch, settings):

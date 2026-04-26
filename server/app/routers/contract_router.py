@@ -38,7 +38,7 @@ def get_max_price(settings: Settings = Depends(get_settings)) -> int:
         settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
 
     Returns:
-        int: Maximum item price in USDC atomic units
+        int: Maximum item price in settlement token atomic units
     """
     return contract_service.max_price(settings)
 

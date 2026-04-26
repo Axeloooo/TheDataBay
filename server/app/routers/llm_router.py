@@ -15,6 +15,7 @@ from fastapi import (
 )
 
 from ..schemas.job_schema import JobResponse, JobStatusResponse
+from ..schemas.marketplace_schema import TOKEN_DECIMALS
 from ..schemas.llm_schema import (
     VectorSpec,
     QueryEmbeddingRequest,
@@ -68,8 +69,8 @@ async def create_batch_embeddings(
         title (str): Dataset title
         description (str): Dataset description
         seller (str): Seller EVM address
-        price (int | None): Legacy price field in USDC atomic units
-        price_atomic (int | None): Preferred price field in USDC atomic units
+        price (int | None): Legacy price field in settlement token atomic units
+        price_atomic (int | None): Preferred price field in settlement token atomic units
         settlement_currency (str): Settlement currency metadata
         settlement_decimals (int): Settlement decimals metadata
         seller_wallet_type (str): Seller wallet type (evm only for now)
@@ -88,13 +89,19 @@ async def create_batch_embeddings(
     effective_price = price_atomic if price_atomic is not None else price
     if effective_price is None:
         raise HTTPException(status_code=400, detail="price_atomic is required.")
-    if settlement_currency != "USDC":
+    if settlement_currency not in TOKEN_DECIMALS:
         raise HTTPException(
-            status_code=400, detail="Only USDC settlement is supported."
+            status_code=400,
+            detail=(
+                f"Unsupported settlement_currency {settlement_currency!r}. "
+                f"Supported: {sorted(TOKEN_DECIMALS.keys())}."
+            ),
         )
-    if settlement_decimals != 6:
+    expected_decimals = TOKEN_DECIMALS[settlement_currency]
+    if settlement_decimals != expected_decimals:
         raise HTTPException(
-            status_code=400, detail="Settlement decimals must equal 6 for USDC."
+            status_code=400,
+            detail=f"settlement_decimals must equal {expected_decimals} for {settlement_currency}.",
         )
 
     return await enqueue_batch_job(

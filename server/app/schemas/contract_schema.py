@@ -17,7 +17,7 @@ class TxHashResponse(BaseModel):
 class BuyItemRequest(BaseModel):
     """Buy item request schema."""
 
-    value_wei: int = Field(..., ge=0, description="Payment amount in USDC atomic units")
+    value_wei: int = Field(..., ge=0, description="Payment amount in settlement token atomic units")
 
 
 class UpdateDatasetUrlRequest(BaseModel):
@@ -36,7 +36,7 @@ class UpdateSignatureRequest(BaseModel):
 class UpdatePriceRequest(BaseModel):
     """Update price request schema."""
 
-    new_price: int = Field(..., gt=0, description="New item price in USDC atomic units")
+    new_price: int = Field(..., gt=0, description="New item price in settlement token atomic units")
 
 
 class SetFeeConfigRequest(BaseModel):

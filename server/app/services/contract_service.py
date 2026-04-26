@@ -15,8 +15,7 @@ from fastapi import HTTPException
 from ..schemas.dataset_schema import WalletType
 from ..schemas.marketplace_schema import (
     MarketplaceDataItem,
-    SETTLEMENT_CURRENCY,
-    SETTLEMENT_DECIMALS,
+    TOKEN_DECIMALS,
 )
 from web3 import Web3
 from web3.contract import Contract
@@ -256,17 +255,27 @@ def _payment_token_from_settings(settings: Settings) -> str | None:
         raise
 
 
+def _token_symbol_table(settings: Settings) -> dict[str, str]:
+    table = {}
+    for symbol, attr in [("USDC", "payment_token_address"), ("CADC", "cadc_token_address")]:
+        addr = getattr(settings, attr, "")
+        if not addr:
+            continue
+        try:
+            table[Web3.to_checksum_address(addr)] = symbol
+        except ValueError:
+            pass
+    return table
+
+
 def _settlement_currency_for_token(payment_token: str, settings: Settings | None) -> str:
     if settings is None:
-        return SETTLEMENT_CURRENCY
-    configured_token = _payment_token_from_settings(settings)
+        return "USDC"
     try:
         token = Web3.to_checksum_address(payment_token)
     except ValueError:
         return str(payment_token)
-    if configured_token is None:
-        return token
-    return SETTLEMENT_CURRENCY if token == configured_token else token
+    return _token_symbol_table(settings).get(token, token)
 
 
 def _settlement_decimals_for_token(
@@ -275,13 +284,13 @@ def _settlement_decimals_for_token(
     token_config_cache: dict[str, int] | None,
 ) -> int:
     if contract is None:
-        return SETTLEMENT_DECIMALS
+        return TOKEN_DECIMALS["USDC"]
     try:
         token = Web3.to_checksum_address(payment_token)
     except ValueError:
-        return SETTLEMENT_DECIMALS
+        return TOKEN_DECIMALS["USDC"]
     if token == "0x0000000000000000000000000000000000000000":
-        return SETTLEMENT_DECIMALS
+        return TOKEN_DECIMALS["USDC"]
     if token_config_cache is not None and token in token_config_cache:
         return token_config_cache[token]
     config = _call_contract_read(
@@ -824,7 +833,7 @@ def buy_item(listing_id: str, value_wei: int, settings: Settings) -> str:
 
     Args:
         listing_id (str): Listing UUID string
-        value_wei (int): Settlement payment amount in USDC atomic units
+        value_wei (int): Settlement payment amount in settlement token atomic units
         settings (Settings): Application settings instance
 
     Returns:
@@ -906,7 +915,7 @@ def update_price(listing_id: str, new_price: int, settings: Settings) -> str:
 
     Args:
         listing_id (str): Listing UUID string
-        new_price (int): New price for the item in USDC atomic units
+        new_price (int): New price for the item in settlement token atomic units
         settings (Settings): Application settings instance
 
     Returns:

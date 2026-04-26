@@ -53,7 +53,7 @@ async def enqueue_batch_job(
         title (str): Dataset title
         description (str): Dataset description
         seller (str): Seller EVM address
-        price (int): Price in USDC atomic units
+        price (int): Price in settlement token atomic units
         seller_wallet_type (str): Seller wallet type (evm only for now)
 
     Returns:
@@ -228,7 +228,7 @@ async def _process_embedding_job(
         title (str): Dataset title
         description (str): Dataset description
         seller (str): Seller EVM address
-        price (int): Price in USDC atomic units
+        price (int): Price in settlement token atomic units
     """
     logger.info("llm_job.process start job_id=%s listing_id=%s", job_id, listing_id)
 
