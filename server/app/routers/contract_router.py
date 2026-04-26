@@ -172,29 +172,22 @@ def get_purchases_by_wallet(
 def create_item(
     request: CreateItemRequest, settings: Settings = Depends(get_settings)
 ) -> TxHashResponse:
-    """Create a marketplace item on-chain.
+    """Create a new marketplace item on-chain.
 
     Args:
         request (CreateItemRequest): Create item request model
         settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
 
+    Raises:
+        HTTPException: Direct wallet transaction required for createItem.
+
     Returns:
         TxHashResponse: Transaction hash response
     """
-    tx_hash = contract_service.create_item(
-        listing_id=request.listing_id,
-        title=request.title,
-        description=request.description,
-        seller=request.seller,
-        payment_token=request.payment_token,
-        price=request.price,
-        dataset_url=request.dataset_url,
-        dataset_hash=request.dataset_hash,
-        signature_url=request.signature_url,
-        signature_hash=request.signature_hash,
-        settings=settings,
+    raise HTTPException(
+        status_code=400,
+        detail="Direct wallet transaction required for createItem.",
     )
-    return TxHashResponse(tx_hash=tx_hash)
 
 
 @router.post("/items/{listing_id}/buy", response_model=TxHashResponse)
