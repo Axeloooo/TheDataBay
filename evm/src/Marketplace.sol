@@ -228,41 +228,24 @@ contract Marketplace is Ownable, ReentrancyGuard {
      */
     function createItem(
         bytes32 itemId,
-        string calldata title,
-        string calldata description,
+        string memory title,
+        string memory description,
         address seller,
         address paymentToken,
         uint256 price,
-        string calldata datasetUrl,
+        string memory datasetUrl,
         bytes32 datasetHash,
-        string calldata signatureUrl,
+        string memory signatureUrl,
         bytes32 signatureHash
     ) external returns (bytes32 createdItemId) {
-        if (bytes(title).length == 0) revert Marketplace__TitleRequired();
-        if (bytes(description).length == 0) revert Marketplace__DescriptionRequired();
-        if (price == 0) revert Marketplace__PriceMustBeGreaterThanZero();
-        TokenConfig memory tokenConfig = _enabledTokenConfig(paymentToken);
-        if (price > tokenConfig.maxPrice) revert Marketplace__PriceExceedsMaximum(price, tokenConfig.maxPrice);
-        if (bytes(datasetUrl).length == 0) revert Marketplace__DatasetUrlRequired();
-        if (bytes(signatureUrl).length == 0) revert Marketplace__SignatureUrlRequired();
-        if (seller == address(0) || seller != msg.sender) revert Marketplace__SellerRequired();
-        if (items[itemId].exists) revert Marketplace__ItemAlreadyExists(itemId);
-
-        DataItem storage it = items[itemId];
-        it.title = title;
-        it.description = description;
-        it.seller = seller;
-        it.price = price;
-        it.paymentToken = paymentToken;
-        it.datasetUrl = datasetUrl;
-        it.datasetHash = datasetHash;
-        it.signatureUrl = signatureUrl;
-        it.signatureHash = signatureHash;
-        it.exists = true;
-
-        itemIds.push(itemId);
-
-        emit ItemCreated(itemId, seller, paymentToken, price, datasetUrl, datasetHash, signatureUrl, signatureHash);
+        _validateItemText(title, description);
+        _validateItemPrice(paymentToken, price);
+        _validateItemArtifacts(datasetUrl, signatureUrl);
+        _validateNewItemSellerAndId(itemId, seller);
+        _storeItemSaleTerms(itemId, title, description, seller, paymentToken, price);
+        _storeItemArtifacts(itemId, datasetUrl, datasetHash, signatureUrl, signatureHash);
+        _markItemCreated(itemId);
+        _emitItemCreated(itemId, seller, paymentToken, price, datasetUrl, datasetHash, signatureUrl, signatureHash);
         createdItemId = itemId;
     }
 
@@ -327,8 +310,8 @@ contract Marketplace is Ownable, ReentrancyGuard {
     {
         if (newPrice == 0) revert Marketplace__PriceMustBeGreaterThanZero();
         DataItem storage it = items[itemId];
-        TokenConfig memory tokenConfig = _enabledTokenConfig(it.paymentToken);
-        if (newPrice > tokenConfig.maxPrice) revert Marketplace__PriceExceedsMaximum(newPrice, tokenConfig.maxPrice);
+        uint256 maxPrice = _enabledTokenMaxPrice(it.paymentToken);
+        if (newPrice > maxPrice) revert Marketplace__PriceExceedsMaximum(newPrice, maxPrice);
         uint256 old = it.price;
         it.price = newPrice;
         emit PriceUpdated(itemId, old, newPrice);
@@ -466,7 +449,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
     function _purchase(bytes32 itemId, address buyer) internal {
         DataItem storage it = items[itemId];
         if (buyer == it.seller) revert Marketplace__SellerCannotBuyOwnItem();
-        _enabledTokenConfig(it.paymentToken);
+        _requireEnabledToken(it.paymentToken);
         IERC20 paymentToken = IERC20(it.paymentToken);
 
         uint256 fee = (it.price * feeBps) / 10_000;
@@ -501,9 +484,85 @@ contract Marketplace is Ownable, ReentrancyGuard {
         emit TokenConfigUpdated(token, enabled, decimals, maxPrice);
     }
 
-    function _enabledTokenConfig(address token) internal view returns (TokenConfig memory config) {
-        config = acceptedTokens[token];
+    function _validateItemText(string memory title, string memory description) internal pure {
+        if (bytes(title).length == 0) revert Marketplace__TitleRequired();
+        if (bytes(description).length == 0) revert Marketplace__DescriptionRequired();
+    }
+
+    function _validateItemPrice(address paymentToken, uint256 price) internal view {
+        if (price == 0) revert Marketplace__PriceMustBeGreaterThanZero();
+        uint256 maxPrice = _enabledTokenMaxPrice(paymentToken);
+        if (price > maxPrice) revert Marketplace__PriceExceedsMaximum(price, maxPrice);
+    }
+
+    function _validateItemArtifacts(string memory datasetUrl, string memory signatureUrl) internal pure {
+        if (bytes(datasetUrl).length == 0) revert Marketplace__DatasetUrlRequired();
+        if (bytes(signatureUrl).length == 0) revert Marketplace__SignatureUrlRequired();
+    }
+
+    function _validateNewItemSellerAndId(bytes32 itemId, address seller) internal view {
+        if (seller == address(0) || seller != msg.sender) revert Marketplace__SellerRequired();
+        if (items[itemId].exists) revert Marketplace__ItemAlreadyExists(itemId);
+    }
+
+    function _storeItemSaleTerms(
+        bytes32 itemId,
+        string memory title,
+        string memory description,
+        address seller,
+        address paymentToken,
+        uint256 price
+    ) internal {
+        DataItem storage it = items[itemId];
+        it.title = title;
+        it.description = description;
+        it.seller = seller;
+        it.price = price;
+        it.paymentToken = paymentToken;
+    }
+
+    function _storeItemArtifacts(
+        bytes32 itemId,
+        string memory datasetUrl,
+        bytes32 datasetHash,
+        string memory signatureUrl,
+        bytes32 signatureHash
+    ) internal {
+        DataItem storage it = items[itemId];
+        it.datasetUrl = datasetUrl;
+        it.datasetHash = datasetHash;
+        it.signatureUrl = signatureUrl;
+        it.signatureHash = signatureHash;
+    }
+
+    function _markItemCreated(bytes32 itemId) internal {
+        DataItem storage it = items[itemId];
+        it.exists = true;
+
+        itemIds.push(itemId);
+    }
+
+    function _emitItemCreated(
+        bytes32 itemId,
+        address seller,
+        address paymentToken,
+        uint256 price,
+        string memory datasetUrl,
+        bytes32 datasetHash,
+        string memory signatureUrl,
+        bytes32 signatureHash
+    ) internal {
+        emit ItemCreated(itemId, seller, paymentToken, price, datasetUrl, datasetHash, signatureUrl, signatureHash);
+    }
+
+    function _enabledTokenMaxPrice(address token) internal view returns (uint256 maxPrice) {
+        TokenConfig storage config = acceptedTokens[token];
         if (!config.enabled) revert Marketplace__TokenNotAccepted(token);
+        maxPrice = config.maxPrice;
+    }
+
+    function _requireEnabledToken(address token) internal view {
+        if (!acceptedTokens[token].enabled) revert Marketplace__TokenNotAccepted(token);
     }
 
     function _walletIdForEvm(address user) internal view returns (bytes32) {
