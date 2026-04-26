@@ -12,6 +12,7 @@ export const ENV = {
   WALLETCONNECT_PROJECT_ID: readExtra("walletConnectProjectId"),
   CONTRACT_ADDRESS: readExtra("contractAddress"),
   PAYMENT_TOKEN_ADDRESS: readExtra("paymentTokenAddress"),
+  CADC_TOKEN_ADDRESS: readExtra("cadcTokenAddress"),
   CHAIN_ID: Number.parseInt(readExtra("chainId") || "31337", 10),
   RPC_URL: readExtra("rpcUrl") || "http://127.0.0.1:8545",
   EXPLORER_URL: readExtra("explorerUrl"),
