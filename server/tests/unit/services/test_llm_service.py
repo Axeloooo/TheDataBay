@@ -8,7 +8,7 @@ def test_warmup_model_success(monkeypatch, settings):
     class FakeEmbeddings:
         def embed_query(self, text):
             self.text = text
-            return [0.1, 0.2]
+            return [0.1] * settings.embedding_dimension
 
     fake = FakeEmbeddings()
     monkeypatch.setattr(llm_service, "get_embeddings", lambda model: fake)

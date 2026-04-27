@@ -199,7 +199,7 @@ async def test_process_embedding_job_success(monkeypatch, settings, job_manager)
 
     delete_calls: list[str] = []
 
-    async def fake_delete_listing_documents(listing_id):
+    async def fake_delete_stale_listing_documents(listing_id, current_ids):
         delete_calls.append(listing_id)
 
     fake_vectorstore = AsyncMock()
@@ -216,7 +216,9 @@ async def test_process_embedding_job_success(monkeypatch, settings, job_manager)
         llm_job_service, "async_upsert_dataset_key", fake_async_upsert_dataset_key
     )
     monkeypatch.setattr(
-        llm_job_service, "delete_listing_documents", fake_delete_listing_documents
+        llm_job_service,
+        "delete_stale_listing_documents",
+        fake_delete_stale_listing_documents,
     )
     monkeypatch.setattr(
         llm_job_service, "vectorstore_for_settings", lambda settings: fake_vectorstore
@@ -310,7 +312,7 @@ async def test_process_embedding_job_key_not_written_when_vector_ingest_fails(
         key_upsert_calls.append(kwargs)
         return None
 
-    async def fake_delete_listing_documents(listing_id):
+    async def fake_delete_stale_listing_documents(listing_id, current_ids):
         return None
 
     fake_vectorstore = AsyncMock()
@@ -325,7 +327,9 @@ async def test_process_embedding_job_key_not_written_when_vector_ingest_fails(
         llm_job_service, "async_upsert_dataset_key", fake_async_upsert_dataset_key
     )
     monkeypatch.setattr(
-        llm_job_service, "delete_listing_documents", fake_delete_listing_documents
+        llm_job_service,
+        "delete_stale_listing_documents",
+        fake_delete_stale_listing_documents,
     )
     monkeypatch.setattr(llm_job_service, "vectorstore_for_settings", lambda settings: fake_vectorstore)
 
