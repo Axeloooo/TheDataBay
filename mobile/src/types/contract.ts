@@ -13,8 +13,8 @@ export type MarketplaceDataItem = {
   settlement_decimals: number;
   dataset_url: string;
   dataset_hash: string;
-  signature_url: string;
-  signature_hash: string;
+  signature_url?: string;
+  signature_hash?: string;
   exists: boolean;
   purchase_count: number;
 };

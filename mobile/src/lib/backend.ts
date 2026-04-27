@@ -168,7 +168,8 @@ export const backend = {
           dataset_url: "",
           dataset_hash: "0x",
           signature_url: "",
-          signature_hash: "0x",
+          signature_hash:
+            "0x0000000000000000000000000000000000000000000000000000000000000000",
           exists: true,
           purchase_count: result.purchase_count,
         }),

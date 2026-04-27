@@ -8,28 +8,26 @@ import logging
 import uuid
 
 from fastapi import BackgroundTasks, HTTPException, UploadFile
+from langchain_core.documents import Document
+from sqlalchemy import text
 from web3 import Web3
 
 from ..config.settings import Settings
 from ..database.async_engine import get_async_session_factory
-from ..repositories.dataset_embedding_repo import DatasetEmbeddingRepository
 from ..schemas.job_schema import JobResponse, JobStatus, JobStatusResponse
-from ..schemas.llm_schema import DatasetStats, SignatureInfo, VectorSpec
+from ..schemas.llm_schema import DatasetStats, VectorSpec
 from .dataset_key_repo import async_upsert_dataset_key
 from ..services.encryption_service import encrypt_bytes, generate_key
 from ..services.job_manager import JobManager
 from ..services.llm_service import (
-    generate_embeddings_chunked,
-    mean_pool,
+    DATASET_ROWS_COLLECTION,
     parse_dataset_file,
     record_to_text,
+    vectorstore_for_settings,
 )
-from ..services.pinata_service import upload_signature, upload_bytes
+from ..services.pinata_service import upload_bytes
 
 logger = logging.getLogger(__name__)
-
-# Module-level repository instance (can be monkeypatched in tests)
-_embedding_repo = DatasetEmbeddingRepository()
 
 
 async def enqueue_batch_job(
@@ -195,9 +193,38 @@ def get_job_status(job_id: str, job_manager: JobManager) -> JobStatusResponse:
         response.dataset_hash = dataset.get("dataset_hash")
         response.vector_spec = VectorSpec(**job.result["vectorSpec"])
         response.stats = DatasetStats(**job.result["stats"])
-        response.signature = SignatureInfo(**job.result["signature"])
 
     return response
+
+
+async def delete_stale_listing_documents(
+    listing_id: str, current_ids: list[str]
+) -> None:
+    """Delete PGVector row documents for a listing whose IDs are not in current_ids.
+
+    Called after a successful aadd_documents so that a failed ingest never
+    leaves the listing with no vectors.
+    """
+    factory = get_async_session_factory()
+    async with factory() as session:
+        async with session.begin():
+            await session.execute(
+                text(
+                    """
+                    DELETE FROM langchain_pg_embedding e
+                    USING langchain_pg_collection c
+                    WHERE e.collection_id = c.uuid
+                      AND c.name = :collection_name
+                      AND e.cmetadata->>'listing_id' = :listing_id
+                      AND e.id != ALL(:current_ids)
+                    """
+                ),
+                {
+                    "collection_name": DATASET_ROWS_COLLECTION,
+                    "listing_id": listing_id,
+                    "current_ids": current_ids,
+                },
+            )
 
 
 async def _process_embedding_job(
@@ -214,9 +241,9 @@ async def _process_embedding_job(
 ) -> None:
     """Background task to process embedding job.
 
-    The job owns its own async database session.  Both the DatasetKey upsert
-    and the DatasetEmbedding upsert are wrapped in a single ``session.begin()``
-    block so they commit atomically or both roll back on any exception.
+    The job owns its own async database session for DatasetKey persistence.
+    PGVector manages its own connection, so DatasetKey is written last after
+    vector ingest succeeds. A retry deletes stale row vectors before ingest.
 
     Args:
         job_id (str): Job identifier
@@ -244,17 +271,14 @@ async def _process_embedding_job(
             decoded_content
         )
 
-        # Transform to text
-        texts = []
-        for row in data_rows:
-            text = record_to_text(row, column_names)
-            texts.append(text)
-
-        # Generate per-row embeddings with chunking
-        row_embeddings, dimension = await generate_embeddings_chunked(texts, settings)
-
-        # Produce single dataset vector via mean pooling
-        dataset_vector = mean_pool(row_embeddings)
+        documents = [
+            Document(
+                page_content=record_to_text(row, column_names),
+                metadata={"listing_id": listing_id, "row_index": i},
+            )
+            for i, row in enumerate(data_rows)
+        ]
+        document_ids = [f"{listing_id}:{i}" for i in range(len(documents))]
 
         # Encrypt raw dataset bytes and upload to IPFS
         aad = listing_id.encode("utf-8")
@@ -262,16 +286,17 @@ async def _process_embedding_job(
         ciphertext, nonce = encrypt_bytes(content_bytes, key, aad)
         dataset_url, dataset_hash = await upload_bytes(ciphertext, filename, settings)
 
-        # Upload raw row embeddings as signature to IPFS (unencrypted)
-        ipfs_url, signature_hash = await upload_signature(
-            row_embeddings, filename, settings, compress=True
+        await vectorstore_for_settings(settings).aadd_documents(
+            documents,
+            ids=document_ids,
         )
+        await delete_stale_listing_documents(listing_id, document_ids)
 
         # Prepare key material
         key_b64 = base64.b64encode(key).decode("utf-8")
         nonce_b64 = base64.b64encode(nonce).decode("utf-8")
 
-        # Atomically persist DatasetKey + DatasetEmbedding
+        # Persist DatasetKey after vector ingest succeeds.
         factory = get_async_session_factory()
         async with factory() as session:
             async with session.begin():
@@ -283,11 +308,6 @@ async def _process_embedding_job(
                     dataset_url=dataset_url,
                     dataset_hash=dataset_hash,
                 )
-                await _embedding_repo.upsert(
-                    db=session,
-                    listing_id=listing_id,
-                    embedding=dataset_vector,
-                )
 
         # Build result
         result = {
@@ -296,13 +316,9 @@ async def _process_embedding_job(
                 "dataset_url": dataset_url,
                 "dataset_hash": dataset_hash,
             },
-            "signature": {
-                "signature_url": ipfs_url,
-                "signature_hash": signature_hash,
-            },
             "vectorSpec": {
                 "model": settings.embedding_model,
-                "dimension": dimension,
+                "dimension": settings.embedding_dimension,
             },
             "stats": {
                 "total_rows": len(data_rows),

@@ -26,7 +26,7 @@ from ..services.llm_job_service import (
     enqueue_batch_job,
     get_job_status as get_job_status_service,
 )
-from ..services.llm_service import generate_single_embedding
+from ..services.llm_service import embed_query as embed_query_service
 from ..config.settings import Settings, get_settings
 
 router = APIRouter(
@@ -132,7 +132,7 @@ async def embed_query(
         QueryEmbeddingResponse: Complete response with embedding, and vectorSpec
     """
     logger.info("llm.embed_query called query_len=%s", len(request.query))
-    query_embedding, dimension = generate_single_embedding(request.query, settings)
+    query_embedding, dimension = await embed_query_service(request.query, settings)
 
     vector_spec = VectorSpec(
         model=settings.embedding_model,

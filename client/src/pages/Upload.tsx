@@ -165,10 +165,6 @@ function Upload() {
     jobStatus?.dataset_url ?? persistedSession?.datasetUrl;
   const currentDatasetHash =
     jobStatus?.dataset_hash ?? persistedSession?.datasetHash;
-  const currentSignatureUrl =
-    jobStatus?.signature?.signature_url ?? persistedSession?.signatureUrl;
-  const currentSignatureHash =
-    jobStatus?.signature?.signature_hash ?? persistedSession?.signatureHash;
   const effectiveStatus = jobStatus?.status ?? persistedSession?.status;
 
   const walletMismatch =
@@ -204,8 +200,8 @@ function Upload() {
             Connect Wallet to List Datasets
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Listing requires an EVM wallet signature. Connect your wallet to
-            upload, encrypt, and publish datasets on-chain.
+            Connect your wallet to upload, encrypt, and publish datasets
+            on-chain.
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             Solana wallet connection is planned for upcoming cross-chain
@@ -479,27 +475,6 @@ function Upload() {
                     </div>
                   </div>
                 )}
-                {currentSignatureUrl && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">
-                      Signature URL
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-xs break-all">
-                        {currentSignatureUrl}
-                      </code>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() =>
-                          copyToClipboard(currentSignatureUrl, "Signature URL")
-                        }
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}
@@ -596,10 +571,6 @@ function Upload() {
                       }
                       if (!currentDatasetUrl || !currentDatasetHash) {
                         setError("Missing dataset upload outputs.");
-                        return;
-                      }
-                      if (!currentSignatureUrl || !currentSignatureHash) {
-                        setError("Missing signature upload outputs.");
                         return;
                       }
                       if (

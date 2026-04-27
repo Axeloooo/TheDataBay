@@ -240,7 +240,7 @@ contract Marketplace is Ownable, ReentrancyGuard {
     ) external returns (bytes32 createdItemId) {
         _validateItemText(title, description);
         _validateItemPrice(paymentToken, price);
-        _validateItemArtifacts(datasetUrl, signatureUrl);
+        _validateItemArtifacts(datasetUrl);
         _validateNewItemSellerAndId(itemId, seller);
         _storeItemSaleTerms(itemId, title, description, seller, paymentToken, price);
         _storeItemArtifacts(itemId, datasetUrl, datasetHash, signatureUrl, signatureHash);
@@ -495,9 +495,8 @@ contract Marketplace is Ownable, ReentrancyGuard {
         if (price > maxPrice) revert Marketplace__PriceExceedsMaximum(price, maxPrice);
     }
 
-    function _validateItemArtifacts(string memory datasetUrl, string memory signatureUrl) internal pure {
+    function _validateItemArtifacts(string memory datasetUrl) internal pure {
         if (bytes(datasetUrl).length == 0) revert Marketplace__DatasetUrlRequired();
-        if (bytes(signatureUrl).length == 0) revert Marketplace__SignatureUrlRequired();
     }
 
     function _validateNewItemSellerAndId(bytes32 itemId, address seller) internal view {

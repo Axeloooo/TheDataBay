@@ -12,11 +12,6 @@ export type DatasetStats = {
   has_header: boolean;
 };
 
-export type SignatureInfo = {
-  signature_url: string;
-  signature_hash: string;
-};
-
 export type JobResponse = {
   job_id: string;
   status: JobLifecycleStatus;
@@ -33,7 +28,6 @@ export type JobStatusResponse = {
   error?: string | null;
   vector_spec?: VectorSpec | null;
   stats?: DatasetStats | null;
-  signature?: SignatureInfo | null;
   dataset_url?: string | null;
   dataset_hash?: string | null;
   filename: string;

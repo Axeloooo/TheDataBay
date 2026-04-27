@@ -1,6 +1,4 @@
-import asyncio
 import io
-from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -14,12 +12,35 @@ def make_upload_file(name: str, content: bytes) -> UploadFile:
     return UploadFile(filename=name, file=io.BytesIO(content))
 
 
-def test_enqueue_batch_job_success(settings, job_manager):
+@pytest.mark.asyncio
+async def test_enqueue_batch_job_success(settings, job_manager):
     file = make_upload_file("data.csv", b"col1,col2\n1,2\n3,4\n")
     tasks = BackgroundTasks()
 
-    response = asyncio.run(
-        llm_job_service.enqueue_batch_job(
+    response = await llm_job_service.enqueue_batch_job(
+        file=file,
+        background_tasks=tasks,
+        settings=settings,
+        job_manager=job_manager,
+        title="Dataset",
+        description="Desc",
+        seller="0x0000000000000000000000000000000000000001",
+        price=100,
+    )
+
+    assert response.status == JobStatus.QUEUED.value
+    assert job_manager.get_job(response.job_id) is not None
+    assert len(tasks.tasks) == 1
+    assert response.listing_id is not None
+
+
+@pytest.mark.asyncio
+async def test_enqueue_batch_job_invalid_extension(settings, job_manager):
+    file = make_upload_file("data.txt", b"hello")
+    tasks = BackgroundTasks()
+
+    with pytest.raises(HTTPException):
+        await llm_job_service.enqueue_batch_job(
             file=file,
             background_tasks=tasks,
             settings=settings,
@@ -29,111 +50,82 @@ def test_enqueue_batch_job_success(settings, job_manager):
             seller="0x0000000000000000000000000000000000000001",
             price=100,
         )
-    )
-
-    assert response.status == JobStatus.QUEUED.value
-    assert job_manager.get_job(response.job_id) is not None
-    assert len(tasks.tasks) == 1
-    assert response.listing_id is not None
 
 
-def test_enqueue_batch_job_invalid_extension(settings, job_manager):
-    file = make_upload_file("data.txt", b"hello")
-    tasks = BackgroundTasks()
-
-    with pytest.raises(HTTPException):
-        asyncio.run(
-            llm_job_service.enqueue_batch_job(
-                file=file,
-                background_tasks=tasks,
-                settings=settings,
-                job_manager=job_manager,
-                title="Dataset",
-                description="Desc",
-                seller="0x0000000000000000000000000000000000000001",
-                price=100,
-            )
-        )
-
-
-def test_enqueue_batch_job_rejects_non_evm_wallet(settings, job_manager):
+@pytest.mark.asyncio
+async def test_enqueue_batch_job_rejects_non_evm_wallet(settings, job_manager):
     file = make_upload_file("data.csv", b"col1,col2\n1,2\n")
     tasks = BackgroundTasks()
 
     with pytest.raises(HTTPException):
-        asyncio.run(
-            llm_job_service.enqueue_batch_job(
-                file=file,
-                background_tasks=tasks,
-                settings=settings,
-                job_manager=job_manager,
-                title="Dataset",
-                description="Desc",
-                seller="0x0000000000000000000000000000000000000001",
-                price=100,
-                seller_wallet_type="solana",
-            )
+        await llm_job_service.enqueue_batch_job(
+            file=file,
+            background_tasks=tasks,
+            settings=settings,
+            job_manager=job_manager,
+            title="Dataset",
+            description="Desc",
+            seller="0x0000000000000000000000000000000000000001",
+            price=100,
+            seller_wallet_type="solana",
         )
 
 
-def test_enqueue_batch_job_too_large(settings, job_manager):
+@pytest.mark.asyncio
+async def test_enqueue_batch_job_too_large(settings, job_manager):
     file = make_upload_file("data.csv", b"x" * 10)
     tasks = BackgroundTasks()
 
     tiny_settings = settings.model_copy(update={"max_file_size_mb": 0})
 
     with pytest.raises(HTTPException):
-        asyncio.run(
-            llm_job_service.enqueue_batch_job(
-                file=file,
-                background_tasks=tasks,
-                settings=tiny_settings,
-                job_manager=job_manager,
-                title="Dataset",
-                description="Desc",
-                seller="0x0000000000000000000000000000000000000001",
-                price=100,
-            )
+        await llm_job_service.enqueue_batch_job(
+            file=file,
+            background_tasks=tasks,
+            settings=tiny_settings,
+            job_manager=job_manager,
+            title="Dataset",
+            description="Desc",
+            seller="0x0000000000000000000000000000000000000001",
+            price=100,
         )
 
 
-def test_enqueue_batch_job_decode_error(settings, job_manager):
+@pytest.mark.asyncio
+async def test_enqueue_batch_job_decode_error(settings, job_manager):
     file = make_upload_file("data.csv", b"\xff\xfe\xff")
     tasks = BackgroundTasks()
 
     with pytest.raises(HTTPException):
-        asyncio.run(
-            llm_job_service.enqueue_batch_job(
-                file=file,
-                background_tasks=tasks,
-                settings=settings,
-                job_manager=job_manager,
-                title="Dataset",
-                description="Desc",
-                seller="0x0000000000000000000000000000000000000001",
-                price=100,
-            )
+        await llm_job_service.enqueue_batch_job(
+            file=file,
+            background_tasks=tasks,
+            settings=settings,
+            job_manager=job_manager,
+            title="Dataset",
+            description="Desc",
+            seller="0x0000000000000000000000000000000000000001",
+            price=100,
         )
 
 
-def test_enqueue_batch_job_too_many_rows(settings, job_manager):
+@pytest.mark.asyncio
+async def test_enqueue_batch_job_too_many_rows(settings, job_manager):
     file = make_upload_file("data.csv", b"a,b\n1,2\n")
     tasks = BackgroundTasks()
 
     strict_settings = settings.model_copy(update={"max_dataset_rows": 1})
 
     with pytest.raises(HTTPException):
-        asyncio.run(
-            llm_job_service.enqueue_batch_job(
-                file=file,
-                background_tasks=tasks,
-                settings=strict_settings,
-                job_manager=job_manager,
-                title="Dataset",
-                description="Desc",
-                seller="0x0000000000000000000000000000000000000001",
-                price=100,
-            )
+        await llm_job_service.enqueue_batch_job(
+            file=file,
+            background_tasks=tasks,
+            settings=strict_settings,
+            job_manager=job_manager,
+            title="Dataset",
+            description="Desc",
+            seller="0x0000000000000000000000000000000000000001",
+            price=100,
         )
 
 
@@ -154,10 +146,6 @@ def test_get_job_status_completed(settings, job_manager):
                 "empty_rows_skipped": 0,
                 "has_header": True,
             },
-            "signature": {
-                "signature_url": "ipfs://QmHash",
-                "signature_hash": "0xabc",
-            },
         },
     )
     job_manager.update_status(job_id, JobStatus.COMPLETED)
@@ -167,7 +155,6 @@ def test_get_job_status_completed(settings, job_manager):
     assert response.status == JobStatus.COMPLETED.value
     assert response.dataset_url == "ipfs://QmData"
     assert response.vector_spec is not None
-    assert response.signature is not None
     assert response.listing_id == "123e4567-e89b-12d3-a456-426614174000"
 
 
@@ -188,7 +175,8 @@ def _make_fake_session_factory():
     return factory, fake_session
 
 
-def test_process_embedding_job_success(monkeypatch, settings, job_manager):
+@pytest.mark.asyncio
+async def test_process_embedding_job_success(monkeypatch, settings, job_manager):
     job_id = job_manager.create_job(filename="data.csv")
 
     def fake_parse_dataset_file(content):
@@ -196,12 +184,6 @@ def test_process_embedding_job_success(monkeypatch, settings, job_manager):
 
     def fake_record_to_text(record, columns):
         return "col1: 1 | col2: 2"
-
-    async def fake_generate_embeddings_chunked(texts, settings):
-        return [[0.1, 0.2], [0.2, 0.1]], 2
-
-    def fake_mean_pool(embeddings):
-        return [0.15, 0.15]
 
     def fake_generate_key():
         return b"k" * 32
@@ -212,84 +194,89 @@ def test_process_embedding_job_success(monkeypatch, settings, job_manager):
     async def fake_upload_bytes(payload, filename, settings):
         return "ipfs://QmData", "0xdata"
 
-    async def fake_upload_signature(embeddings, filename, settings, compress=True):
-        return "ipfs://QmHash", "0xabc"
-
     async def fake_async_upsert_dataset_key(**kwargs):
         return None
 
-    fake_embedding_repo_instance = AsyncMock()
-    fake_embedding_repo_instance.upsert = AsyncMock(return_value=MagicMock())
+    delete_calls: list[str] = []
+
+    async def fake_delete_stale_listing_documents(listing_id, current_ids):
+        delete_calls.append(listing_id)
+
+    fake_vectorstore = AsyncMock()
+    fake_vectorstore.aadd_documents = AsyncMock(return_value=None)
 
     fake_factory, _fake_session = _make_fake_session_factory()
 
     monkeypatch.setattr(llm_job_service, "parse_dataset_file", fake_parse_dataset_file)
     monkeypatch.setattr(llm_job_service, "record_to_text", fake_record_to_text)
-    monkeypatch.setattr(
-        llm_job_service, "generate_embeddings_chunked", fake_generate_embeddings_chunked
-    )
-    monkeypatch.setattr(llm_job_service, "mean_pool", fake_mean_pool)
     monkeypatch.setattr(llm_job_service, "generate_key", fake_generate_key)
     monkeypatch.setattr(llm_job_service, "encrypt_bytes", fake_encrypt_bytes)
     monkeypatch.setattr(llm_job_service, "upload_bytes", fake_upload_bytes)
-    monkeypatch.setattr(llm_job_service, "upload_signature", fake_upload_signature)
     monkeypatch.setattr(
         llm_job_service, "async_upsert_dataset_key", fake_async_upsert_dataset_key
     )
     monkeypatch.setattr(
-        llm_job_service, "_embedding_repo", fake_embedding_repo_instance
+        llm_job_service,
+        "delete_stale_listing_documents",
+        fake_delete_stale_listing_documents,
+    )
+    monkeypatch.setattr(
+        llm_job_service, "vectorstore_for_settings", lambda settings: fake_vectorstore
     )
     monkeypatch.setattr(
         llm_job_service, "get_async_session_factory", lambda: fake_factory
     )
 
-    asyncio.run(
-        llm_job_service._process_embedding_job(
-            job_id=job_id,
-            content_bytes=b"col1,col2\n1,2\n",
-            filename="data.csv",
-            settings=settings,
-            job_manager=job_manager,
-            listing_id="123e4567-e89b-12d3-a456-426614174000",
-            title="Dataset",
-            description="Desc",
-            seller="0x0000000000000000000000000000000000000001",
-            price=100,
-        )
+    listing_id = "123e4567-e89b-12d3-a456-426614174000"
+    await llm_job_service._process_embedding_job(
+        job_id=job_id,
+        content_bytes=b"col1,col2\n1,2\n",
+        filename="data.csv",
+        settings=settings,
+        job_manager=job_manager,
+        listing_id=listing_id,
+        title="Dataset",
+        description="Desc",
+        seller="0x0000000000000000000000000000000000000001",
+        price=100,
     )
 
     job = job_manager.get_job(job_id)
     assert job.status == JobStatus.COMPLETED
-    assert job.result["signature"]["signature_url"] == "ipfs://QmHash"
+    assert "signature" not in job.result
+    assert delete_calls == [listing_id]
+    fake_vectorstore.aadd_documents.assert_awaited_once()
+    docs = fake_vectorstore.aadd_documents.await_args.args[0]
+    ids = fake_vectorstore.aadd_documents.await_args.kwargs["ids"]
+    assert [doc.page_content for doc in docs] == ["col1: 1 | col2: 2"]
+    assert docs[0].metadata == {"listing_id": listing_id, "row_index": 0}
+    assert ids == [f"{listing_id}:0"]
 
 
-def test_process_embedding_job_failure(monkeypatch, settings, job_manager):
+@pytest.mark.asyncio
+async def test_process_embedding_job_failure(monkeypatch, settings, job_manager):
     job_id = job_manager.create_job(filename="data.csv")
 
     def fake_parse_dataset_file(content):
         return [["1", "2"]], ["col1", "col2"], True, 0
 
-    async def fake_generate_embeddings_chunked(texts, settings):
+    async def fake_upload_bytes(payload, filename, settings):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(llm_job_service, "parse_dataset_file", fake_parse_dataset_file)
-    monkeypatch.setattr(
-        llm_job_service, "generate_embeddings_chunked", fake_generate_embeddings_chunked
-    )
+    monkeypatch.setattr(llm_job_service, "upload_bytes", fake_upload_bytes)
 
-    asyncio.run(
-        llm_job_service._process_embedding_job(
-            job_id=job_id,
-            content_bytes=b"col1,col2\n1,2\n",
-            filename="data.csv",
-            settings=settings,
-            job_manager=job_manager,
-            listing_id="123e4567-e89b-12d3-a456-426614174000",
-            title="Dataset",
-            description="Desc",
-            seller="0x0000000000000000000000000000000000000001",
-            price=100,
-        )
+    await llm_job_service._process_embedding_job(
+        job_id=job_id,
+        content_bytes=b"col1,col2\n1,2\n",
+        filename="data.csv",
+        settings=settings,
+        job_manager=job_manager,
+        listing_id="123e4567-e89b-12d3-a456-426614174000",
+        title="Dataset",
+        description="Desc",
+        seller="0x0000000000000000000000000000000000000001",
+        price=100,
     )
 
     job = job_manager.get_job(job_id)
@@ -297,11 +284,11 @@ def test_process_embedding_job_failure(monkeypatch, settings, job_manager):
     assert job.error is not None
 
 
-def test_process_embedding_job_rollback_on_embedding_upsert_failure(
+@pytest.mark.asyncio
+async def test_process_embedding_job_key_not_written_when_vector_ingest_fails(
     monkeypatch, settings, job_manager
 ):
-    """When the embedding upsert raises, the job should end FAILED and the
-    DatasetKey upsert must not have been committed (atomic rollback)."""
+    """DatasetKey is written last, so vector ingest failure leaves no key row."""
     job_id = job_manager.create_job(filename="data.csv")
 
     def fake_parse_dataset_file(content):
@@ -309,12 +296,6 @@ def test_process_embedding_job_rollback_on_embedding_upsert_failure(
 
     def fake_record_to_text(record, columns):
         return "col1: 1 | col2: 2"
-
-    async def fake_generate_embeddings_chunked(texts, settings):
-        return [[0.1, 0.2]], 2
-
-    def fake_mean_pool(embeddings):
-        return [0.15, 0.15]
 
     def fake_generate_key():
         return b"k" * 32
@@ -325,81 +306,46 @@ def test_process_embedding_job_rollback_on_embedding_upsert_failure(
     async def fake_upload_bytes(payload, filename, settings):
         return "ipfs://QmData", "0xdata"
 
-    async def fake_upload_signature(embeddings, filename, settings, compress=True):
-        return "ipfs://QmHash", "0xabc"
-
-    # Track whether async_upsert_dataset_key was called
     key_upsert_calls: list = []
 
     async def fake_async_upsert_dataset_key(**kwargs):
         key_upsert_calls.append(kwargs)
         return None
 
-    # Embedding upsert raises
-    fake_embedding_repo_instance = AsyncMock()
-    fake_embedding_repo_instance.upsert = AsyncMock(
-        side_effect=RuntimeError("DB write failed")
-    )
+    async def fake_delete_stale_listing_documents(listing_id, current_ids):
+        return None
 
-    # Session begin context manager that re-raises (simulating rollback on error)
-    fake_session = AsyncMock()
-    fake_session.__aenter__ = AsyncMock(return_value=fake_session)
-    fake_session.__aexit__ = AsyncMock(return_value=False)
-
-    begin_raised: list[bool] = []
-
-    @asynccontextmanager
-    async def fake_begin():
-        try:
-            yield None
-        except Exception:
-            begin_raised.append(True)
-            raise
-
-    fake_session.begin = MagicMock(side_effect=fake_begin)
-
-    def fake_factory():
-        return fake_session
+    fake_vectorstore = AsyncMock()
+    fake_vectorstore.aadd_documents = AsyncMock(side_effect=RuntimeError("DB write failed"))
 
     monkeypatch.setattr(llm_job_service, "parse_dataset_file", fake_parse_dataset_file)
     monkeypatch.setattr(llm_job_service, "record_to_text", fake_record_to_text)
-    monkeypatch.setattr(
-        llm_job_service, "generate_embeddings_chunked", fake_generate_embeddings_chunked
-    )
-    monkeypatch.setattr(llm_job_service, "mean_pool", fake_mean_pool)
     monkeypatch.setattr(llm_job_service, "generate_key", fake_generate_key)
     monkeypatch.setattr(llm_job_service, "encrypt_bytes", fake_encrypt_bytes)
     monkeypatch.setattr(llm_job_service, "upload_bytes", fake_upload_bytes)
-    monkeypatch.setattr(llm_job_service, "upload_signature", fake_upload_signature)
     monkeypatch.setattr(
         llm_job_service, "async_upsert_dataset_key", fake_async_upsert_dataset_key
     )
     monkeypatch.setattr(
-        llm_job_service, "_embedding_repo", fake_embedding_repo_instance
+        llm_job_service,
+        "delete_stale_listing_documents",
+        fake_delete_stale_listing_documents,
     )
-    monkeypatch.setattr(
-        llm_job_service, "get_async_session_factory", lambda: fake_factory
-    )
+    monkeypatch.setattr(llm_job_service, "vectorstore_for_settings", lambda settings: fake_vectorstore)
 
-    asyncio.run(
-        llm_job_service._process_embedding_job(
-            job_id=job_id,
-            content_bytes=b"col1,col2\n1,2\n",
-            filename="data.csv",
-            settings=settings,
-            job_manager=job_manager,
-            listing_id="123e4567-e89b-12d3-a456-426614174000",
-            title="Dataset",
-            description="Desc",
-            seller="0x0000000000000000000000000000000000000001",
-            price=100,
-        )
+    await llm_job_service._process_embedding_job(
+        job_id=job_id,
+        content_bytes=b"col1,col2\n1,2\n",
+        filename="data.csv",
+        settings=settings,
+        job_manager=job_manager,
+        listing_id="123e4567-e89b-12d3-a456-426614174000",
+        title="Dataset",
+        description="Desc",
+        seller="0x0000000000000000000000000000000000000001",
+        price=100,
     )
 
     job = job_manager.get_job(job_id)
     assert job.status == JobStatus.FAILED
-    # The begin() context manager propagated the error (rollback path was hit)
-    assert begin_raised, "Expected session.begin() to catch and re-raise the exception"
-    # DatasetKey upsert was staged inside the transaction that rolled back,
-    # so no committed write — the key_upsert_calls list may be non-empty but
-    # the begin() context will have rolled back the transaction.
+    assert key_upsert_calls == []

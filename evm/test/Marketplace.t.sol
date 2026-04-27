@@ -274,7 +274,7 @@ contract MarketplaceTest is Test {
         marketplace.setTokenEnabled(unknownToken, true);
     }
 
-    function test_createItem_rejects_empty_fields() public {
+    function test_createItem_rejects_empty_required_fields() public {
         bytes32 itemId = bytes32(uint256(1));
         vm.prank(seller);
         vm.expectRevert(Marketplace.Marketplace__TitleRequired.selector);
@@ -291,12 +291,21 @@ contract MarketplaceTest is Test {
         vm.prank(seller);
         vm.expectRevert(Marketplace.Marketplace__DatasetUrlRequired.selector);
         marketplace.createItem(itemId, TITLE, DESC, seller, address(usdc), PRICE, "", DATASET_HASH, SIG_URL, SIG_HASH);
+    }
+
+    function test_createItem_accepts_empty_signature_artifacts() public {
+        bytes32 itemId = bytes32(uint256(2));
 
         vm.prank(seller);
-        vm.expectRevert(Marketplace.Marketplace__SignatureUrlRequired.selector);
         marketplace.createItem(
-            itemId, TITLE, DESC, seller, address(usdc), PRICE, DATASET_URL, DATASET_HASH, "", SIG_HASH
+            itemId, TITLE, DESC, seller, address(usdc), PRICE, DATASET_URL, DATASET_HASH, "", bytes32(0)
         );
+
+        Marketplace.DataItemView memory v = marketplace.getItemView(itemId);
+        assertEq(v.datasetUrl, DATASET_URL);
+        assertEq(v.datasetHash, DATASET_HASH);
+        assertEq(v.signatureUrl, "");
+        assertEq(v.signatureHash, bytes32(0));
     }
 
     function test_createItem_rejects_invalid_price() public {

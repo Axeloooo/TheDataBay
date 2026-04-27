@@ -308,17 +308,26 @@ def _item_view_to_schema(
     contract: Contract | None = None,
     token_config_cache: dict[str, int] | None = None,
 ) -> MarketplaceDataItem:
+    def _first_present(mapping: Mapping, *keys: str) -> Any:
+        for key in keys:
+            if key in mapping:
+                return mapping[key]
+        return None
+
     if isinstance(raw, Mapping):
-        item_id = raw.get("itemId") or raw.get("item_id") or raw.get("id")
+        item_id = _first_present(raw, "itemId", "item_id", "id")
         title = raw.get("title")
         description = raw.get("description")
         seller = raw.get("seller")
-        payment_token = raw.get("paymentToken") or raw.get("payment_token") or "0x0000000000000000000000000000000000000000"
+        payment_token = (
+            _first_present(raw, "paymentToken", "payment_token")
+            or "0x0000000000000000000000000000000000000000"
+        )
         price = raw.get("price")
-        dataset_url = raw.get("datasetUrl") or raw.get("dataset_url")
-        dataset_hash = raw.get("datasetHash") or raw.get("dataset_hash")
-        signature_url = raw.get("signatureUrl") or raw.get("signature_url")
-        signature_hash = raw.get("signatureHash") or raw.get("signature_hash")
+        dataset_url = _first_present(raw, "datasetUrl", "dataset_url")
+        dataset_hash = _first_present(raw, "datasetHash", "dataset_hash")
+        signature_url = _first_present(raw, "signatureUrl", "signature_url")
+        signature_hash = _first_present(raw, "signatureHash", "signature_hash")
         exists = raw.get("exists")
         purchase_count = (
             raw.get("purchaseCount")

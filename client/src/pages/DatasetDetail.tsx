@@ -166,8 +166,6 @@ function DatasetDetail() {
     verifyDatasetIntegrity({
       datasetUrl: dataset.dataset_url,
       datasetHash: dataset.dataset_hash,
-      signatureUrl: dataset.signature_url,
-      signatureHash: dataset.signature_hash,
     }).then((result) => {
       if (!active) return;
       setIntegrityStatus(result.status);

@@ -161,11 +161,10 @@ def test_create_batch_embeddings_rejects_mismatched_decimals_for_cadc(client, mo
 
 
 def test_embed_query_returns_vector_payload(client, monkeypatch, settings):
-    monkeypatch.setattr(
-        llm_router,
-        "generate_single_embedding",
-        lambda query, resolved_settings: ([0.25, 0.75], 2),
-    )
+    async def fake_embed_query(query, resolved_settings):
+        return [0.25, 0.75], 2
+
+    monkeypatch.setattr(llm_router, "embed_query_service", fake_embed_query)
 
     response = client.post(
         "/api/v1/llm/embed/query",
@@ -184,13 +183,10 @@ def test_embed_query_returns_vector_payload(client, monkeypatch, settings):
 
 
 def test_embed_query_validates_non_empty_query(client, monkeypatch):
-    monkeypatch.setattr(
-        llm_router,
-        "generate_single_embedding",
-        lambda query, settings: (_ for _ in ()).throw(
-            AssertionError("generate_single_embedding should not be called")
-        ),
-    )
+    async def fail_embed_query(query, settings):
+        raise AssertionError("embed_query_service should not be called")
+
+    monkeypatch.setattr(llm_router, "embed_query_service", fail_embed_query)
 
     response = client.post("/api/v1/llm/embed/query", json={"query": ""})
 
@@ -217,10 +213,6 @@ def test_get_job_status_returns_router_response(client, monkeypatch):
                 "total_columns": 2,
                 "empty_rows_skipped": 0,
                 "has_header": True,
-            },
-            signature={
-                "signature_url": "ipfs://signature",
-                "signature_hash": "0xsignature",
             },
             dataset_url="ipfs://dataset",
             dataset_hash="0xdataset",

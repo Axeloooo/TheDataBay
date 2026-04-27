@@ -1,36 +1,28 @@
-import asyncio
-
 import pytest
 from fastapi import HTTPException
 
 from app.services import llm_service
 
 
-class DummyEmbedResponse:
-    def __init__(self, embeddings):
-        self.embeddings = embeddings
-
-
 def test_warmup_model_success(monkeypatch, settings):
-    called = {}
+    class FakeEmbeddings:
+        def embed_query(self, text):
+            self.text = text
+            return [0.1] * settings.embedding_dimension
 
-    def fake_embed(model, input):
-        called["model"] = model
-        called["input"] = input
-        return None
-
-    monkeypatch.setattr(llm_service.ollama, "embed", fake_embed)
+    fake = FakeEmbeddings()
+    monkeypatch.setattr(llm_service, "get_embeddings", lambda model: fake)
 
     assert llm_service.warmup_model(settings) is True
-    assert called["model"] == settings.embedding_model
-    assert called["input"] == "warmup test"
+    assert fake.text == "warmup"
 
 
 def test_warmup_model_failure(monkeypatch, settings):
-    def fake_embed(model, input):
-        raise RuntimeError("boom")
+    class FakeEmbeddings:
+        def embed_query(self, text):
+            raise RuntimeError("boom")
 
-    monkeypatch.setattr(llm_service.ollama, "embed", fake_embed)
+    monkeypatch.setattr(llm_service, "get_embeddings", lambda model: FakeEmbeddings())
 
     assert llm_service.warmup_model(settings) is False
 
@@ -65,78 +57,23 @@ def test_record_to_text_extends_columns():
     assert text == "x: a | col_1: b"
 
 
-def test_generate_single_embedding_success(monkeypatch, settings):
-    def fake_embed(model, input):
-        return DummyEmbedResponse([[0.1, 0.2, 0.3]])
 
-    monkeypatch.setattr(llm_service.ollama, "embed", fake_embed)
+@pytest.mark.asyncio
+async def test_embed_query_success(monkeypatch, settings):
+    class FakeEmbeddings:
+        async def aembed_query(self, text):
+            assert text == "hello"
+            return [0.1, 0.2, 0.3]
 
-    embedding, dim = llm_service.generate_single_embedding("hello", settings)
+    monkeypatch.setattr(llm_service, "get_embeddings", lambda model: FakeEmbeddings())
+
+    embedding, dim = await llm_service.embed_query("hello", settings)
     assert embedding == [0.1, 0.2, 0.3]
     assert dim == 3
 
 
-def test_generate_single_embedding_empty_raises(settings):
+def test_embed_query_empty_raises(settings):
     with pytest.raises(HTTPException):
-        llm_service.generate_single_embedding("   ", settings)
+        import asyncio
 
-
-def test_generate_embeddings_chunked(monkeypatch, settings):
-    async def fake_sleep(_):
-        return None
-
-    def fake_embed(model, input):
-        return DummyEmbedResponse(
-            [[float(i), float(i) + 1.0] for i in range(len(input))]
-        )
-
-    monkeypatch.setattr(llm_service.asyncio, "sleep", fake_sleep)
-    monkeypatch.setattr(llm_service.ollama, "embed", fake_embed)
-
-    texts = ["a", "b", "c"]
-    embeddings, dim = asyncio.run(
-        llm_service.generate_embeddings_chunked(texts, settings, chunk_size=2)
-    )
-
-    assert len(embeddings) == 3
-    assert dim == 2
-
-
-def test_generate_embeddings_chunked_error(monkeypatch, settings):
-    def fake_embed(model, input):
-        raise RuntimeError("boom")
-
-    monkeypatch.setattr(llm_service.ollama, "embed", fake_embed)
-
-    with pytest.raises(HTTPException):
-        asyncio.run(llm_service.generate_embeddings_chunked(["a"], settings))
-
-
-# ---------------------------------------------------------------------------
-# mean_pool tests
-# ---------------------------------------------------------------------------
-
-
-def test_mean_pool_single_embedding_returns_same_vector():
-    result = llm_service.mean_pool([[1.0, 2.0, 3.0]])
-    assert result == [1.0, 2.0, 3.0]
-
-
-def test_mean_pool_two_identical_embeddings_returns_same_vector():
-    result = llm_service.mean_pool([[1.0, 0.0], [1.0, 0.0]])
-    assert result == [1.0, 0.0]
-
-
-def test_mean_pool_two_opposite_embeddings_returns_zero_vector():
-    result = llm_service.mean_pool([[1.0, -1.0], [-1.0, 1.0]])
-    assert result == [0.0, 0.0]
-
-
-def test_mean_pool_empty_list_raises_value_error():
-    with pytest.raises(ValueError):
-        llm_service.mean_pool([])
-
-
-def test_mean_pool_mismatched_dimensions_raises_value_error():
-    with pytest.raises(ValueError):
-        llm_service.mean_pool([[1.0, 2.0], [3.0]])
+        asyncio.run(llm_service.embed_query("   ", settings))
