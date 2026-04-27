@@ -4,9 +4,33 @@ metadata:
   name: ip-factory-config
   namespace: ip-factory
 data:
+  # App
+  APP_NAME: "BridgeMart API"
+  APP_VERSION: "0.1.0"
   ENVIRONMENT: "production"
-  GITHUB_REPO_TEMPLATE: "ip-factory-template"
-  GITHUB_APP_PRIVATE_KEY_PATH: "/secrets/github-app-key/private-key.pem"
-  GITHUB_SCOPES: "read:user user:email"
-  LINKEDIN_SCOPES: "r_verify openid profile email r_profile_basicinfo"
-  LINKEDIN_VERSION: "202510"
+  HOST: "0.0.0.0"
+  PORT: "8080"
+  CORS_ORIGINS: '["https://chiselware.org"]'
+
+  # Ollama / embedding
+  EMBEDDING_MODEL: "nomic-embed-text"
+  EMBEDDING_DIMENSION: "768"
+
+  # Embedding job limits
+  MAX_FILE_SIZE_MB: "50"
+  MAX_DATASET_ROWS: "50000"
+  EMBEDDING_CHUNK_SIZE: "256"
+
+  # Similarity search
+  TOP_K: "10"
+  K_ROWS: "100"
+  SIMILARITY_THRESHOLD: "0.75"
+  CACHE_MAXSIZE: "100"
+
+  # Pinata IPFS gateway (non-secret)
+  PINATA_GATEWAY_URL: "https://gateway.pinata.cloud"
+
+  # Smart contract (non-secret)
+  CONTRACT_ABI_PATH: "server/app/contracts/Marketplace.json"
+  CHAIN_ID: "1"
+  RPC_URL: "https://mainnet.infura.io/v3/<INFURA_PROJECT_ID>"

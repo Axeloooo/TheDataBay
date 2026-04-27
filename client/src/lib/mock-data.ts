@@ -1,4 +1,7 @@
 import type { MarketplaceDataItem } from "@/types/contract";
+
+// Placeholder ERC-20 addresses used in mock data only.
+const MOCK_USDC_ADDRESS = "0x0000000000000000000000000000000000000001";
 import type {
   Agent,
   AgentRecommendation,
@@ -35,6 +38,7 @@ export const MOCK_ITEMS: MarketplaceDataItem[] = [
     description:
       "Complete daily OHLCV data for all S&P 500 constituents from January 2000 through December 2025. Includes adjusted close prices, dividends, and stock splits. Sourced from NYSE/NASDAQ feeds with 99.97% uptime coverage.",
     seller: "0x1a2B3c4D5e6F7a8B9c0D1e2F3a4B5c6D7e8F9a0b",
+    payment_token: MOCK_USDC_ADDRESS,
     price_atomic: "49990000",
     settlement_currency: "USDC",
     settlement_decimals: 6,
@@ -55,6 +59,7 @@ export const MOCK_ITEMS: MarketplaceDataItem[] = [
     description:
       "Hourly temperature, humidity, wind speed, and precipitation readings from 48,000+ weather stations worldwide for Q1 2025. WMO-compliant formatting with station metadata and quality flags.",
     seller: "0x2b3C4d5E6f7A8b9C0d1E2f3A4b5C6d7E8f9A0b1C",
+    payment_token: MOCK_USDC_ADDRESS,
     price_atomic: "29500000",
     settlement_currency: "USDC",
     settlement_decimals: 6,
@@ -75,6 +80,7 @@ export const MOCK_ITEMS: MarketplaceDataItem[] = [
     description:
       "Pre-processed English Wikipedia dump optimized for NLP model training. Includes sentence-segmented text, named-entity annotations, and paragraph-level topic labels across 6.7M articles. Cleaned of markup, templates, and disambiguation pages.",
     seller: "0x3c4D5e6F7a8B9c0D1e2F3a4B5c6D7e8F9a0B1c2D",
+    payment_token: MOCK_USDC_ADDRESS,
     price_atomic: "199000000",
     settlement_currency: "USDC",
     settlement_decimals: 6,
@@ -95,6 +101,7 @@ export const MOCK_ITEMS: MarketplaceDataItem[] = [
     description:
       "Aggregated trading volume, liquidity depth, and swap event data from Uniswap V2/V3, SushiSwap, Curve, and Balancer on Ethereum mainnet. Covers January 2023 through March 2025 with 1-minute granularity.",
     seller: "0x4d5E6f7A8b9C0d1E2f3A4b5C6d7E8f9A0b1C2d3E",
+    payment_token: MOCK_USDC_ADDRESS,
     price_atomic: "75000000",
     settlement_currency: "USDC",
     settlement_decimals: 6,
@@ -115,6 +122,7 @@ export const MOCK_ITEMS: MarketplaceDataItem[] = [
     description:
       "Metadata catalog for 2.1M high-resolution satellite captures across North America (Sentinel-2 and Landsat-9). Includes bounding boxes, cloud cover percentages, acquisition timestamps, and spectral band availability. Ideal for geospatial ML pipelines.",
     seller: "0x5e6F7a8B9c0D1e2F3a4B5c6D7e8F9a0B1c2D3e4F",
+    payment_token: MOCK_USDC_ADDRESS,
     price_atomic: "150000000",
     settlement_currency: "USDC",
     settlement_decimals: 6,
@@ -135,6 +143,7 @@ export const MOCK_ITEMS: MarketplaceDataItem[] = [
     description:
       "350K labeled e-commerce product reviews with fine-grained sentiment scores (1-5), aspect-level annotations (quality, shipping, value, support), and reviewer demographics. Covers electronics, apparel, and home goods categories.",
     seller: "0x6f7A8b9C0d1E2f3A4b5C6d7E8f9A0b1C2d3E4f5A",
+    payment_token: MOCK_USDC_ADDRESS,
     price_atomic: "35000000",
     settlement_currency: "USDC",
     settlement_decimals: 6,
@@ -155,6 +164,7 @@ export const MOCK_ITEMS: MarketplaceDataItem[] = [
     description:
       "Anonymized shipment records from 12,000+ routes across sea, air, and ground freight. Includes transit times, delay classifications, port congestion indices, and cost breakdowns. Designed for logistics optimization and demand-forecasting benchmarks.",
     seller: "0x7a8B9c0D1e2F3a4B5c6D7e8F9a0B1c2D3e4F5a6B",
+    payment_token: MOCK_USDC_ADDRESS,
     price_atomic: "89990000",
     settlement_currency: "USDC",
     settlement_decimals: 6,

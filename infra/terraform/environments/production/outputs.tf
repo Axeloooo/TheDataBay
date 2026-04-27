@@ -3,8 +3,8 @@ output "resource_group_name" {
   value       = azurerm_resource_group.main.name
 }
 
-output "aks_cluster_name" {
-  description = "AKS cluster name"
+output "aks_cluster_id" {
+  description = "AKS cluster resource ID"
   value       = module.aks.cluster_id
 }
 

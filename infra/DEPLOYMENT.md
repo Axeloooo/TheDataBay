@@ -52,7 +52,7 @@ _ip_factory_repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 export KEY_VAULT_NAME="$(cd "${_ip_factory_repo_root}/infra/terraform/environments/production" && terraform output -raw key_vault_name 2>/dev/null || true)"
 export GITHUB_APP_PRIVATE_KEY_FILE="${_ip_factory_repo_root}/infra/k8s/development/github-app.pem"
 
-export DATABASE_URL="mysql+pymysql://ipfactory:root@mysql:3306/ip_factory_db?charset=utf8mb4"
+export POSTGRES_URL="postgresql+psycopg://bridgemart:root@postgres:5432/bridgemart"
 export FRONTEND_URL="https://chiselware.org"
 export GITHUB_APP_ID="<VALUE>"
 export GITHUB_ORG="<VALUE>"
@@ -71,10 +71,7 @@ export STRIPE_SECRET_KEY="<VALUE>"
 export STRIPE_SUCCESS_URL="https://chiselware.org/checkout/success"
 export STRIPE_CANCEL_URL="https://chiselware.org/checkout/cancel"
 export STRIPE_WEBHOOK_SECRET="<VALUE>"
-export MYSQL_ROOT_PASSWORD="root"
-export MYSQL_DATABASE="ip_factory_db"
-export MYSQL_USER="ipfactory"
-export MYSQL_PASSWORD="root"
+export POSTGRES_PASSWORD="<VALUE>"
 unset _ip_factory_repo_root
 ```
 
@@ -111,7 +108,7 @@ After Terraform completes, re-source the bootstrap file so `KEY_VAULT_NAME` reso
 ```bash
 source infra/terraform/environments/production/.env
 
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "DATABASE-URL" --value "$DATABASE_URL"
+az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "POSTGRES-URL" --value "$POSTGRES_URL"
 az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "FRONTEND-URL" --value "$FRONTEND_URL"
 az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "GITHUB-APP-ID" --value "$GITHUB_APP_ID"
 az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "GITHUB-ORG" --value "$GITHUB_ORG"
@@ -130,10 +127,7 @@ az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "STRIPE-SECRET-KEY"
 az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "STRIPE-SUCCESS-URL" --value "$STRIPE_SUCCESS_URL"
 az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "STRIPE-CANCEL-URL" --value "$STRIPE_CANCEL_URL"
 az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "STRIPE-WEBHOOK-SECRET" --value "$STRIPE_WEBHOOK_SECRET"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "MYSQL-ROOT-PASSWORD" --value "$MYSQL_ROOT_PASSWORD"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "MYSQL-DATABASE" --value "$MYSQL_DATABASE"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "MYSQL-USER" --value "$MYSQL_USER"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "MYSQL-PASSWORD" --value "$MYSQL_PASSWORD"
+az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "POSTGRES-PASSWORD" --value "$POSTGRES_PASSWORD"
 az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "GITHUB-APP-PRIVATE-KEY" --file "$GITHUB_APP_PRIVATE_KEY_FILE"
 ```
 
@@ -144,16 +138,18 @@ az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "GITHUB-APP-PRIVATE
 ACR_LOGIN_SERVER=$(cd infra/terraform/environments/production && terraform output -raw acr_login_server)
 TAG=$(git rev-parse --short HEAD)
 
+ACR_NAME=${ACR_LOGIN_SERVER%%.azurecr.io}
+
 # Login to ACR
-az acr login --name ipfactoryprod
+az acr login --name "$ACR_NAME"
 
 # Build and push API image (run from repo root)
-docker build -f infra/docker/production/api.Dockerfile -t $ACR_LOGIN_SERVER/ip-factory/api:$TAG .
+docker build -f infra/docker/production/server.Dockerfile -t $ACR_LOGIN_SERVER/ip-factory/api:$TAG .
 docker push $ACR_LOGIN_SERVER/ip-factory/api:$TAG
 
 # Build and push UI image (VITE_SERVER_URL must stay on the origin host, not include /api/v1)
 docker build \
-  -f infra/docker/production/ui.Dockerfile \
+  -f infra/docker/production/client.Dockerfile \
   --build-arg VITE_SERVER_URL=https://chiselware.org \
   -t $ACR_LOGIN_SERVER/ip-factory/ui:$TAG \
   .
@@ -206,17 +202,23 @@ Before deploying, update placeholder values in the manifests:
 
    ```bash
    TENANT_ID=$(az account show --query tenantId -o tsv)
-   sed -i '' "s/<AZURE_TENANT_ID>/$TENANT_ID/g" infra/k8s/production/secret-provider-class.yaml
+   SECRETS_PROVIDER_CLIENT_ID=$(az aks show \
+     --resource-group ip-factory-production-rg \
+     --name ip-factory-production-aks \
+     --query addonProfiles.azureKeyvaultSecretsProvider.identity.clientId \
+     -o tsv)
+   perl -pi -e "s/<AZURE_TENANT_ID>/$ENV{TENANT_ID}/g" infra/k8s/production/secret-provider-class.yaml
+   perl -pi -e "s/<SECRETS_PROVIDER_CLIENT_ID>/$ENV{SECRETS_PROVIDER_CLIENT_ID}/g" infra/k8s/production/secret-provider-class.yaml
    ```
 
 2. **backend-deployment.yaml** and **frontend-deployment.yaml**: Replace `<ACR_LOGIN_SERVER>` and `<TAG>`:
    ```bash
    ACR_LOGIN_SERVER=$(cd infra/terraform/environments/production && terraform output -raw acr_login_server)
    TAG=$(git rev-parse --short HEAD)
-   sed -i '' "s|<ACR_LOGIN_SERVER>|$ACR_LOGIN_SERVER|g" infra/k8s/production/backend-deployment.yaml
-   sed -i '' "s|<ACR_LOGIN_SERVER>|$ACR_LOGIN_SERVER|g" infra/k8s/production/frontend-deployment.yaml
-   sed -i '' "s|<TAG>|$TAG|g" infra/k8s/production/backend-deployment.yaml
-   sed -i '' "s|<TAG>|$TAG|g" infra/k8s/production/frontend-deployment.yaml
+   perl -pi -e "s|<ACR_LOGIN_SERVER>|$ENV{ACR_LOGIN_SERVER}|g" infra/k8s/production/backend-deployment.yaml
+   perl -pi -e "s|<ACR_LOGIN_SERVER>|$ENV{ACR_LOGIN_SERVER}|g" infra/k8s/production/frontend-deployment.yaml
+   perl -pi -e "s|<TAG>|$ENV{TAG}|g" infra/k8s/production/backend-deployment.yaml
+   perl -pi -e "s|<TAG>|$ENV{TAG}|g" infra/k8s/production/frontend-deployment.yaml
    ```
 
 Deploy in order:
@@ -228,13 +230,13 @@ kubectl apply -f infra/k8s/production/namespace.yaml
 # Apply CSI Secret Store classes (must be before workloads)
 kubectl apply -f infra/k8s/production/secret-provider-class.yaml
 
-# Deploy MySQL
+# Deploy PostgreSQL (with pgvector)
 kubectl apply -f infra/k8s/production/mysql-statefulset.yaml
 
-# Wait for MySQL to be ready
+# Wait for PostgreSQL to be ready
 kubectl wait --namespace ip-factory \
   --for=condition=ready pod \
-  --selector=app=mysql \
+  --selector=app=postgres \
   --timeout=120s
 
 # Apply ConfigMap and ClusterIssuer

@@ -261,5 +261,7 @@ const realBackend = {
     ),
 };
 
-export const backend =
+type Backend = typeof realBackend;
+
+export const backend: Backend =
   import.meta.env.VITE_MOCK === "true" ? mockBackend : realBackend;

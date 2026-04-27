@@ -59,7 +59,7 @@ module "aks" {
 module "acr" {
   source = "../../modules/acr"
 
-  registry_name                  = "${local.name_prefix}-acr"
+  registry_name                  = replace("${local.name_prefix}acr", "-", "")
   location                       = azurerm_resource_group.main.location
   resource_group_name            = azurerm_resource_group.main.name
   sku                            = var.acr_sku

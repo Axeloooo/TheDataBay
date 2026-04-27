@@ -1,7 +1,7 @@
 import type { MarketplaceDataItem, AccessCheckResponse, WalletAccessRequest, PurchasedItemsRequest, PurchasedItemsResponse } from "@/types/contract";
 import type { KeyReleaseRequest, KeyReleaseResponse } from "@/types/dataset";
 import type { JobResponse, JobStatusResponse } from "@/types/llm";
-import type { SimilaritySearchRequest, SimilaritySearchResponse } from "@/types/ai";
+import type { SimilaritySearchRequest, SimilaritySearchResponse, ScoreLabel } from "@/types/ai";
 import type { Agent, AgentListResponse, RecommendationListResponse, PurchaseRequest, PurchaseRequestListResponse } from "@/types/agent";
 import {
   MOCK_ITEMS,
@@ -54,17 +54,23 @@ export const mockBackend = {
         item.title.toLowerCase().includes(q) ||
         item.description.toLowerCase().includes(q)
       )
-      .map((item) => ({
-        item: withBytes32Id(item),
-        score: item.title.toLowerCase().includes(q) ? 0.95 : 0.72,
-        explanation: {
-          method: "mock_substring",
-          k_rows: 100,
-          rows_in_dataset: 1000,
-          dimension: 384,
-          normalized: true,
-        },
-      }));
+      .map((item) => {
+        const score = item.title.toLowerCase().includes(q) ? 0.95 : 0.72;
+        const scoreLabel: ScoreLabel = score >= 0.9 ? "high" : score >= 0.7 ? "moderate" : "low";
+        return {
+          listing_id: item.id,
+          title: item.title,
+          description: item.description,
+          seller: item.seller,
+          payment_token: item.payment_token,
+          price_atomic: Number(item.price_atomic ?? 0),
+          settlement_currency: item.settlement_currency ?? "USDC",
+          settlement_decimals: item.settlement_decimals ?? 6,
+          purchase_count: item.purchase_count ?? 0,
+          score,
+          score_label: scoreLabel,
+        };
+      });
     return delay({ query: payload.query, results, count: results.length });
   },
 

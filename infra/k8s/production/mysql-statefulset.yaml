@@ -1,58 +1,47 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: mysql
+  name: postgres
   namespace: ip-factory
 spec:
   clusterIP: None
   selector:
-    app: mysql
+    app: postgres
   ports:
-    - port: 3306
-      targetPort: 3306
+    - port: 5432
+      targetPort: 5432
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: mysql
+  name: postgres
   namespace: ip-factory
 spec:
-  serviceName: mysql
+  serviceName: postgres
   replicas: 1
   selector:
     matchLabels:
-      app: mysql
+      app: postgres
   template:
     metadata:
       labels:
-        app: mysql
+        app: postgres
     spec:
       containers:
-        - name: mysql
-          image: mysql:8.0
+        - name: postgres
+          image: pgvector/pgvector:pg16
           ports:
-            - containerPort: 3306
+            - containerPort: 5432
           env:
-            - name: MYSQL_ROOT_PASSWORD
+            - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: ip-factory-secrets
-                  key: MYSQL_ROOT_PASSWORD
-            - name: MYSQL_DATABASE
-              valueFrom:
-                secretKeyRef:
-                  name: ip-factory-secrets
-                  key: MYSQL_DATABASE
-            - name: MYSQL_USER
-              valueFrom:
-                secretKeyRef:
-                  name: ip-factory-secrets
-                  key: MYSQL_USER
-            - name: MYSQL_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: ip-factory-secrets
-                  key: MYSQL_PASSWORD
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              value: "bridgemart"
+            - name: POSTGRES_USER
+              value: "bridgemart"
           resources:
             requests:
               cpu: "100m"
@@ -63,24 +52,23 @@ spec:
           livenessProbe:
             exec:
               command:
-                - mysqladmin
-                - ping
-                - -h
-                - localhost
+                - pg_isready
+                - -U
+                - bridgemart
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
           readinessProbe:
             tcpSocket:
-              port: 3306
+              port: 5432
             initialDelaySeconds: 10
             periodSeconds: 5
           volumeMounts:
-            - name: mysql-data
-              mountPath: /var/lib/mysql
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
   volumeClaimTemplates:
     - metadata:
-        name: mysql-data
+        name: postgres-data
       spec:
         accessModes:
           - ReadWriteOnce

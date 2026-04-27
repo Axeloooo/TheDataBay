@@ -29,11 +29,11 @@ spec:
             - configMapRef:
                 name: ip-factory-config
           env:
-            - name: DATABASE_URL
+            - name: POSTGRES_URL
               valueFrom:
                 secretKeyRef:
                   name: ip-factory-secrets
-                  key: DATABASE_URL
+                  key: POSTGRES_URL
             - name: FRONTEND_URL
               valueFrom:
                 secretKeyRef:
