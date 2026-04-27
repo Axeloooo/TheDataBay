@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Ollama settings
     embedding_model: str = Field(alias="EMBEDDING_MODEL")
+    embedding_dimension: int = Field(default=768, alias="EMBEDDING_DIMENSION")
 
     # Embedding job settings
     max_file_size_mb: int = Field(alias="MAX_FILE_SIZE_MB")

@@ -20,7 +20,6 @@ from .dataset_key_repo import async_upsert_dataset_key
 from ..services.encryption_service import encrypt_bytes, generate_key
 from ..services.job_manager import JobManager
 from ..services.llm_service import (
-    EMBEDDING_DIMENSION,
     DATASET_ROWS_COLLECTION,
     parse_dataset_file,
     record_to_text,
@@ -198,8 +197,14 @@ def get_job_status(job_id: str, job_manager: JobManager) -> JobStatusResponse:
     return response
 
 
-async def delete_listing_documents(listing_id: str) -> None:
-    """Delete prior LangChain PGVector row documents for one listing."""
+async def delete_stale_listing_documents(
+    listing_id: str, current_ids: list[str]
+) -> None:
+    """Delete PGVector row documents for a listing whose IDs are not in current_ids.
+
+    Called after a successful aadd_documents so that a failed ingest never
+    leaves the listing with no vectors.
+    """
     factory = get_async_session_factory()
     async with factory() as session:
         async with session.begin():
@@ -211,11 +216,13 @@ async def delete_listing_documents(listing_id: str) -> None:
                     WHERE e.collection_id = c.uuid
                       AND c.name = :collection_name
                       AND e.cmetadata->>'listing_id' = :listing_id
+                      AND e.id != ALL(:current_ids)
                     """
                 ),
                 {
                     "collection_name": DATASET_ROWS_COLLECTION,
                     "listing_id": listing_id,
+                    "current_ids": current_ids,
                 },
             )
 
@@ -279,11 +286,11 @@ async def _process_embedding_job(
         ciphertext, nonce = encrypt_bytes(content_bytes, key, aad)
         dataset_url, dataset_hash = await upload_bytes(ciphertext, filename, settings)
 
-        await delete_listing_documents(listing_id)
         await vectorstore_for_settings(settings).aadd_documents(
             documents,
             ids=document_ids,
         )
+        await delete_stale_listing_documents(listing_id, document_ids)
 
         # Prepare key material
         key_b64 = base64.b64encode(key).decode("utf-8")
@@ -311,7 +318,7 @@ async def _process_embedding_job(
             },
             "vectorSpec": {
                 "model": settings.embedding_model,
-                "dimension": EMBEDDING_DIMENSION,
+                "dimension": settings.embedding_dimension,
             },
             "stats": {
                 "total_rows": len(data_rows),

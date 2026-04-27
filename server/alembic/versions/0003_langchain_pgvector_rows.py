@@ -65,17 +65,6 @@ def upgrade() -> None:
             sa.PrimaryKeyConstraint("id"),
         )
 
-    collection_indexes = {
-        idx["name"] for idx in inspector.get_indexes("langchain_pg_collection")
-    }
-    if "ix_langchain_pg_collection_name" not in collection_indexes:
-        op.create_index(
-            "ix_langchain_pg_collection_name",
-            "langchain_pg_collection",
-            ["name"],
-            unique=False,
-        )
-
     embedding_indexes = {
         idx["name"] for idx in inspector.get_indexes("langchain_pg_embedding")
     }
@@ -117,6 +106,19 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+
+    for column_name, column_type in (
+        ("signature_url", sa.Text()),
+        ("signature_hash", sa.Text()),
+    ):
+        if not _has_column(inspector, "dataset_keys", column_name):
+            op.add_column(
+                "dataset_keys",
+                sa.Column(column_name, column_type, nullable=True),
+            )
+
     op.create_table(
         "dataset_embeddings",
         sa.Column("listing_id", sa.Text(), nullable=False),
@@ -158,10 +160,6 @@ def downgrade() -> None:
     op.drop_index(
         "ix_langchain_pg_embedding_collection_id",
         table_name="langchain_pg_embedding",
-    )
-    op.drop_index(
-        "ix_langchain_pg_collection_name",
-        table_name="langchain_pg_collection",
     )
     op.drop_table("langchain_pg_embedding")
     op.drop_table("langchain_pg_collection")
