@@ -36,12 +36,6 @@ pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 SAMPLE_CSV_PATH = Path(__file__).parent / "sample.csv"
 DIM = 768
 
-# Synthetic 768-dim row embeddings (5 rows matching sample.csv)
-_ROW_EMBEDDINGS = [
-    [float(i % 100) / 100.0] * DIM for i in range(5)
-]
-
-
 def _make_settings() -> Settings:
     data = {
         "APP_NAME": "BridgeMart API",
@@ -119,7 +113,15 @@ async def _delete_rows(factory, listing_id: str) -> None:
     async with factory() as session:
         async with session.begin():
             await session.execute(
-                text("DELETE FROM dataset_embeddings WHERE listing_id = :lid"),
+                text(
+                    """
+                    DELETE FROM langchain_pg_embedding e
+                    USING langchain_pg_collection c
+                    WHERE e.collection_id = c.uuid
+                      AND c.name = 'dataset_rows'
+                      AND e.cmetadata->>'listing_id' = :lid
+                    """
+                ),
                 {"lid": listing_id},
             )
             await session.execute(
@@ -141,7 +143,7 @@ async def test_process_embedding_job_persists_rows(
     settings,
     job_manager,
 ) -> None:
-    """_process_embedding_job should persist a DatasetEmbedding and a DatasetKey row."""
+    """_process_embedding_job should persist row documents and a DatasetKey row."""
 
     listing_id = "integ-llm-job-001"
     job_id = job_manager.create_job(
@@ -153,9 +155,6 @@ async def test_process_embedding_job_persists_rows(
 
     # -- Monkeypatches -------------------------------------------------------
 
-    async def fake_generate_embeddings_chunked(texts, settings):
-        return _ROW_EMBEDDINGS[: len(texts)], DIM
-
     def fake_generate_key():
         return b"\xab" * 32
 
@@ -165,16 +164,53 @@ async def test_process_embedding_job_persists_rows(
     async def fake_upload_bytes(payload, filename, settings):
         return "ipfs://QmFakeData", "0xfakedata"
 
-    async def fake_upload_signature(embeddings, filename, settings, compress=True):
-        return "ipfs://QmFakeSig", "0xfakesig"
+    class FakeVectorstore:
+        async def aadd_documents(self, documents, ids):
+            async with committing_factory() as session:
+                collection_id = "00000000-0000-0000-0000-000000000001"
+                async with session.begin():
+                    await session.execute(
+                        text(
+                            """
+                            INSERT INTO langchain_pg_collection (uuid, name, cmetadata)
+                            VALUES (:uuid, 'dataset_rows', '{}')
+                            ON CONFLICT (name) DO NOTHING
+                            """
+                        ),
+                        {"uuid": collection_id},
+                    )
+                    for doc, doc_id in zip(documents, ids):
+                        await session.execute(
+                            text(
+                                """
+                                INSERT INTO langchain_pg_embedding
+                                    (id, collection_id, embedding, document, cmetadata)
+                                VALUES
+                                    (:id, :collection_id, CAST(:embedding AS vector(768)),
+                                     :document, CAST(:metadata AS jsonb))
+                                """
+                            ),
+                            {
+                                "id": doc_id,
+                                "collection_id": collection_id,
+                                "embedding": str([0.1] * DIM),
+                                "document": doc.page_content,
+                                "metadata": (
+                                    '{"listing_id": "%s", "row_index": %s}'
+                                    % (
+                                        doc.metadata["listing_id"],
+                                        doc.metadata["row_index"],
+                                    )
+                                ),
+                            },
+                        )
 
-    monkeypatch.setattr(
-        llm_job_service, "generate_embeddings_chunked", fake_generate_embeddings_chunked
-    )
     monkeypatch.setattr(llm_job_service, "generate_key", fake_generate_key)
     monkeypatch.setattr(llm_job_service, "encrypt_bytes", fake_encrypt_bytes)
     monkeypatch.setattr(llm_job_service, "upload_bytes", fake_upload_bytes)
-    monkeypatch.setattr(llm_job_service, "upload_signature", fake_upload_signature)
+    monkeypatch.setattr(
+        llm_job_service, "vectorstore_for_settings", lambda settings: FakeVectorstore()
+    )
 
     # Point the job's internal session factory at the test container DB
     monkeypatch.setattr(
@@ -202,24 +238,20 @@ async def test_process_embedding_job_persists_rows(
         job = job_manager.get_job(job_id)
         assert job.status == JobStatus.COMPLETED, f"Job ended with status {job.status}, error: {job.error}"
 
-        # Verify DatasetEmbedding row
         async with committing_factory() as verify_session:
             emb_result = await verify_session.execute(
                 text(
-                    "SELECT listing_id, embedding::text FROM dataset_embeddings "
-                    "WHERE listing_id = :lid"
+                    """
+                    SELECT COUNT(*)
+                    FROM langchain_pg_embedding e
+                    JOIN langchain_pg_collection c ON c.uuid = e.collection_id
+                    WHERE c.name = 'dataset_rows'
+                      AND e.cmetadata->>'listing_id' = :lid
+                    """
                 ),
                 {"lid": listing_id},
             )
-            emb_row = emb_result.fetchone()
-            assert emb_row is not None, "Expected DatasetEmbedding row to exist"
-            assert emb_row[0] == listing_id
-
-            # Parse embedding from Postgres vector string representation
-            emb_str = emb_row[1].strip("[]")
-            emb_values = [float(v) for v in emb_str.split(",")]
-            assert len(emb_values) == DIM, f"Expected {DIM}-dim vector, got {len(emb_values)}"
-            assert any(v != 0.0 for v in emb_values), "Embedding vector should not be all zeros"
+            assert emb_result.scalar_one() == 5
 
             # Verify DatasetKey row
             key_result = await verify_session.execute(

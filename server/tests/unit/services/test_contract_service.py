@@ -172,6 +172,32 @@ def test_item_view_to_schema_decodes_web3_attribute_dict():
     assert item.price_atomic == "100"
 
 
+def test_item_view_to_schema_preserves_empty_signature_url_mapping():
+    item_id = bytes.fromhex("02" * 32)
+
+    item = contract_service._item_view_to_schema(
+        AttributeDict(
+            {
+                "itemId": item_id,
+                "title": "Dataset",
+                "description": "desc",
+                "seller": "0x0000000000000000000000000000000000000001",
+                "price": 100,
+                "datasetUrl": "ipfs://dataset",
+                "datasetHash": bytes.fromhex("11" * 32),
+                "signatureUrl": "",
+                "signatureHash": bytes(32),
+                "exists": True,
+                "purchaseCount": 0,
+                "paymentToken": "0x0000000000000000000000000000000000000002",
+            }
+        )
+    )
+
+    assert item.signature_url == ""
+    assert item.signature_hash == "0x" + "0" * 64
+
+
 def test_item_view_to_schema_uses_token_config_metadata(settings):
     item_id = bytes.fromhex("03" * 32)
     payment_token = Web3.to_checksum_address(

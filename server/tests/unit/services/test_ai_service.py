@@ -6,20 +6,19 @@ Ollama embedding fn) are mocked.  No I/O — these are pure unit tests.
 """
 
 import asyncio
-from contextlib import asynccontextmanager
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from app.services.ai_service import (
     AIService,
     EmbeddingError,
+    _aggregate_row_hits,
     _bytes32_hex_to_uuid,
     _clamp,
     _score_label,
 )
-from app.schemas.ai_schema import RankedDataset
 
 
 # ---------------------------------------------------------------------------
@@ -43,7 +42,7 @@ def make_item(listing_id: str, title: str = "Test Dataset") -> SimpleNamespace:
 
 def make_service(
     *,
-    repo_hits: list[tuple[str, float]],
+    row_hits: list[tuple[object, float]],
     contract_items: list,
     embedding_vec: list[float] | None = None,
     embedding_raises: Exception | None = None,
@@ -80,37 +79,33 @@ def make_service(
     }
     settings = Settings(_env_file=None, **settings_data)
 
-    # Embedding repo mock
-    embedding_repo = MagicMock()
-    embedding_repo.search_by_vector = AsyncMock(return_value=repo_hits)
+    vectorstore = MagicMock()
+    vectorstore.asimilarity_search_with_score_by_vector = AsyncMock(
+        return_value=row_hits
+    )
 
-    # Session factory mock
-    mock_session = MagicMock()
-
-    @asynccontextmanager
-    async def fake_factory():
-        yield mock_session
-
-    # Contract fetcher mock
     contract_listing_fetcher = MagicMock(return_value=contract_items)
 
-    # Embedding function mock
     if embedding_raises is not None:
-        def embedding_fn(text, settings):
+        async def embedding_fn(text, settings):
             raise embedding_raises
     else:
         vec = embedding_vec or [0.1] * 768
-        def embedding_fn(text, settings):
+        async def embedding_fn(text, settings):
             return vec, len(vec)
 
     service = AIService(
-        embedding_repo=embedding_repo,
-        session_factory=fake_factory,
+        vectorstore_factory=lambda settings: vectorstore,
         contract_listing_fetcher=contract_listing_fetcher,
         embedding_fn=embedding_fn,
         settings=settings,
     )
-    return service, embedding_repo, contract_listing_fetcher
+    return service, vectorstore, contract_listing_fetcher
+
+
+def make_doc(listing_id: str | None) -> SimpleNamespace:
+    metadata = {} if listing_id is None else {"listing_id": listing_id}
+    return SimpleNamespace(metadata=metadata)
 
 
 # ---------------------------------------------------------------------------
@@ -195,15 +190,27 @@ class TestScoreLabel:
 # rank_datasets — ranking order
 # ---------------------------------------------------------------------------
 
-def test_ranking_follows_repo_score_order():
-    """Results are returned in the order provided by search_by_vector (desc score)."""
+
+def test_row_hits_aggregate_by_listing_max_similarity():
+    hits = _aggregate_row_hits(
+        [
+            (make_doc("listing-a"), 0.4),
+            (make_doc("listing-b"), 0.1),
+            (make_doc("listing-a"), 0.2),
+            (make_doc(None), 0.0),
+        ]
+    )
+
+    assert hits == [("listing-b", 0.9), ("listing-a", 0.8)]
+
+
+def test_ranking_follows_aggregated_row_score_order():
     items = [
         make_item("0xAAA", "Alpha"),
         make_item("0xBBB", "Beta"),
     ]
-    # Repo returns AAA first (higher score), BBB second
     service, _, _ = make_service(
-        repo_hits=[("0xAAA", 0.9), ("0xBBB", 0.4)],
+        row_hits=[(make_doc("0xAAA"), 0.1), (make_doc("0xBBB"), 0.6)],
         contract_items=items,
     )
 
@@ -218,7 +225,7 @@ def test_scores_are_clamped_to_unit_interval():
     """Raw pgvector scores outside [0, 1] are clamped before being returned."""
     items = [make_item("0xAAA")]
     service, _, _ = make_service(
-        repo_hits=[("0xAAA", 1.2)],   # raw score > 1
+        row_hits=[(make_doc("0xAAA"), -0.2)],
         contract_items=items,
     )
 
@@ -230,7 +237,7 @@ def test_scores_are_clamped_to_unit_interval():
 def test_negative_raw_score_clamped_to_zero():
     items = [make_item("0xCCC")]
     service, _, _ = make_service(
-        repo_hits=[("0xCCC", -0.5)],
+        row_hits=[(make_doc("0xCCC"), 1.5)],
         contract_items=items,
     )
 
@@ -256,7 +263,7 @@ def test_negative_raw_score_clamped_to_zero():
 def test_score_label_derivation(raw_score: float, expected_label: str):
     items = [make_item("0xDDD")]
     service, _, _ = make_service(
-        repo_hits=[("0xDDD", raw_score)],
+        row_hits=[(make_doc("0xDDD"), 1.0 - raw_score)],
         contract_items=items,
     )
 
@@ -274,7 +281,7 @@ def test_threshold_filtering_happens_after_clamping():
     items = [make_item("0xEEE")]
     # Raw score 1.5 clamps to 1.0 — above threshold of 0.5 → keep
     service, _, _ = make_service(
-        repo_hits=[("0xEEE", 1.5)],
+        row_hits=[(make_doc("0xEEE"), -0.5)],
         contract_items=items,
         similarity_threshold=0.5,
     )
@@ -290,7 +297,7 @@ def test_threshold_filters_low_clamped_score():
     items = [make_item("0xFFF")]
     # Raw score -0.8 clamps to 0.0 — below threshold of 0.5 → skip
     service, _, _ = make_service(
-        repo_hits=[("0xFFF", -0.8)],
+        row_hits=[(make_doc("0xFFF"), 1.8)],
         contract_items=items,
         similarity_threshold=0.5,
     )
@@ -319,7 +326,7 @@ def test_stale_pgvector_hit_is_skipped():
 
     live_item = make_item(live_bytes32_hex, "Live Dataset")
     service, _, _ = make_service(
-        repo_hits=[("stale-uuid-not-on-chain", 0.9), (live_uuid, 0.7)],
+        row_hits=[(make_doc("stale-uuid-not-on-chain"), 0.1), (make_doc(live_uuid), 0.3)],
         contract_items=[live_item],
     )
 
@@ -331,7 +338,7 @@ def test_stale_pgvector_hit_is_skipped():
 
 def test_all_stale_returns_empty_list():
     service, _, _ = make_service(
-        repo_hits=[("stale-1", 0.9), ("stale-2", 0.5)],
+        row_hits=[(make_doc("stale-1"), 0.1), (make_doc("stale-2"), 0.5)],
         contract_items=[],
     )
 
@@ -346,7 +353,7 @@ def test_all_stale_returns_empty_list():
 
 def test_empty_repo_hits_returns_empty_list():
     service, _, _ = make_service(
-        repo_hits=[],
+        row_hits=[],
         contract_items=[make_item("0xAAA")],
     )
 
@@ -363,7 +370,7 @@ def test_embedding_failure_raises_embedding_error():
     from fastapi import HTTPException as FastAPIHTTPException
 
     service, _, _ = make_service(
-        repo_hits=[],
+        row_hits=[],
         contract_items=[],
         embedding_raises=FastAPIHTTPException(status_code=500, detail="Ollama down"),
     )
@@ -388,18 +395,32 @@ def test_no_ipfs_import_in_ai_service_module():
     )
 
 
-def test_search_by_vector_is_called_not_ipfs(monkeypatch):
-    """rank_datasets() calls search_by_vector, never any IPFS download helper."""
+def test_vectorstore_is_called_not_ipfs(monkeypatch):
+    """rank_datasets() calls PGVector, never any IPFS download helper."""
     items = [make_item("0xAAA")]
-    service, embedding_repo, _ = make_service(
-        repo_hits=[("0xAAA", 0.8)],
+    service, vectorstore, _ = make_service(
+        row_hits=[(make_doc("0xAAA"), 0.2)],
         contract_items=items,
     )
 
     asyncio.run(service.rank_datasets("query"))
 
-    # The embedding repo's search_by_vector was called exactly once
-    embedding_repo.search_by_vector.assert_called_once()
+    vectorstore.asimilarity_search_with_score_by_vector.assert_awaited_once()
+
+
+def test_rank_datasets_overfetches_rows_for_listing_aggregation():
+    items = [make_item("0xAAA")]
+    service, vectorstore, _ = make_service(
+        row_hits=[(make_doc("0xAAA"), 0.2)],
+        contract_items=items,
+    )
+
+    asyncio.run(service.rank_datasets("query", limit=20))
+
+    assert (
+        vectorstore.asimilarity_search_with_score_by_vector.await_args.kwargs["k"]
+        == 200
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -423,7 +444,7 @@ def test_ranked_dataset_fields_are_mapped_correctly():
     item.price_atomic = "250"
 
     service, _, _ = make_service(
-        repo_hits=[(listing_uuid, 0.75)],
+        row_hits=[(make_doc(listing_uuid), 0.25)],
         contract_items=[item],
     )
 
