@@ -52,6 +52,7 @@ type UploadStore = {
 };
 
 const STORAGE_KEY = "bridgemart_upload_store_v2";
+const ZERO_BYTES32 = `0x${"0".repeat(64)}`;
 
 function settlementDecimalsFor(currency: SettlementCurrency): number {
   return SETTLEMENT_TOKENS[currency].decimals;
@@ -86,8 +87,6 @@ function syncSessionFromStatus(
     status: statusToUploadStatus(status.status),
     datasetUrl: status.dataset_url ?? current.datasetUrl,
     datasetHash: status.dataset_hash ?? current.datasetHash,
-    signatureUrl: status.signature?.signature_url ?? current.signatureUrl,
-    signatureHash: status.signature?.signature_hash ?? current.signatureHash,
     error: status.error ?? current.error,
     updatedAt: new Date().toISOString(),
   };
@@ -229,13 +228,6 @@ export const useUploadStore = create<UploadStore>()(
             error: session.error,
             dataset_url: session.datasetUrl,
             dataset_hash: session.datasetHash,
-            signature:
-              session.signatureUrl && session.signatureHash
-                ? {
-                    signature_url: session.signatureUrl,
-                    signature_hash: session.signatureHash,
-                  }
-                : undefined,
           };
         }
 
@@ -412,12 +404,6 @@ export const useUploadStore = create<UploadStore>()(
           state.jobStatus?.dataset_url ?? state.persistedSession?.datasetUrl;
         const currentDatasetHash =
           state.jobStatus?.dataset_hash ?? state.persistedSession?.datasetHash;
-        const currentSignatureUrl =
-          state.jobStatus?.signature?.signature_url ??
-          state.persistedSession?.signatureUrl;
-        const currentSignatureHash =
-          state.jobStatus?.signature?.signature_hash ??
-          state.persistedSession?.signatureHash;
 
         if (!address) {
           set({ error: "Connect wallet to create item." });
@@ -425,10 +411,6 @@ export const useUploadStore = create<UploadStore>()(
         }
         if (!currentListingId || !currentDatasetUrl || !currentDatasetHash) {
           set({ error: "Missing dataset upload outputs." });
-          return null;
-        }
-        if (!currentSignatureUrl || !currentSignatureHash) {
-          set({ error: "Missing signature upload outputs." });
           return null;
         }
 
@@ -469,8 +451,8 @@ export const useUploadStore = create<UploadStore>()(
             priceAtomic: effectivePriceAtomic,
             datasetUrl: currentDatasetUrl,
             datasetHash: currentDatasetHash,
-            signatureUrl: currentSignatureUrl,
-            signatureHash: currentSignatureHash,
+            signatureUrl: "",
+            signatureHash: ZERO_BYTES32,
           });
 
           toast.success("Listing created on-chain", { description: txHash });

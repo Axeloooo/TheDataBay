@@ -189,9 +189,7 @@ function RecordCardDetails({
             <Link2 className="h-5 w-5" />
             URLs
           </CardTitle>
-          <CardDescription>
-            Encrypted dataset and signature locations
-          </CardDescription>
+          <CardDescription>Encrypted dataset location</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -205,23 +203,6 @@ function RecordCardDetails({
                 size="icon"
                 onClick={() =>
                   copyToClipboard(dataset.dataset_url, "Dataset URL")
-                }
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Signature URL</p>
-            <div className="flex items-center gap-2">
-              <p className="flex-1 font-mono text-xs break-all">
-                {dataset.signature_url}
-              </p>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() =>
-                  copyToClipboard(dataset.signature_url, "Signature URL")
                 }
               >
                 <Copy className="h-4 w-4" />
@@ -305,23 +286,6 @@ function RecordCardDetails({
                 size="icon"
                 onClick={() =>
                   copyToClipboard(dataset.dataset_hash, "Dataset hash")
-                }
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Signature Hash</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-xs break-all">
-                {dataset.signature_hash}
-              </code>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() =>
-                  copyToClipboard(dataset.signature_hash, "Signature hash")
                 }
               >
                 <Copy className="h-4 w-4" />

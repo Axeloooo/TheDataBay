@@ -118,8 +118,6 @@ export default function DatasetDetailScreen() {
       void verifyDatasetIntegrity({
         datasetUrl: item.dataset_url,
         datasetHash: item.dataset_hash,
-        signatureUrl: item.signature_url,
-        signatureHash: item.signature_hash,
       }).then((result) => {
         setIntegrity(result.status);
         setIntegrityDetail(result.detail);

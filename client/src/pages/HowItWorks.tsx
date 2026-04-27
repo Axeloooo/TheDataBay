@@ -30,7 +30,7 @@ function HowItWorks() {
       icon: Shield,
       title: "Verify Before You Spend",
       description:
-        "Every listing exposes SHA-256 integrity proofs, seller signatures, and structured metadata. Read everything — commit nothing — until you're sure.",
+        "Every listing exposes SHA-256 integrity proofs and structured metadata. Read everything — commit nothing — until you're sure.",
     },
     {
       icon: Coins,
