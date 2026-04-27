@@ -1,7 +1,4 @@
 import asyncio
-import gzip
-import hashlib
-import json
 
 import pytest
 from fastapi import HTTPException
@@ -72,55 +69,6 @@ def make_async_client(post_response=None, get_response=None):
     return FakeAsyncClient
 
 
-def test_upload_signature_success(monkeypatch, settings):
-    response = FakeResponse(status_code=200, json_data={"IpfsHash": "QmHash"})
-    monkeypatch.setattr(
-        pinata_service.httpx,
-        "AsyncClient",
-        make_async_client(post_response=response),
-    )
-
-    embeddings = [[0.1, 0.2], [0.3, 0.4]]
-    filename = "data.csv"
-
-    ipfs_url, signature_hash = asyncio.run(
-        pinata_service.upload_signature(embeddings, filename, settings, compress=True)
-    )
-
-    expected_bytes = json.dumps(
-        {"embeddings": embeddings, "filename": filename}
-    ).encode("utf-8")
-    expected_bytes = gzip.compress(expected_bytes)
-    expected_hash = "0x" + hashlib.sha256(expected_bytes).hexdigest()
-
-    assert ipfs_url == "ipfs://QmHash"
-    assert signature_hash == expected_hash
-
-
-def test_upload_signature_without_compression(monkeypatch, settings):
-    response = FakeResponse(status_code=200, json_data={"IpfsHash": "QmHash"})
-    monkeypatch.setattr(
-        pinata_service.httpx,
-        "AsyncClient",
-        make_async_client(post_response=response),
-    )
-
-    embeddings = [[0.1, 0.2]]
-    filename = "data.csv"
-
-    ipfs_url, signature_hash = asyncio.run(
-        pinata_service.upload_signature(embeddings, filename, settings, compress=False)
-    )
-
-    expected_bytes = json.dumps(
-        {"embeddings": embeddings, "filename": filename}
-    ).encode("utf-8")
-    expected_hash = "0x" + hashlib.sha256(expected_bytes).hexdigest()
-
-    assert ipfs_url == "ipfs://QmHash"
-    assert signature_hash == expected_hash
-
-
 def test_upload_bytes_success(monkeypatch, settings):
     response = FakeResponse(status_code=200, json_data={"IpfsHash": "QmHash"})
     monkeypatch.setattr(
@@ -138,15 +86,11 @@ def test_upload_bytes_success(monkeypatch, settings):
     assert file_hash.startswith("0x")
 
 
-def test_upload_signature_missing_credentials():
+def test_upload_bytes_missing_credentials():
     settings = make_settings(PINATA_API_KEY="", PINATA_SECRET_KEY="")
 
     with pytest.raises(HTTPException):
-        asyncio.run(
-            pinata_service.upload_signature(
-                [[0.1]], "file.csv", settings, compress=True
-            )
-        )
+        asyncio.run(pinata_service.upload_bytes(b"payload", "file.csv", settings))
 
 
 def test_test_connection_success(monkeypatch, settings):
@@ -165,65 +109,6 @@ def test_test_connection_missing_credentials():
     assert asyncio.run(pinata_service.test_connection(settings)) is False
 
 
-def test_download_signature_embeddings_success(monkeypatch, settings):
-    embeddings = [[0.1, 0.2], [0.3, 0.4]]
-    payload = json.dumps({"embeddings": embeddings, "filename": "data.csv"}).encode(
-        "utf-8"
-    )
-    compressed = gzip.compress(payload)
-    expected_hash = "0x" + hashlib.sha256(compressed).hexdigest()
-
-    response = FakeResponse(status_code=200, content=compressed)
-    monkeypatch.setattr(
-        pinata_service.httpx,
-        "AsyncClient",
-        make_async_client(get_response=response),
-    )
-
-    result = asyncio.run(
-        pinata_service.download_signature_embeddings(
-            signature_url="ipfs://QmHash",
-            settings=settings,
-            expected_signature_hash=expected_hash,
-            compressed=True,
-        )
-    )
-
-    assert result == embeddings
-
-
-def test_download_signature_embeddings_hash_mismatch(monkeypatch, settings):
-    embeddings = [[0.1, 0.2]]
-    payload = json.dumps({"embeddings": embeddings, "filename": "data.csv"}).encode(
-        "utf-8"
-    )
-    compressed = gzip.compress(payload)
-
-    response = FakeResponse(status_code=200, content=compressed)
-    monkeypatch.setattr(
-        pinata_service.httpx,
-        "AsyncClient",
-        make_async_client(get_response=response),
-    )
-
+def test_to_gateway_url_rejects_invalid_ipfs_url(settings):
     with pytest.raises(HTTPException):
-        asyncio.run(
-            pinata_service.download_signature_embeddings(
-                signature_url="ipfs://QmHash",
-                settings=settings,
-                expected_signature_hash="0xdeadbeef",
-                compressed=True,
-            )
-        )
-
-
-def test_download_signature_embeddings_invalid_ipfs_url(settings):
-    with pytest.raises(HTTPException):
-        asyncio.run(
-            pinata_service.download_signature_embeddings(
-                signature_url="http://bad",
-                settings=settings,
-                expected_signature_hash=None,
-                compressed=True,
-            )
-        )
+        pinata_service._to_gateway_url("http://bad", settings)
