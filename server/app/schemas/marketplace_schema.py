@@ -32,9 +32,12 @@ class MarketplaceDataItem(BaseModel):
     dataset_hash: str = Field(
         ..., description="Hash of the dataset for integrity verification"
     )
-    signature_url: str = Field(..., description="URL to the signature embeddings")
+    signature_url: str = Field(
+        default="", description="Legacy URL to signature embeddings"
+    )
     signature_hash: str = Field(
-        ..., description="Hash of the signature embeddings for integrity verification"
+        default="0x" + "0" * 64,
+        description="Legacy hash of the signature embeddings",
     )
     exists: bool = Field(
         ..., description="Indicates if the item exists in the marketplace"

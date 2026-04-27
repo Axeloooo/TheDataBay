@@ -87,9 +87,14 @@ class CreateItemRequest(BaseModel):
     dataset_hash: str = Field(
         ..., min_length=1, description="Dataset sha256 hash (0x...)"
     )
-    signature_url: str = Field(..., min_length=1, description="Signature IPFS URL")
+    signature_url: str = Field(
+        default="",
+        description="Legacy signature URL; may be empty for row-vector listings",
+    )
     signature_hash: str = Field(
-        ..., min_length=1, description="Signature sha256 hash (0x...)"
+        ...,
+        min_length=1,
+        description="Legacy signature sha256 hash (0x...); use zero bytes32 when signature_url is empty",
     )
 
 

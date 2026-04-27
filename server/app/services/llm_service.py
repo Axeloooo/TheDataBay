@@ -1,17 +1,41 @@
-"""
-LLM service functions for embedding generation using Ollama.
-"""
-
 import csv
 import io
-import asyncio
+from functools import lru_cache
 from typing import List, Tuple
 
-import ollama
-from ollama import EmbedResponse
 from fastapi import HTTPException
+from langchain_ollama import OllamaEmbeddings
+from langchain_postgres import PGVector
 
 from ..config.settings import Settings
+
+DATASET_ROWS_COLLECTION = "dataset_rows"
+EMBEDDING_DIMENSION = 768
+
+
+@lru_cache(maxsize=32)
+def get_embeddings(model: str) -> OllamaEmbeddings:
+    """Return a cached LangChain Ollama embeddings client for a model."""
+    return OllamaEmbeddings(model=model)
+
+
+@lru_cache(maxsize=32)
+def get_vectorstore(connection: str, model: str) -> PGVector:
+    """Return a cached async LangChain PGVector store for dataset rows."""
+    return PGVector(
+        embeddings=get_embeddings(model),
+        collection_name=DATASET_ROWS_COLLECTION,
+        connection=connection,
+        embedding_length=EMBEDDING_DIMENSION,
+        use_jsonb=True,
+        create_extension=False,
+        async_mode=True,
+    )
+
+
+def vectorstore_for_settings(settings: Settings) -> PGVector:
+    """Resolve the configured PGVector store."""
+    return get_vectorstore(settings.psycopg_database_url, settings.embedding_model)
 
 
 def warmup_model(settings: Settings) -> bool:
@@ -25,8 +49,7 @@ def warmup_model(settings: Settings) -> bool:
     """
 
     try:
-        test_text = "warmup test"
-        ollama.embed(model=settings.embedding_model, input=test_text)
+        get_embeddings(settings.embedding_model).embed_query("warmup")
         return True
     except Exception as exc:
         print(f"Warning: Model warmup failed: {str(exc)}")
@@ -130,100 +153,11 @@ def record_to_text(
     return " | ".join(parts)
 
 
-async def generate_embeddings_chunked(
-    texts: List[str],
-    settings: Settings,
-    chunk_size: int | None = None,
-) -> Tuple[List[List[float]], int]:
-    """
-    Generate embeddings for large datasets using chunked processing.
-
-    Splits texts into chunks and processes them sequentially to avoid
-    overloading Ollama and prevent memory issues.
-
-    Args:
-        texts (List[str]): List of text strings to embed
-        settings (Settings): Settings instance with embedding config
-        chunk_size (int | None): Number of texts per chunk (defaults to config setting)
-
-    Returns:
-        Tuple[List[List[float]], int]: List of embedding vectors and their dimension
-    """
-
-    if not texts:
-        return [], 0
-
-    chunk_size = chunk_size or settings.embedding_chunk_size
-
-    all_embeddings: List[List[float]] = []
-    dimension = 0
-
-    for i in range(0, len(texts), chunk_size):
-        chunk = texts[i : i + chunk_size]
-
-        try:
-            response: EmbedResponse = ollama.embed(
-                model=settings.embedding_model,
-                input=chunk,
-            )
-
-            chunk_embeddings = response.embeddings
-            all_embeddings.extend(chunk_embeddings)
-
-            if dimension == 0 and chunk_embeddings:
-                dimension = len(chunk_embeddings[0])
-
-            if i + chunk_size < len(texts):
-                await asyncio.sleep(0.1)
-
-        except Exception as exc:
-            raise HTTPException(
-                status_code=500,
-                detail=(
-                    f"Error generating embeddings at chunk {i//chunk_size}: {str(exc)}"
-                ),
-            ) from exc
-
-    return all_embeddings, dimension
-
-
-def mean_pool(embeddings: list[list[float]]) -> list[float]:
-    """Compute the element-wise arithmetic mean of a list of embedding vectors.
-
-    Args:
-        embeddings: Non-empty list of embedding vectors, all with the same
-                    dimension.
-
-    Returns:
-        A new list of floats representing the mean vector.
-
-    Raises:
-        ValueError: If ``embeddings`` is empty or if any row has a different
-                    dimension than the first row.
-    """
-    if not embeddings:
-        raise ValueError("embeddings list must not be empty")
-
-    dim = len(embeddings[0])
-    for i, row in enumerate(embeddings[1:], start=1):
-        if len(row) != dim:
-            raise ValueError(
-                f"Dimension mismatch: row 0 has dim {dim} but row {i} has dim {len(row)}"
-            )
-
-    n = len(embeddings)
-    result: list[float] = [0.0] * dim
-    for row in embeddings:
-        for j, val in enumerate(row):
-            result[j] += val
-    return [v / n for v in result]
-
-
-def generate_single_embedding(
+async def embed_query(
     text: str,
     settings: Settings,
 ) -> Tuple[List[float], int]:
-    """Generate embedding for a single text using Ollama.
+    """Generate a query embedding using LangChain's Ollama integration.
 
     Args:
         text (str): Text to embed
@@ -237,15 +171,8 @@ def generate_single_embedding(
         raise HTTPException(status_code=400, detail="Text to embed cannot be empty")
 
     try:
-        response: EmbedResponse = ollama.embed(
-            model=settings.embedding_model,
-            input=text,
-        )
-
-        embedding = response.embeddings[0] if response.embeddings else []
-        dimension = len(embedding)
-
-        return embedding, dimension
+        embedding = await get_embeddings(settings.embedding_model).aembed_query(text)
+        return embedding, len(embedding)
 
     except Exception as exc:
         raise HTTPException(

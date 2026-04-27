@@ -73,6 +73,23 @@ class Settings(BaseSettings):
                 return url.replace(prefix, async_prefix, 1)
         return url
 
+    @property
+    def psycopg_database_url(self) -> str:
+        """Return a psycopg3 URL for LangChain's PGVector integration."""
+        url = self.database_url.get_secret_value()
+        driver_aliases = {
+            "postgresql+asyncpg://": "postgresql+psycopg://",
+            "postgresql+psycopg2://": "postgresql+psycopg://",
+            "postgresql+psycopg3://": "postgresql+psycopg://",
+            "postgresql://": "postgresql+psycopg://",
+            "postgres://": "postgresql+psycopg://",
+        }
+
+        for prefix, psycopg_prefix in driver_aliases.items():
+            if url.startswith(prefix):
+                return url.replace(prefix, psycopg_prefix, 1)
+        return url
+
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",
