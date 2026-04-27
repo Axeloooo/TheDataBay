@@ -28,6 +28,7 @@ const STORAGE_KEY = "bridgemart_preferred_currency_v1";
 function normalizeCurrency(raw: string): DisplayCurrency {
   switch (raw.trim()) {
     case "USDC":
+    case "CADC":
     case "USD":
     case "CAD":
     case "MXN":

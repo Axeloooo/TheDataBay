@@ -9,6 +9,7 @@ import {
   SETTLEMENT_CURRENCY,
   SETTLEMENT_DECIMALS,
   formatSettlementAmount,
+  getPaymentTokenAddress,
   parseSettlementAmount,
   createItemTx,
 } from "@/src/lib/marketplace";
@@ -53,6 +54,7 @@ type UploadStore = {
 };
 
 const STORAGE_KEY = "bridgemart_upload_store_v1";
+const ZERO_BYTES32 = `0x${"0".repeat(64)}`;
 
 function statusToUploadStatus(status: string | null | undefined): UploadStatus {
   if (status === "completed") return "completed";
@@ -71,8 +73,6 @@ async function syncSessionFromStatus(
     status: statusToUploadStatus(status.status),
     datasetUrl: status.dataset_url ?? current.datasetUrl,
     datasetHash: status.dataset_hash ?? current.datasetHash,
-    signatureUrl: status.signature?.signature_url ?? current.signatureUrl,
-    signatureHash: status.signature?.signature_hash ?? current.signatureHash,
     error: status.error ?? current.error,
     updatedAt: new Date().toISOString(),
   };
@@ -316,12 +316,6 @@ export const useUploadStore = create<UploadStore>()(
           state.jobStatus?.dataset_url ?? state.persistedSession?.datasetUrl;
         const currentDatasetHash =
           state.jobStatus?.dataset_hash ?? state.persistedSession?.datasetHash;
-        const currentSignatureUrl =
-          state.jobStatus?.signature?.signature_url ??
-          state.persistedSession?.signatureUrl;
-        const currentSignatureHash =
-          state.jobStatus?.signature?.signature_hash ??
-          state.persistedSession?.signatureHash;
 
         if (!address) {
           set({ error: "Connect the seller wallet to create the listing." });
@@ -329,10 +323,6 @@ export const useUploadStore = create<UploadStore>()(
         }
         if (!currentListingId || !currentDatasetUrl || !currentDatasetHash) {
           set({ error: "Missing uploaded dataset outputs." });
-          return null;
-        }
-        if (!currentSignatureUrl || !currentSignatureHash) {
-          set({ error: "Missing signature outputs." });
           return null;
         }
 
@@ -353,11 +343,12 @@ export const useUploadStore = create<UploadStore>()(
             description:
               state.persistedSession?.description ?? state.description,
             seller: address,
+            paymentToken: getPaymentTokenAddress(),
             priceAtomic: effectivePriceAtomic,
             datasetUrl: currentDatasetUrl,
             datasetHash: currentDatasetHash,
-            signatureUrl: currentSignatureUrl,
-            signatureHash: currentSignatureHash,
+            signatureUrl: "",
+            signatureHash: ZERO_BYTES32,
           });
 
           await clearUploadSession();

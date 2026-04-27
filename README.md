@@ -95,6 +95,7 @@ Set frontend env values:
 ```bash
 VITE_API_URL=http://localhost:8000
 VITE_CONTRACT_ADDRESS=<deployed_marketplace_address>
+VITE_PAYMENT_TOKEN_ADDRESS=<accepted_usdc_token_address>
 VITE_PINATA_GATEWAY_URL=https://gateway.pinata.cloud
 ```
 
@@ -119,23 +120,24 @@ npm run start
 
 ### ⚙️ Backend (`server/`)
 
-| Command                                                    | What it does                 |
-| ---------------------------------------------------------- | ---------------------------- |
-| `uvicorn app.main:app --reload --host 0.0.0.0 --port 8000` | Run API locally with reload  |
-| `pytest`                                                   | Run all tests                |
-| `pytest tests/services -q`                                 | Run service-level tests only |
-| `pytest tests/services/test_contract_service.py -q`        | Focus contract service tests |
+| Command                    | What it does                               |
+| -------------------------- | ------------------------------------------ |
+| `fastapi dev`              | Run API locally with reload                |
+| `pytest`                   | Run all tests except integration (default) |
+| `pytest tests/unit -q`     | Run unit tests only (no Docker required)   |
+| `pytest -m integration -q` | Run integration tests (requires Docker)    |
+| `pytest -k "test_name" -q` | Run a single test by name                  |
 
 ### 📱 Mobile (`mobile/`)
 
-| Command         | What it does                  |
-| --------------- | ----------------------------- |
-| `npm run start` | Start Expo dev server         |
-| `npm run ios`   | Launch iOS target             |
-| `npm run android` | Launch Android target       |
-| `npm run web`   | Launch web target             |
-| `npm run lint`  | Run Expo/ESLint checks        |
-| `npm run test`  | Run mobile Jest tests         |
+| Command           | What it does           |
+| ----------------- | ---------------------- |
+| `npm run start`   | Start Expo dev server  |
+| `npm run ios`     | Launch iOS target      |
+| `npm run android` | Launch Android target  |
+| `npm run web`     | Launch web target      |
+| `npm run lint`    | Run Expo/ESLint checks |
+| `npm run test`    | Run mobile Jest tests  |
 
 ### ⛓️ EVM / Foundry (`evm/`)
 
@@ -246,6 +248,7 @@ make getall
 - Verify MetaMask network is your anvil chain (`31337` by default).
 - Verify selected account matches expected seller flow for `createItem`.
 - Verify `VITE_CONTRACT_ADDRESS` points to deployed contract on the same chain.
+- Verify `VITE_PAYMENT_TOKEN_ADDRESS` points to the accepted USDC token for that deployment.
 
 ### Error: no contract code found at configured address
 

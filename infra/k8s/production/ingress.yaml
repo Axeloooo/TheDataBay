@@ -4,11 +4,11 @@ metadata:
   name: ip-factory-ingress
   namespace: ip-factory
   annotations:
-    kubernetes.io/ingress.class: nginx
     cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
 spec:
+  ingressClassName: nginx
   tls:
     - hosts:
         - chiselware.org

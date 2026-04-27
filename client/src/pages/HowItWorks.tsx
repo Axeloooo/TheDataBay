@@ -30,13 +30,13 @@ function HowItWorks() {
       icon: Shield,
       title: "Verify Before You Spend",
       description:
-        "Every listing exposes SHA-256 integrity proofs, seller signatures, and structured metadata. Read everything — commit nothing — until you're sure.",
+        "Every listing exposes SHA-256 integrity proofs and structured metadata. Read everything — commit nothing — until you're sure.",
     },
     {
       icon: Coins,
-      title: "Settle in USDC, Get Provable Access",
+      title: "Settle On-Chain, Get Provable Access",
       description:
-        "A smart contract records your purchase on-chain in USDC. No approval queues, no invoices — your access rights are on-chain and verifiable by anyone, anytime.",
+        "A smart contract records your purchase on-chain using the listing's settlement token. No approval queues, no invoices — your access rights are on-chain and verifiable by anyone, anytime.",
     },
     {
       icon: Download,
@@ -48,13 +48,13 @@ function HowItWorks() {
       icon: Upload,
       title: "Publish Once, Earn Every Time",
       description:
-        "Upload your dataset, set a USDC price, and let the contract handle the rest. Every purchase settles automatically — no billing cycles, no chargebacks.",
+        "Upload your dataset, set a price in the listing's token, and let the contract handle the rest. Every purchase settles automatically — no billing cycles, no chargebacks.",
     },
     {
       icon: ArrowLeftRight,
       title: "Built for What's Next",
       description:
-        "Settlement runs on EVM with USDC today. Multi-chain support for Solana and additional EVM networks is actively in development, while quote currencies remain local-only.",
+        "Settlement runs on EVM today, supporting USDC and CADC. Multi-chain support for Solana and additional EVM networks is actively in development, while quote currencies remain local-only.",
     },
   ];
 
@@ -68,7 +68,8 @@ function HowItWorks() {
           How it works
         </p>
         <h1 className="mt-4 text-balance text-3xl font-semibold leading-tight md:text-4xl">
-          From encrypted listing to verified download, with USDC settlement and quote-only pricing.
+          From encrypted listing to verified download, with on-chain token
+          settlement and quote-only pricing.
         </h1>
         <p className="mt-3 max-w-3xl text-sm text-muted-foreground md:text-base">
           Find the right dataset, confirm its integrity, settle on-chain, and
@@ -148,8 +149,8 @@ function HowItWorks() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              EVM + USDC settlement is live today. Solana and additional EVM
-              chains are on the roadmap — so the datasets you list now will
+              EVM settlement (USDC, CADC) is live today. Solana and additional
+              EVM chains are on the roadmap — so the datasets you list now will
               reach a broader buyer pool as the network grows.
             </p>
           </CardContent>

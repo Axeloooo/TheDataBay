@@ -9,7 +9,6 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
-from ..config.settings import Settings, get_settings
 from ..database.engine import get_session
 from ..services.agent_repo import (
     create_agent,
@@ -159,7 +158,6 @@ async def generate_recommendation_route(
     body: RecommendQueryRequest,
     session: Session = Depends(get_session),
     ai_service: AIService = Depends(get_ai_service),
-    settings: Settings = Depends(get_settings),
     _: None = Depends(agent_write_rate_limiter),
 ):
     """Generate a recommendation for a dataset query on behalf of an agent.
@@ -169,7 +167,6 @@ async def generate_recommendation_route(
         body (RecommendQueryRequest): Request body containing ``query`` field.
         session (Session): Database session.
         ai_service (AIService): AI service instance.
-        settings (Settings): Application settings.
 
     Returns:
         RecommendationResponse: Generated recommendation.
@@ -179,7 +176,7 @@ async def generate_recommendation_route(
         raise HTTPException(status_code=404, detail="Agent not found")
     query = body.query.strip()
     result = await generate_recommendation_service(
-        agent.id, query, session, ai_service, settings
+        agent.id, query, session, ai_service
     )
     if result is None:
         raise HTTPException(

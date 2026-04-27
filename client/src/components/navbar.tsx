@@ -27,15 +27,20 @@ import { useSearchStore } from "@/stores/search-store";
 import { useCurrencyStore } from "@/stores/currency-store";
 import { useWalletStore } from "@/stores/wallet-store";
 
-
 function shortAddress(addr: string) {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
 function Navbar() {
   const [modalOpen, setModalOpen] = useState(false);
-  const { address, isConnected, isConnecting, disconnect, chainName, walletName } =
-    useWalletStore();
+  const {
+    address,
+    isConnected,
+    isConnecting,
+    disconnect,
+    chainName,
+    walletName,
+  } = useWalletStore();
   const preferredCurrency = useCurrencyStore(
     (state) => state.preferredCurrency,
   );
@@ -90,7 +95,7 @@ function Navbar() {
               BridgeMart
             </div>
             <div className="truncate text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
-              USDC-settled dataset exchange
+              On-chain dataset exchange
             </div>
           </div>
         </Link>
@@ -222,7 +227,10 @@ function Navbar() {
                   {isConnecting ? "Connecting…" : "Connect Wallet"}
                 </span>
               </Button>
-              <WalletConnectModal open={modalOpen} onOpenChange={setModalOpen} />
+              <WalletConnectModal
+                open={modalOpen}
+                onOpenChange={setModalOpen}
+              />
             </>
           ) : (
             <div className="flex items-center gap-1.5 md:gap-2">
@@ -260,7 +268,7 @@ function Navbar() {
       {ratesUnavailable && (
         <p className="mt-2 text-right text-[11px] font-medium text-muted-foreground">
           Live FX feed unavailable; quote conversions may be approximate, but
-          settlement remains in USDC.
+          settlement is fixed to the listing's token.
         </p>
       )}
     </div>

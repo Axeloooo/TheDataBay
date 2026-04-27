@@ -11,12 +11,15 @@ import { useWalletStore } from "@/stores/wallet-store";
 import type { WalletConnectorType } from "@/lib/wallet/types";
 
 const RDNS_TO_WALLET: Record<string, { name: string; icon: string }> = {
-  "io.metamask":         { name: "MetaMask",        icon: "/metamask-logo.svg" },
-  "io.rabby":            { name: "Rabby",            icon: "/rabby-logo.svg" },
-  "app.phantom":         { name: "Phantom",          icon: "/phantom-logo.svg" },
-  "com.brave.wallet":    { name: "Brave Wallet",     icon: "/brave-logo.svg" },
-  "com.coinbase.wallet": { name: "Coinbase Wallet",  icon: "/coinbase-logo.svg" },
-  "com.trustwallet.app": { name: "Trust Wallet",     icon: "/trust-logo.svg" },
+  "io.metamask": { name: "MetaMask", icon: "/metamask-logo.svg" },
+  "io.rabby": { name: "Rabby", icon: "/rabby-logo.svg" },
+  "app.phantom": { name: "Phantom", icon: "/phantom-logo.svg" },
+  "com.brave.wallet": { name: "Brave Wallet", icon: "/brave-logo.svg" },
+  "com.coinbase.wallet": {
+    name: "Coinbase Wallet",
+    icon: "/coinbase-logo.svg",
+  },
+  "com.trustwallet.app": { name: "Trust Wallet", icon: "/trust-logo.svg" },
 };
 
 type InjectedWalletOption = {
@@ -56,7 +59,9 @@ type Props = {
 
 export function WalletConnectModal({ open, onOpenChange }: Props) {
   const { connect, isConnecting, isConnected } = useWalletStore();
-  const [selectedWallet, setSelectedWallet] = useState<WalletOption | null>(null);
+  const [selectedWallet, setSelectedWallet] = useState<WalletOption | null>(
+    null,
+  );
   const [error, setError] = useState<string | null>(null);
   const [detectedRdns, setDetectedRdns] = useState<Set<string>>(new Set());
   const eip6963ProvidersRef = useRef<Map<string, object>>(new Map());
@@ -111,7 +116,12 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
 
   const walletOptions: WalletOption[] = [
     ...injectedOptions,
-    { id: "walletconnect", name: "WalletConnect", icon: "/walletconnect-logo.svg", isActive: true },
+    {
+      id: "walletconnect",
+      name: "WalletConnect",
+      icon: "/walletconnect-logo.svg",
+      isActive: true,
+    },
   ];
 
   const handleSelect = async (wallet: WalletOption) => {
@@ -130,7 +140,9 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
         await connect("walletconnect");
       } catch (err) {
         const message =
-          err instanceof Error ? err.message : "Connection failed. Please try again.";
+          err instanceof Error
+            ? err.message
+            : "Connection failed. Please try again.";
         setError(message);
         // Reopen so the user can see the error and retry.
         onOpenChange(true);
@@ -141,11 +153,15 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
     setSelectedWallet(wallet);
     setError(null);
     try {
-      const provider = eip6963ProvidersRef.current.get((wallet as InjectedWalletOption).rdns);
+      const provider = eip6963ProvidersRef.current.get(
+        (wallet as InjectedWalletOption).rdns,
+      );
       await connect(wallet.id, provider);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Connection failed. Please try again.";
+        err instanceof Error
+          ? err.message
+          : "Connection failed. Please try again.";
       setError(message);
     }
   };
@@ -175,7 +191,10 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
         {isConnecting && selectedWallet && !error && (
           <div className="flex flex-col items-center gap-4 py-6">
             <div className="flex size-16 items-center justify-center rounded-2xl border border-border/80 bg-card/80 shadow-sm">
-              <WalletIcon src={selectedWallet.icon} name={selectedWallet.name} />
+              <WalletIcon
+                src={selectedWallet.icon}
+                name={selectedWallet.name}
+              />
             </div>
             <Loader2 className="size-5 animate-spin text-primary" />
             <p className="text-sm text-muted-foreground">
@@ -203,7 +222,11 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
             <div className="grid grid-cols-4 gap-3">
               {walletOptions.map((wallet) => (
                 <button
-                  key={wallet.id === "injected" ? `injected-${(wallet as InjectedWalletOption).rdns}` : wallet.id}
+                  key={
+                    wallet.id === "injected"
+                      ? `injected-${(wallet as InjectedWalletOption).rdns}`
+                      : wallet.id
+                  }
                   title={wallet.name}
                   aria-label={wallet.name}
                   onClick={() => void handleSelect(wallet)}
@@ -225,7 +248,8 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
                   alt="Solana"
                   className="size-10 object-contain"
                   onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).style.display = "none";
+                    (e.currentTarget as HTMLImageElement).style.display =
+                      "none";
                   }}
                 />
               </button>
@@ -233,8 +257,8 @@ export function WalletConnectModal({ open, onOpenChange }: Props) {
 
             {detectedRdns.size === 0 ? (
               <p className="mt-3 text-center text-xs text-muted-foreground">
-                No browser wallet extensions detected. Use WalletConnect to connect
-                Rabby, Coinbase, Trust, or any mobile wallet.
+                No browser wallet extensions detected. Use WalletConnect to
+                connect Rabby, Coinbase, Trust, or any mobile wallet.
               </p>
             ) : (
               <p className="mt-3 text-center text-xs text-muted-foreground">

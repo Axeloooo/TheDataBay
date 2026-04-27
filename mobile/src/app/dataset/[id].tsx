@@ -118,8 +118,6 @@ export default function DatasetDetailScreen() {
       void verifyDatasetIntegrity({
         datasetUrl: item.dataset_url,
         datasetHash: item.dataset_hash,
-        signatureUrl: item.signature_url,
-        signatureHash: item.signature_hash,
       }).then((result) => {
         setIntegrity(result.status);
         setIntegrityDetail(result.detail);
@@ -181,11 +179,11 @@ export default function DatasetDetailScreen() {
     beginMutation("buy");
 
     try {
-      if (dataset.settlement_currency !== "USDC" || dataset.settlement_decimals !== 6) {
-        throw new Error("Unsupported settlement metadata from API.");
-      }
-
-      const txHash = await buyItemTx(dataset.id, dataset.price_atomic);
+      const txHash = await buyItemTx(
+        dataset.id,
+        dataset.price_atomic,
+        dataset.payment_token,
+      );
       completeMutation(txHash);
       await checkAccess();
       if (address) {

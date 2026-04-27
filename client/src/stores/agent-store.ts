@@ -1,6 +1,10 @@
 import { create } from "zustand";
 import { backend } from "@/lib/backend";
-import type { Agent, AgentRecommendation, PurchaseRequest } from "@/types/agent";
+import type {
+  Agent,
+  AgentRecommendation,
+  PurchaseRequest,
+} from "@/types/agent";
 
 type AgentFilters = {
   search: string;
@@ -68,7 +72,11 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
       set({ agents: res.agents, totalAgents: res.total, loadingAgents: false });
     } catch (err) {
       if (requestId !== agentsRequestSeq) return;
-      set({ agentError: err instanceof Error ? err.message : "Failed to load agents", loadingAgents: false });
+      set({
+        agentError:
+          err instanceof Error ? err.message : "Failed to load agents",
+        loadingAgents: false,
+      });
     }
   },
 
@@ -95,7 +103,10 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
     try {
       const recsRes = await backend.getAgentRecommendations(handle);
       if (requestId !== agentDetailRequestSeq) return;
-      set({ recommendations: recsRes.recommendations, loadingRecommendations: false });
+      set({
+        recommendations: recsRes.recommendations,
+        loadingRecommendations: false,
+      });
     } catch (err) {
       // Log the recommendations error but don't overwrite a successful agent load.
       console.error("Failed to load agent recommendations", err);
@@ -110,17 +121,30 @@ export const useAgentStore = create<AgentStore>()((set, get) => ({
     try {
       const res = await backend.getPurchaseRequests({ status });
       if (requestId !== purchaseRequestsSeq) return;
-      set({ purchaseRequests: res.requests, totalPurchaseRequests: res.total, loadingPurchaseRequests: false });
+      set({
+        purchaseRequests: res.requests,
+        totalPurchaseRequests: res.total,
+        loadingPurchaseRequests: false,
+      });
     } catch (err) {
       if (requestId !== purchaseRequestsSeq) return;
-      set({ purchaseRequestError: err instanceof Error ? err.message : "Failed to load purchase requests", loadingPurchaseRequests: false });
+      set({
+        purchaseRequestError:
+          err instanceof Error
+            ? err.message
+            : "Failed to load purchase requests",
+        loadingPurchaseRequests: false,
+      });
     }
   },
 
   clearSelectedAgent: () => set({ selectedAgent: null, recommendations: [] }),
 
-  setSearchFilter: (search) => set((state) => ({ filters: { ...state.filters, search } })),
-  setTagFilter: (tag) => set((state) => ({ filters: { ...state.filters, tag } })),
-  setStatusFilter: (status) => set((state) => ({ filters: { ...state.filters, status } })),
+  setSearchFilter: (search) =>
+    set((state) => ({ filters: { ...state.filters, search } })),
+  setTagFilter: (tag) =>
+    set((state) => ({ filters: { ...state.filters, tag } })),
+  setStatusFilter: (status) =>
+    set((state) => ({ filters: { ...state.filters, status } })),
   clearFilters: () => set({ filters: { search: "", tag: "", status: "" } }),
 }));

@@ -26,10 +26,7 @@ import { DatasetRecommendations } from "@/components/dataset-recommendations";
 import { toast } from "sonner";
 import { fireConfettiBurst } from "@/lib/confetti";
 import { verifyDatasetIntegrity, type IntegrityStatus } from "@/lib/integrity";
-import {
-  convertSettlementToCurrency,
-  formatCurrencyAmount,
-} from "@/lib/fx";
+import { convertSettlementToCurrency, formatCurrencyAmount } from "@/lib/fx";
 import { useWalletStore } from "@/stores/wallet-store";
 import { useCurrencyStore } from "@/stores/currency-store";
 
@@ -169,8 +166,6 @@ function DatasetDetail() {
     verifyDatasetIntegrity({
       datasetUrl: dataset.dataset_url,
       datasetHash: dataset.dataset_hash,
-      signatureUrl: dataset.signature_url,
-      signatureHash: dataset.signature_hash,
     }).then((result) => {
       if (!active) return;
       setIntegrityStatus(result.status);
@@ -210,6 +205,10 @@ function DatasetDetail() {
     () => (dataset ? normalizeMarketplacePrice(dataset) : null),
     [dataset],
   );
+  const settlementLogo =
+    pricing?.settlementCurrency === "CADC"
+      ? "/cadc-logo.svg"
+      : "/usdc-logo.svg";
   const canBuy = dataset ? !isSameAddress(dataset.seller, address) : false;
   const quoteEquivalent =
     pricing && quoteCurrency !== pricing.settlementCurrency
@@ -217,6 +216,7 @@ function DatasetDetail() {
           Number(pricing.settlementAmount),
           quoteCurrency,
           rates,
+          pricing.settlementCurrency,
         )
       : null;
 
@@ -302,7 +302,7 @@ function DatasetDetail() {
               buttonClassName="h-8"
             />
             <p className="mt-2 max-w-xs">
-              Quotes only. Settlement stays in USDC at{" "}
+              Quotes only. Settlement uses the listing's token at{" "}
               {pricing?.settlementDecimals ?? 6} decimals.
             </p>
           </div>
@@ -332,7 +332,7 @@ function DatasetDetail() {
                 setIsBuying(true);
                 try {
                   const priceAtomic = BigInt(pricing.priceAtomic);
-                  await buyItemTx(id, priceAtomic);
+                  await buyItemTx(id, priceAtomic, dataset.payment_token);
                   setIsPurchased(true);
                   toast.success("Purchase successful", {
                     description: "Access granted for this dataset.",
@@ -356,13 +356,13 @@ function DatasetDetail() {
               ) : (
                 <>
                   <img
-                    src="/usdc-logo.svg"
+                    src={settlementLogo}
                     alt=""
                     aria-hidden="true"
                     className="h-4 w-4 rounded-full object-contain"
                   />
                   <ShoppingCart className="h-4 w-4" />
-                  Buy with USDC ({pricing?.settlementAmount ?? "0"} USDC
+                  Buy with {pricing?.settlementCurrency ?? "USDC"} ({pricing?.settlementAmount ?? "0"} {pricing?.settlementCurrency ?? "USDC"}
                   {quoteEquivalent !== null
                     ? ` • ~${formatCurrencyAmount(quoteEquivalent, quoteCurrency)}`
                     : ""}

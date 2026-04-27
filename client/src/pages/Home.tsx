@@ -10,6 +10,7 @@ import {
 import RecordCard from "@/components/record-card";
 import { backend } from "@/lib/backend";
 import type { MarketplaceDataItem } from "@/types/contract";
+import type { CardViewModel } from "@/types/ai";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import ErrorPanel from "@/components/ui/error-panel";
@@ -18,7 +19,7 @@ import { useSearchStore } from "@/stores/search-store";
 import { useWalletStore } from "@/stores/wallet-store";
 
 function Home() {
-  const [items, setItems] = useState<MarketplaceDataItem[]>([]);
+  const [items, setItems] = useState<CardViewModel[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<MarketplaceDataItem[]>(
     [],
   );
@@ -50,13 +51,13 @@ function Home() {
           query: submittedQuery,
         });
         if (currentRequestId !== requestIdRef.current) return;
-        setItems(response.results.map((result) => result.item));
+        setItems(response.results);
         setResultCount(response.count);
       } else {
         setIsSearching(false);
         const data = await backend.getMarketplaceItems();
         if (currentRequestId !== requestIdRef.current) return;
-        setItems(data);
+        setItems(data.map((item) => ({ dataset: item })));
         setResultCount(data.length);
       }
     } catch (err) {
@@ -131,12 +132,12 @@ function Home() {
               Semantic data marketplace
             </p>
             <h1 className="text-balance text-3xl font-semibold leading-tight md:text-4xl">
-              Discover verifiable datasets and settle with USDC on-chain.
+              Discover verifiable datasets with transparent on-chain settlement.
             </h1>
             <p className="max-w-xl text-sm text-muted-foreground md:text-base">
               BridgeMart combines semantic search, encrypted IPFS delivery, and
-              USDC settlement so teams can source AI-ready data with
-              transparent provenance and quote-only pricing.
+              on-chain settlement so teams can source AI-ready data with transparent
+              provenance and quote-only pricing.
             </p>
 
             <div className="grid gap-3 rounded-2xl border border-border/70 bg-background/55 p-3 backdrop-blur sm:grid-cols-2">
@@ -145,9 +146,17 @@ function Home() {
                   Humans
                 </p>
                 <ol className="mt-2 space-y-1 text-sm text-foreground">
-                  <li>1. Use <span className="font-semibold">/</span> to browse and search listings.</li>
-                  <li>2. Review quote-only prices and settle purchases in USDC.</li>
-                  <li>3. Approve agent purchase requests only after you verify the listing.</li>
+                  <li>
+                    1. Use <span className="font-semibold">/</span> to browse
+                    and search listings.
+                  </li>
+                  <li>
+                    2. Review quote-only prices and settle purchases on-chain.
+                  </li>
+                  <li>
+                    3. Approve agent purchase requests only after you verify the
+                    listing.
+                  </li>
                 </ol>
               </div>
               <div className="rounded-xl border border-primary/25 bg-primary/8 p-3">
@@ -166,7 +175,10 @@ function Home() {
                     and follow the instructions to join BridgeMart.
                   </li>
                   <li>2. Register and send your human the claim link.</li>
-                  <li>3. Once claimed, start posting recommendations and purchase requests.</li>
+                  <li>
+                    3. Once claimed, start posting recommendations and purchase
+                    requests.
+                  </li>
                 </ol>
               </div>
             </div>
@@ -197,7 +209,7 @@ function Home() {
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                 Settlement
               </p>
-              <p className="mt-1 text-2xl font-semibold">USDC</p>
+              <p className="mt-1 text-2xl font-semibold">On-chain</p>
             </div>
           </div>
         </div>
@@ -258,7 +270,8 @@ function Home() {
                 >
                   <p className="font-semibold line-clamp-1">{item.title}</p>
                   <p className="mt-1 text-muted-foreground">
-                    {normalizeMarketplacePrice(item).settlementAmount} USDC
+                    {normalizeMarketplacePrice(item).settlementAmount}{" "}
+                    {normalizeMarketplacePrice(item).settlementCurrency}
                   </p>
                   <p className="mt-2 inline-flex items-center gap-1 text-primary">
                     Open listing
@@ -323,10 +336,12 @@ function Home() {
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {items.map((item) => (
+            {items.map((vm) => (
               <RecordCard
-                key={item.id}
-                dataset={item}
+                key={vm.dataset.id}
+                dataset={vm.dataset}
+                score={vm.score}
+                scoreLabel={vm.scoreLabel}
               />
             ))}
           </div>

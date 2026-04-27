@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .llm_schema import DatasetStats, SignatureInfo, VectorSpec
+from .llm_schema import DatasetStats, VectorSpec
 
 
 class JobResponse(BaseModel):
@@ -38,9 +38,6 @@ class JobStatusResponse(BaseModel):
     )
     stats: Optional[DatasetStats] = Field(
         None, description="Dataset statistics (when completed)"
-    )
-    signature: Optional[SignatureInfo] = Field(
-        None, description="Signature file info (when completed)"
     )
     dataset_url: Optional[str] = Field(
         None, description="Encrypted dataset IPFS URL (when completed)"

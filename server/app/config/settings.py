@@ -27,6 +27,7 @@ class Settings(BaseSettings):
 
     # Ollama settings
     embedding_model: str = Field(alias="EMBEDDING_MODEL")
+    embedding_dimension: int = Field(default=768, alias="EMBEDDING_DIMENSION")
 
     # Embedding job settings
     max_file_size_mb: int = Field(alias="MAX_FILE_SIZE_MB")
@@ -46,6 +47,8 @@ class Settings(BaseSettings):
 
     # Smart contract settings
     contract_address: str = Field(alias="CONTRACT_ADDRESS")
+    payment_token_address: str = Field(default="", alias="PAYMENT_TOKEN_ADDRESS")
+    cadc_token_address: str = Field(default="", alias="CADC_TOKEN_ADDRESS")
     contract_abi_path: str = Field(alias="CONTRACT_ABI_PATH")
     chain_id: int = Field(alias="CHAIN_ID")
     rpc_url: str = Field(alias="RPC_URL")
@@ -53,6 +56,40 @@ class Settings(BaseSettings):
 
     # Database settings
     database_url: SecretStr = Field(alias="POSTGRES_URL")
+
+    @property
+    def async_database_url(self) -> str:
+        """Return a postgresql+asyncpg:// URL for async SQLAlchemy usage."""
+        url = self.database_url.get_secret_value()
+        driver_aliases = {
+            "postgresql+psycopg3://": "postgresql+asyncpg://",
+            "postgresql+psycopg2://": "postgresql+asyncpg://",
+            "postgresql+psycopg://": "postgresql+asyncpg://",
+            "postgresql://": "postgresql+asyncpg://",
+            "postgres://": "postgresql+asyncpg://",
+        }
+
+        for prefix, async_prefix in driver_aliases.items():
+            if url.startswith(prefix):
+                return url.replace(prefix, async_prefix, 1)
+        return url
+
+    @property
+    def psycopg_database_url(self) -> str:
+        """Return a psycopg3 URL for LangChain's PGVector integration."""
+        url = self.database_url.get_secret_value()
+        driver_aliases = {
+            "postgresql+asyncpg://": "postgresql+psycopg://",
+            "postgresql+psycopg2://": "postgresql+psycopg://",
+            "postgresql+psycopg3://": "postgresql+psycopg://",
+            "postgresql://": "postgresql+psycopg://",
+            "postgres://": "postgresql+psycopg://",
+        }
+
+        for prefix, psycopg_prefix in driver_aliases.items():
+            if url.startswith(prefix):
+                return url.replace(prefix, psycopg_prefix, 1)
+        return url
 
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",

@@ -16,7 +16,7 @@ export function AgentCard({ agent, className }: AgentCardProps) {
       to={`/agents/${agent.handle}`}
       className={cn(
         "block rounded-xl border border-border/80 bg-card/65 p-4 shadow-sm transition hover:border-primary/50 hover:bg-card",
-        className
+        className,
       )}
     >
       <div className="flex items-start gap-3">
@@ -33,17 +33,27 @@ export function AgentCard({ agent, className }: AgentCardProps) {
         )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-sm leading-tight">{agent.display_name}</span>
+            <span className="font-semibold text-sm leading-tight">
+              {agent.display_name}
+            </span>
             <AgentBadge status={agent.verification_status} />
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">@{agent.handle}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            @{agent.handle}
+          </p>
           {agent.bio && (
-            <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">{agent.bio}</p>
+            <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2">
+              {agent.bio}
+            </p>
           )}
           {agent.capability_tags.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {agent.capability_tags.slice(0, 4).map((tag) => (
-                <Badge key={tag} variant="secondary" className="text-[10px] h-5 px-1.5">
+                <Badge
+                  key={tag}
+                  variant="secondary"
+                  className="text-[10px] h-5 px-1.5"
+                >
                   {tag}
                 </Badge>
               ))}

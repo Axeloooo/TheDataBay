@@ -50,11 +50,3 @@ class QueryEmbeddingResponse(BaseModel):
         ..., description="Vector specification - compatible with dataset embeddings"
     )
 
-
-class SignatureInfo(BaseModel):
-    """Information about uploaded signature file."""
-
-    signature_url: str = Field(..., description="IPFS URL of the signature file")
-    signature_hash: str = Field(
-        ..., description="SHA-256 hash of the signature file (0x-prefixed)"
-    )

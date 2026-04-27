@@ -6,10 +6,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
-import {
-  DISPLAY_CURRENCY_OPTIONS,
-  type DisplayCurrency,
-} from "@/lib/fx";
+import { DISPLAY_CURRENCY_OPTIONS, type DisplayCurrency } from "@/lib/fx";
 
 interface DisplayCurrencySelectorProps {
   value: DisplayCurrency;
@@ -45,7 +42,7 @@ export function DisplayCurrencySelector({
             buttonClassName,
             className,
           )}
-          title={`${title} - quotes only, settlement stays USDC`}
+          title={`${title} - quotes only, settlement uses the listing's token`}
         >
           <img
             src={selected.icon}
@@ -56,7 +53,10 @@ export function DisplayCurrencySelector({
           <span>{selected.code}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className={cn("min-w-[140px]", menuClassName)}>
+      <DropdownMenuContent
+        align="end"
+        className={cn("min-w-[140px]", menuClassName)}
+      >
         {DISPLAY_CURRENCY_OPTIONS.map((option) => (
           <DropdownMenuItem
             key={option.code}
@@ -73,7 +73,9 @@ export function DisplayCurrencySelector({
               className="h-4 w-4 shrink-0 rounded-sm object-contain"
             />
             <span>{option.code}</span>
-            {value === option.code && <span className="ml-auto text-xs">✓</span>}
+            {value === option.code && (
+              <span className="ml-auto text-xs">✓</span>
+            )}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

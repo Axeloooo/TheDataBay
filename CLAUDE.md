@@ -146,6 +146,7 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 | `fastapi-templates`           | `.agents/skills/fastapi-templates/`           | FastAPI route/service scaffolding, dependency injection, API structure           |
 | `frontend-design`             | `.agents/skills/frontend-design/`             | UI-heavy pages/components requiring high design quality                          |
 | `github-actions-templates`    | `.agents/skills/github-actions-templates/`    | GitHub Actions workflow setup, CI/CD automation, or reusable workflow patterns   |
+| `postgresql-table-design`     | `.agents/skills/postgresql-table-design/`     | PostgreSQL schema design: types, indexes, constraints, pgvector                  |
 | `python-testing-patterns`     | `.agents/skills/python-testing-patterns/`     | Python test design, fixtures, mocking, and best practices                        |
 | `react-state-management`      | `.agents/skills/react-state-management/`      | Zustand/global state refactors in `client/` or `mobile/`                         |
 | `requesting-code-review`      | `.agents/skills/requesting-code-review/`      | Final verification pass before merge or when a dedicated review is requested     |
@@ -162,6 +163,18 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 | `vercel-react-native-skills`  | `.agents/skills/vercel-react-native-skills/`  | `mobile/` Expo/React Native features, performance, and platform APIs             |
 | `writing-plans`               | `.agents/skills/writing-plans/`               | Specs or multi-step implementation plans that should be written before coding     |
 
+## Specs & Planning
+
+Feature specs live in the Obsidian Vault at `/Users/axelsanchez/Code/Obsidian Vault/`.
+When a task references a spec, read the relevant vault note before loading any skills.
+
+| Feature                       | Vault Note                                                       |
+| ----------------------------- | ---------------------------------------------------------------- |
+| Semantic Search refactor      | `/Users/axelsanchez/Code/Obsidian Vault/Semantic Search.md`      |
+| CADC payment integration      | `/Users/axelsanchez/Code/Obsidian Vault/CADC.md`                 |
+| Backend architecture refactor | `/Users/axelsanchez/Code/Obsidian Vault/Backend Architecture.md` |
+| Dataset preview               | `/Users/axelsanchez/Code/Obsidian Vault/Dataset Preview.md`      |
+
 ### Recommended Skill Combinations
 
 - **New API endpoint**: `brainstorming` -> `api-design-principles` + `fastapi-templates`
@@ -170,9 +183,11 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 - **State management changes**: `brainstorming` -> `react-state-management` (+ `typescript-advanced-types` if type-heavy)
 - **Mobile feature/perf issue**: `brainstorming` or `systematic-debugging` -> `vercel-react-native-skills`
 - **Contract feature/fix**: `brainstorming` or `systematic-debugging` -> `solskill`
+- **New backend service + repo + tests**: `brainstorming` -> `fastapi-templates` + `api-design-principles` + `test-driven-development` + `python-testing-patterns`
+- **New database table or schema change**: `postgresql-table-design` (always load when writing migrations or SQLModel definitions)
 - **Implementation with tests first**: `test-driven-development` + domain skill (`fastapi-templates`, `vercel-react-best-practices`, `vercel-react-native-skills`, or `solskill`)
 - **Python backend test work**: `python-testing-patterns` + `fastapi-templates` (+ `systematic-debugging` when fixing regressions)
-- **UI flow verification**: `e2e-testing-patterns` + `frontend-design` or `vercel-react-best-practices`
+- **E2E test suite**: `e2e-testing-patterns` + `frontend-design` or `vercel-react-best-practices`
 - **CI/CD automation**: `github-actions-templates` (+ `python-testing-patterns`, `e2e-testing-patterns`, or `terraform-test` depending on pipeline scope)
 - **Terraform delivery**: `terraform-style-guide` + `terraform-test`
 - **Large scoped effort**: `writing-plans` -> `subagent-driven-development` when work can be split safely

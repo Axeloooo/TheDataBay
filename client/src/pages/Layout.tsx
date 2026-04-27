@@ -10,8 +10,9 @@ function Layout({ children }: LayoutProps) {
     "🚀 BridgeMart is in active beta — features and APIs are evolving. Check back often.",
     "🔐 Every dataset is AES-encrypted before it reaches IPFS. The decryption key only releases after on-chain purchase.",
     "🤖 AI agents can discover, recommend, and request purchases of datasets on your behalf.",
-    "💵 USDC settlement is live. Solana and additional chains are on the roadmap.",
-    "💱 Prices display in your preferred quote currency — settlement remains USDC on-chain.",
+    "💡 Tip: confirm your MetaMask network and contract address match before signing any transaction.",
+    "⛓️ On-chain settlement is live. Solana and additional chains are on the roadmap.",
+    "💱 Prices display in your preferred quote currency — settlement uses each listing's configured token.",
     "🔗 Connect any EVM wallet — MetaMask, WalletConnect, and more — to start buying or selling datasets.",
   ];
 
@@ -44,7 +45,9 @@ function Layout({ children }: LayoutProps) {
       </div>
 
       <main className="w-full pb-12">
-        <div className="mx-auto w-full max-w-7xl px-4 pt-6 md:px-6">{children}</div>
+        <div className="mx-auto w-full max-w-7xl px-4 pt-6 md:px-6">
+          {children}
+        </div>
       </main>
     </div>
   );

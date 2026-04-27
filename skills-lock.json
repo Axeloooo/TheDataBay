@@ -36,6 +36,11 @@
       "sourceType": "github",
       "computedHash": "8604814828637308a8cdc45c53e647f0029395328184937312330e4b8e8c587f"
     },
+    "postgresql-table-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "dcace78e5cef7d8dce8ffef7ebee146e6c83a438aa4cf80bf502730e870c02d4"
+    },
     "python-testing-patterns": {
       "source": "wshobson/agents",
       "sourceType": "github",
@@ -84,7 +89,7 @@
     "terraform-test": {
       "source": "hashicorp/agent-skills",
       "sourceType": "github",
-      "computedHash": "5a62d5e759b4720304127bd1e94d405e0f91a907965d87b1117d2b91d7eb2e18"
+      "computedHash": "c446a090ac98bea46704c16003761a030e6aa56a27b0e95d6914fbdb7c1d2a23"
     },
     "test-driven-development": {
       "source": "obra/superpowers",

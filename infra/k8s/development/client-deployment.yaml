@@ -26,6 +26,11 @@ spec:
                 secretKeyRef:
                   name: bridgemart-secrets
                   key: CONTRACT_ADDRESS
+            - name: VITE_PAYMENT_TOKEN_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: bridgemart-secrets
+                  key: PAYMENT_TOKEN_ADDRESS
             - name: VITE_PINATA_GATEWAY_URL
               valueFrom:
                 secretKeyRef:

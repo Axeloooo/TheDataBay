@@ -1,19 +1,20 @@
 import type { WalletType } from "@/src/types/dataset";
 
-export type MarketplaceSettlementCurrency = "USDC";
+export type MarketplaceSettlementCurrency = "USDC" | "CADC";
 
 export type MarketplaceDataItem = {
   id: string;
   title: string;
   description: string;
   seller: string;
+  payment_token: string;
   price_atomic: string;
   settlement_currency: MarketplaceSettlementCurrency;
-  settlement_decimals: 6;
+  settlement_decimals: number;
   dataset_url: string;
   dataset_hash: string;
-  signature_url: string;
-  signature_hash: string;
+  signature_url?: string;
+  signature_hash?: string;
   exists: boolean;
   purchase_count: number;
 };

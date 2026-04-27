@@ -8,63 +8,99 @@ import type {
 } from "@/types/contract";
 import type { KeyReleaseRequest, KeyReleaseResponse } from "@/types/dataset";
 import type { JobResponse, JobStatusResponse } from "@/types/llm";
-import type { SimilaritySearchRequest, SimilaritySearchResponse } from "@/types/ai";
-import type { Agent, AgentListResponse, RecommendationListResponse, PurchaseRequest, PurchaseRequestListResponse } from "@/types/agent";
+import type {
+  SimilaritySearchRequest,
+  SimilaritySearchResponse,
+  CardViewModel,
+} from "@/types/ai";
+import type {
+  Agent,
+  AgentListResponse,
+  RecommendationListResponse,
+  PurchaseRequest,
+  PurchaseRequestListResponse,
+} from "@/types/agent";
 import { normalizeAtomicString } from "@/lib/atomic";
 import { mockBackend } from "@/lib/mock-backend";
+import { uuidToBytes32 } from "@/lib/ids";
+import { SETTLEMENT_TOKENS } from "@/types/contract";
+import type { SettlementCurrency } from "@/types/contract";
 
 type MarketplaceApiItem = Omit<
   MarketplaceDataItem,
-  "price_atomic" | "settlement_currency" | "settlement_decimals"
+  "payment_token" | "price_atomic" | "settlement_currency" | "settlement_decimals"
 > & {
+  payment_token?: unknown;
+  paymentToken?: unknown;
   price?: unknown;
   price_atomic?: unknown;
   settlement_currency?: unknown;
   settlement_decimals?: unknown;
 };
 
-function normalizeMarketplaceItem(item: MarketplaceApiItem): MarketplaceDataItem {
+function normalizeMarketplaceItem(
+  item: MarketplaceApiItem,
+): MarketplaceDataItem {
   const priceAtomic = item.price_atomic ?? item.price;
   if (priceAtomic === undefined || priceAtomic === null) {
     throw new Error("Missing marketplace price from API.");
   }
+  const rawPaymentToken = item.payment_token ?? item.paymentToken;
+  if (typeof rawPaymentToken !== "string" || !rawPaymentToken.trim()) {
+    throw new Error("Missing marketplace payment token from API.");
+  }
 
   const rawSettlementCurrency = item.settlement_currency;
-  const settlementCurrency = rawSettlementCurrency == null
-    ? "USDC"
-    : String(rawSettlementCurrency).trim().toUpperCase();
-  if (settlementCurrency !== "USDC") {
-    throw new Error("Unsupported marketplace settlement currency from API.");
+  const normalizedCurrencyStr =
+    rawSettlementCurrency == null
+      ? "USDC"
+      : String(rawSettlementCurrency).trim().toUpperCase();
+
+  const isValidCurrency = (s: string): s is SettlementCurrency =>
+    s in SETTLEMENT_TOKENS;
+
+  if (!isValidCurrency(normalizedCurrencyStr)) {
+    throw new Error(
+      `Unsupported marketplace settlement currency from API: ${normalizedCurrencyStr}`,
+    );
   }
+  const settlementCurrency: SettlementCurrency = normalizedCurrencyStr;
+
   if (
     rawSettlementCurrency != null &&
-    String(rawSettlementCurrency) !== "USDC" &&
-    settlementCurrency === "USDC"
+    String(rawSettlementCurrency) !== settlementCurrency
   ) {
-    // Soft warning: backend returned USDC in a non-canonical format (e.g., wrong case/whitespace).
-    // This keeps the UI resilient while still surfacing potential backend drift.
+    // Soft warning: backend returned currency in a non-canonical format (e.g., wrong case/whitespace).
     console.warn(
-      "Non-canonical marketplace settlement currency from API; normalized to USDC:",
+      "Non-canonical marketplace settlement currency from API; normalized to",
+      settlementCurrency,
+      "from:",
       rawSettlementCurrency,
     );
   }
 
-  const settlementDecimals = Number(item.settlement_decimals ?? 6);
-  if (settlementDecimals !== 6) {
-    throw new Error("Unsupported marketplace settlement decimals from API.");
+  const expectedDecimals = SETTLEMENT_TOKENS[settlementCurrency].decimals;
+  const settlementDecimals = Number(item.settlement_decimals ?? expectedDecimals);
+  if (settlementDecimals !== expectedDecimals) {
+    console.warn(
+      `Unexpected settlement decimals from API for ${settlementCurrency}: expected ${expectedDecimals}, got ${settlementDecimals}`,
+    );
   }
 
   const rest = { ...item };
   delete rest.price;
+  delete rest.paymentToken;
+  delete rest.payment_token;
   delete rest.price_atomic;
   delete rest.settlement_currency;
   delete rest.settlement_decimals;
 
   return {
     ...rest,
+    payment_token: rawPaymentToken.trim(),
     price_atomic: normalizeAtomicString(priceAtomic),
-    settlement_currency: "USDC",
-    settlement_decimals: 6,
+    settlement_currency: settlementCurrency,
+    settlement_decimals: settlementDecimals,
   };
 }
 
@@ -79,12 +115,16 @@ const realBackend = {
     apiRequest<JobStatusResponse>(`/api/v1/llm/jobs/${jobId}`),
 
   getMarketplaceItems: async () => {
-    const items = await apiRequest<MarketplaceApiItem[]>("/api/v1/contract/items/all");
+    const items = await apiRequest<MarketplaceApiItem[]>(
+      "/api/v1/contract/items/all",
+    );
     return items.map(normalizeMarketplaceItem);
   },
 
   getMarketplaceItem: async (listingId: string) => {
-    const item = await apiRequest<MarketplaceApiItem>(`/api/v1/contract/items/${listingId}`);
+    const item = await apiRequest<MarketplaceApiItem>(
+      `/api/v1/contract/items/${listingId}`,
+    );
     return normalizeMarketplaceItem(item);
   },
 
@@ -95,30 +135,52 @@ const realBackend = {
     }),
 
   checkAccess: (listingId: string, payload: WalletAccessRequest) =>
-    apiRequest<AccessCheckResponse>(`/api/v1/contract/access/${listingId}/check`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+    apiRequest<AccessCheckResponse>(
+      `/api/v1/contract/access/${listingId}/check`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
 
-  similaritySearch: async (payload: SimilaritySearchRequest) => {
-    const response = await apiRequest<SimilaritySearchResponse>("/api/v1/ai/similarity-search", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+  similaritySearch: async (
+    payload: SimilaritySearchRequest,
+  ): Promise<{ query: string; results: CardViewModel[]; count: number }> => {
+    const response = await apiRequest<SimilaritySearchResponse>(
+      "/api/v1/ai/similarity-search",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
     return {
-      ...response,
-      results: response.results.map((result) => ({
-        ...result,
-        item: normalizeMarketplaceItem(result.item as MarketplaceApiItem),
+      query: response.query,
+      count: response.count,
+      results: response.results.map((r) => ({
+        dataset: {
+          id: uuidToBytes32(r.listing_id),
+          title: r.title,
+          description: r.description,
+          payment_token: r.payment_token,
+          price_atomic: String(r.price_atomic),
+          settlement_currency: r.settlement_currency,
+          settlement_decimals: r.settlement_decimals,
+          purchase_count: r.purchase_count,
+        },
+        score: r.score,
+        scoreLabel: r.score_label,
       })),
     };
   },
 
   getPurchasedItemsByWallet: async (payload: PurchasedItemsRequest) => {
-    const response = await apiRequest<PurchasedItemsResponse>("/api/v1/contract/purchases/by-wallet", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
+    const response = await apiRequest<PurchasedItemsResponse>(
+      "/api/v1/contract/purchases/by-wallet",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
     return {
       ...response,
       items: response.items.map((item) =>
@@ -128,45 +190,75 @@ const realBackend = {
   },
 
   // Agent endpoints
-  getAgents: (params?: { search?: string; tag?: string; status?: string; offset?: number; limit?: number }) => {
+  getAgents: (params?: {
+    search?: string;
+    tag?: string;
+    status?: string;
+    offset?: number;
+    limit?: number;
+  }) => {
     const searchParams = new URLSearchParams();
     if (params?.search) searchParams.set("search", params.search);
     if (params?.tag) searchParams.set("tag", params.tag);
     if (params?.status) searchParams.set("status", params.status);
-    if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
-    if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
+    if (params?.offset !== undefined)
+      searchParams.set("offset", String(params.offset));
+    if (params?.limit !== undefined)
+      searchParams.set("limit", String(params.limit));
     const qs = searchParams.toString();
     return apiRequest<AgentListResponse>(`/api/v1/agents${qs ? "?" + qs : ""}`);
   },
 
-  getAgent: (handle: string) =>
-    apiRequest<Agent>(`/api/v1/agents/${handle}`),
+  getAgent: (handle: string) => apiRequest<Agent>(`/api/v1/agents/${handle}`),
 
-  getAgentRecommendations: (handle: string, params?: { offset?: number; limit?: number }) => {
+  getAgentRecommendations: (
+    handle: string,
+    params?: { offset?: number; limit?: number },
+  ) => {
     const searchParams = new URLSearchParams();
-    if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
-    if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
+    if (params?.offset !== undefined)
+      searchParams.set("offset", String(params.offset));
+    if (params?.limit !== undefined)
+      searchParams.set("limit", String(params.limit));
     const qs = searchParams.toString();
-    return apiRequest<RecommendationListResponse>(`/api/v1/agents/${handle}/recommendations${qs ? "?" + qs : ""}`);
+    return apiRequest<RecommendationListResponse>(
+      `/api/v1/agents/${handle}/recommendations${qs ? "?" + qs : ""}`,
+    );
   },
 
   getRecommendationsForListing: (listingId: string) =>
-    apiRequest<RecommendationListResponse>(`/api/v1/recommendations/by-listing/${listingId}`),
+    apiRequest<RecommendationListResponse>(
+      `/api/v1/recommendations/by-listing/${listingId}`,
+    ),
 
-  getPurchaseRequests: (params?: { status?: string; offset?: number; limit?: number }) => {
+  getPurchaseRequests: (params?: {
+    status?: string;
+    offset?: number;
+    limit?: number;
+  }) => {
     const searchParams = new URLSearchParams();
     if (params?.status) searchParams.set("status", params.status);
-    if (params?.offset !== undefined) searchParams.set("offset", String(params.offset));
-    if (params?.limit !== undefined) searchParams.set("limit", String(params.limit));
+    if (params?.offset !== undefined)
+      searchParams.set("offset", String(params.offset));
+    if (params?.limit !== undefined)
+      searchParams.set("limit", String(params.limit));
     const qs = searchParams.toString();
-    return apiRequest<PurchaseRequestListResponse>(`/api/v1/purchase-requests${qs ? "?" + qs : ""}`);
+    return apiRequest<PurchaseRequestListResponse>(
+      `/api/v1/purchase-requests${qs ? "?" + qs : ""}`,
+    );
   },
 
-  reviewPurchaseRequest: (requestId: string, payload: { status: "approved" | "rejected"; reviewed_by: string }) =>
-    apiRequest<PurchaseRequest>(`/api/v1/purchase-requests/${requestId}/review`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+  reviewPurchaseRequest: (
+    requestId: string,
+    payload: { status: "approved" | "rejected"; reviewed_by: string },
+  ) =>
+    apiRequest<PurchaseRequest>(
+      `/api/v1/purchase-requests/${requestId}/review`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
 };
 
 export const backend =

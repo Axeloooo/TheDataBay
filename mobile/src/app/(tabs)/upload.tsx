@@ -167,10 +167,6 @@ export default function UploadScreen() {
     jobStatus?.listing_id ?? persistedSession?.listingId ?? null;
   const currentDatasetUrl =
     jobStatus?.dataset_url ?? persistedSession?.datasetUrl ?? null;
-  const currentSignatureUrl =
-    jobStatus?.signature?.signature_url ??
-    persistedSession?.signatureUrl ??
-    null;
   const priceEquivalent = useMemo(() => {
     const atomicAmount = selectUploadPriceAtomic(settlementAmount);
     if (!atomicAmount) {
@@ -189,8 +185,7 @@ export default function UploadScreen() {
     effectiveStatus === "completed" &&
     !!currentListingId &&
     !!address &&
-    !!currentDatasetUrl &&
-    !!currentSignatureUrl;
+    !!currentDatasetUrl;
 
   async function handlePickFile() {
     const result = await DocumentPicker.getDocumentAsync({
@@ -435,11 +430,6 @@ export default function UploadScreen() {
             {currentDatasetUrl ? (
               <Text style={[styles.metaText, { color: palette.subtleText }]}>
                 Dataset URL ready for on-chain submission.
-              </Text>
-            ) : null}
-            {currentSignatureUrl ? (
-              <Text style={[styles.metaText, { color: palette.subtleText }]}>
-                Signature artifact uploaded and available.
               </Text>
             ) : null}
             {createTxHash ? (

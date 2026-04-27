@@ -20,10 +20,7 @@ import { toast } from "sonner";
 import type { MarketplaceDataItem } from "@/types/contract";
 import { Badge } from "@/components/ui/badge";
 import { ChainIcon, detectAddressChain } from "@/components/chain-icon";
-import {
-  convertSettlementToCurrency,
-  formatCurrencyAmount,
-} from "@/lib/fx";
+import { convertSettlementToCurrency, formatCurrencyAmount } from "@/lib/fx";
 import { normalizeMarketplacePrice } from "@/lib/marketplace";
 import { useCurrencyStore } from "@/stores/currency-store";
 
@@ -52,6 +49,8 @@ function RecordCardDetails({
   };
 
   const pricing = normalizeMarketplacePrice(dataset);
+  const logoSrc =
+    pricing.settlementCurrency === "CADC" ? "/cadc-logo.svg" : "/usdc-logo.svg";
   const preferredCurrency = useCurrencyStore(
     (state) => state.preferredCurrency,
   );
@@ -62,6 +61,7 @@ function RecordCardDetails({
           Number(pricing.settlementAmount),
           preferredCurrency,
           rates,
+          pricing.settlementCurrency,
         )
       : null;
   const sellerChain = detectAddressChain(dataset.seller);
@@ -127,7 +127,7 @@ function RecordCardDetails({
               <p className="text-sm text-muted-foreground">Price</p>
               <p className="mt-1 inline-flex items-center gap-2 text-3xl font-bold font-mono">
                 <img
-                  src="/usdc-logo.svg"
+                  src={logoSrc}
                   alt=""
                   aria-hidden="true"
                   className="h-7 w-7 rounded-full object-contain"
@@ -170,7 +170,9 @@ function RecordCardDetails({
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Price atomic</p>
-              <p className="font-mono text-xs break-all">{pricing.priceAtomic}</p>
+              <p className="font-mono text-xs break-all">
+                {pricing.priceAtomic}
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 {pricing.settlementCurrency} settlement at{" "}
                 {pricing.settlementDecimals} decimals
@@ -187,9 +189,7 @@ function RecordCardDetails({
             <Link2 className="h-5 w-5" />
             URLs
           </CardTitle>
-          <CardDescription>
-            Encrypted dataset and signature locations
-          </CardDescription>
+          <CardDescription>Encrypted dataset location</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -203,23 +203,6 @@ function RecordCardDetails({
                 size="icon"
                 onClick={() =>
                   copyToClipboard(dataset.dataset_url, "Dataset URL")
-                }
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground">Signature URL</p>
-            <div className="flex items-center gap-2">
-              <p className="flex-1 font-mono text-xs break-all">
-                {dataset.signature_url}
-              </p>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() =>
-                  copyToClipboard(dataset.signature_url, "Signature URL")
                 }
               >
                 <Copy className="h-4 w-4" />
@@ -303,23 +286,6 @@ function RecordCardDetails({
                 size="icon"
                 onClick={() =>
                   copyToClipboard(dataset.dataset_hash, "Dataset hash")
-                }
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Signature Hash</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-xs break-all">
-                {dataset.signature_hash}
-              </code>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() =>
-                  copyToClipboard(dataset.signature_hash, "Signature hash")
                 }
               >
                 <Copy className="h-4 w-4" />

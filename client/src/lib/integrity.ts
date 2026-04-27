@@ -22,38 +22,30 @@ async function fetchAndHash(url: string): Promise<string> {
   return sha256Hex(data);
 }
 
-export type IntegrityStatus = "verifying" | "verified" | "failed" | "unavailable";
+export type IntegrityStatus =
+  | "verifying"
+  | "verified"
+  | "failed"
+  | "unavailable";
 
 export async function verifyDatasetIntegrity(input: {
   datasetUrl: string;
   datasetHash: string;
-  signatureUrl: string;
-  signatureHash: string;
 }): Promise<{ status: IntegrityStatus; detail?: string }> {
-  if (
-    !input.datasetUrl ||
-    !input.signatureUrl ||
-    !input.datasetHash ||
-    !input.signatureHash
-  ) {
+  if (!input.datasetUrl || !input.datasetHash) {
     return { status: "unavailable", detail: "Missing URL or hash." };
   }
 
   try {
-    const [datasetActual, signatureActual] = await Promise.all([
-      fetchAndHash(input.datasetUrl),
-      fetchAndHash(input.signatureUrl),
-    ]);
+    const datasetActual = await fetchAndHash(input.datasetUrl);
     const datasetMatch =
       normalizeHash(datasetActual) === normalizeHash(input.datasetHash);
-    const signatureMatch =
-      normalizeHash(signatureActual) === normalizeHash(input.signatureHash);
-    if (datasetMatch && signatureMatch) {
+    if (datasetMatch) {
       return { status: "verified" };
     }
     return {
       status: "failed",
-      detail: "Hash mismatch detected for dataset or signature payload.",
+      detail: "Hash mismatch detected for dataset payload.",
     };
   } catch (error) {
     return {
