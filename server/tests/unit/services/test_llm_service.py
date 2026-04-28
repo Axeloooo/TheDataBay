@@ -54,7 +54,7 @@ def test_parse_dataset_file_empty():
 
 def test_record_to_text_extends_columns():
     text = llm_service.record_to_text(["a", "b"], ["x"])
-    assert text == "x: a | col_1: b"
+    assert text == "Dataset row — x: a, col_1: b"
 
 
 
