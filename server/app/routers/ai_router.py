@@ -12,7 +12,7 @@ from ..schemas.ai_schema import (
     SimilaritySearchRequest,
     SimilaritySearchResponse,
 )
-from ..services.ai_service import AIService, EmbeddingError, get_ai_service
+from ..services.ai_service import AIService, CollectionNotFoundError, EmbeddingError, get_ai_service
 
 router = APIRouter(prefix="/api/v1/ai", tags=["ai"])
 logger = logging.getLogger(__name__)
@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
     response_model=SimilaritySearchResponse,
     responses={
         422: {"model": ErrorResponse, "description": "Validation error"},
+        404: {"model": ErrorResponse, "description": "No datasets have been indexed yet"},
         503: {"model": ErrorResponse, "description": "Embedding service unavailable"},
     },
 )
@@ -40,6 +41,7 @@ async def similarity_search(
         SimilaritySearchResponse: Ordered list of matching datasets with scores.
 
     Raises:
+        HTTPException 404: When no datasets have been indexed yet.
         HTTPException 503: When Ollama query-embedding is unavailable.
     """
     started = time.perf_counter()
@@ -51,6 +53,15 @@ async def similarity_search(
 
     try:
         ranked = await ai_service.rank_datasets(request.query, request.limit)
+    except CollectionNotFoundError:
+        return JSONResponse(
+            status_code=404,
+            content=ErrorResponse(
+                error="no_datasets_indexed",
+                message="No datasets have been indexed yet. Upload a dataset to enable search.",
+                details={},
+            ).model_dump(),
+        )
     except EmbeddingError as exc:
         return JSONResponse(
             status_code=503,

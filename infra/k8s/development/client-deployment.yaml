@@ -31,6 +31,11 @@ spec:
                 secretKeyRef:
                   name: bridgemart-secrets
                   key: PAYMENT_TOKEN_ADDRESS
+            - name: VITE_CADC_TOKEN_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: bridgemart-secrets
+                  key: CADC_TOKEN_ADDRESS
             - name: VITE_PINATA_GATEWAY_URL
               valueFrom:
                 secretKeyRef:
@@ -43,11 +48,11 @@ spec:
                   key: WALLETCONNECT_PROJECT_ID
           resources:
             requests:
-              memory: "384Mi"
+              memory: "512Mi"
               cpu: "25m"
             limits:
-              memory: "512Mi"
-              cpu: "200m"
+              memory: "1Gi"
+              cpu: "500m"
           ports:
             - containerPort: 5173
 ---

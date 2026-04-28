@@ -157,11 +157,10 @@ def record_to_text(
     if len(column_names) < len(record):
         column_names.extend([f"col_{i}" for i in range(len(column_names), len(record))])
 
-    parts = []
-    for col_name, value in zip(column_names, record):
-        parts.append(f"{col_name}: {value}")
-
-    return " | ".join(parts)
+    pairs = [f"{col_name}: {value}" for col_name, value in zip(column_names, record)]
+    # Comma-separated prose embeds more naturally than pipe-delimited for
+    # semantic queries like "age 63 with cp 3" against "age: 63, cp: 3, ..."
+    return "Dataset row — " + ", ".join(pairs)
 
 
 async def embed_query(

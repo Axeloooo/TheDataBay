@@ -15,6 +15,7 @@ from fastapi import (
 )
 
 from ..schemas.job_schema import JobResponse, JobStatusResponse
+from ..schemas.preview_schema import DatasetPreviewResponse
 from ..schemas.marketplace_schema import TOKEN_DECIMALS
 from ..schemas.llm_schema import (
     VectorSpec,
@@ -144,6 +145,31 @@ async def embed_query(
         query_embedding=query_embedding,
         vector_spec=vector_spec,
     )
+
+
+@router.get("/datasets/{listing_id}/preview", response_model=DatasetPreviewResponse)
+async def get_dataset_preview(
+    listing_id: str,
+    job_manager: JobManager = Depends(get_job_manager),
+):
+    """Return a preview of the first rows from a completed embedding job.
+
+    Args:
+        listing_id (str): Listing UUID
+        job_manager (JobManager): Job manager instance
+
+    Returns:
+        DatasetPreviewResponse: Column names and first up to 10 rows
+    """
+    job = job_manager.find_by_listing_id(listing_id)
+    if not job or not job.result:
+        raise HTTPException(status_code=404, detail="Preview not available for this dataset.")
+    preview = job.result.get("preview") or {}
+    column_names = preview.get("column_names")
+    rows = preview.get("rows")
+    if not column_names or rows is None:
+        raise HTTPException(status_code=404, detail="Preview not available for this dataset.")
+    return DatasetPreviewResponse(column_names=column_names, rows=rows)
 
 
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)

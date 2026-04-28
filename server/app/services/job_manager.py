@@ -103,6 +103,24 @@ class JobManager:
         """
         self._jobs.pop(job_id, None)
 
+    def find_by_listing_id(self, listing_id: str) -> Optional[Job]:
+        """Return the most-recently completed job for a listing, or any job if none completed.
+
+        Args:
+            listing_id (str): Listing UUID to look up
+
+        Returns:
+            Optional[Job]: Matching job or None
+        """
+        candidates = [
+            j for j in self._jobs.values()
+            if j.metadata.get("listing_id") == listing_id
+        ]
+        if not candidates:
+            return None
+        completed = [j for j in candidates if j.status == JobStatus.COMPLETED]
+        return completed[-1] if completed else candidates[-1]
+
     def get_all_jobs(self) -> Dict[str, Job]:
         """Get all jobs (for debugging/admin purposes).
 

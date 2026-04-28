@@ -47,6 +47,17 @@ export const mockBackend = {
     return delay({ has_access: MOCK_PURCHASED_IDS.has(listingId) });
   },
 
+  getDatasetPreview: (_listingId: string): Promise<{ column_names: string[]; rows: string[][] }> => {
+    return delay({
+      column_names: ["age", "sex", "cp", "trestbps", "chol", "fbs", "restecg", "thalach", "exang", "num"],
+      rows: [
+        ["63", "1", "3", "145", "233", "1", "0", "150", "0", "1"],
+        ["37", "1", "2", "130", "250", "0", "1", "187", "0", "0"],
+        ["41", "0", "1", "130", "204", "0", "0", "172", "0", "0"],
+      ],
+    });
+  },
+
   similaritySearch: (payload: SimilaritySearchRequest): Promise<SimilaritySearchResponse> => {
     const q = payload.query.toLowerCase();
     const results = MOCK_ITEMS

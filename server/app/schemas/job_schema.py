@@ -6,6 +6,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
 
+from typing import List
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from .llm_schema import DatasetStats, VectorSpec
@@ -44,6 +46,12 @@ class JobStatusResponse(BaseModel):
     )
     dataset_hash: Optional[str] = Field(
         None, description="Encrypted dataset SHA-256 hash (when completed)"
+    )
+    preview_column_names: Optional[List[str]] = Field(
+        None, description="Column names extracted from the dataset header"
+    )
+    preview_rows: Optional[List[List[str]]] = Field(
+        None, description="First up to 10 data rows (unencrypted, for display)"
     )
     filename: str = Field(..., description="Original filename")
 

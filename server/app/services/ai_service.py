@@ -60,6 +60,10 @@ class EmbeddingError(Exception):
     """Raised when query embedding generation fails (e.g. Ollama unavailable)."""
 
 
+class CollectionNotFoundError(Exception):
+    """Raised when the pgvector collection has not been populated yet."""
+
+
 def _distance_to_similarity(distance: float) -> float:
     """Convert LangChain PGVector cosine distance to a similarity score."""
     return round(1.0 - distance, 12)
@@ -137,6 +141,12 @@ class AIService:
                 q_vec,
                 k=row_k,
             )
+        except ValueError as exc:
+            if "Collection not found" in str(exc):
+                logger.info("ai_service.rank_datasets collection_not_found")
+                raise CollectionNotFoundError(str(exc)) from exc
+            logger.error("ai_service.rank_datasets vector_search_failed: %s", exc)
+            raise EmbeddingError(str(exc)) from exc
         except Exception as exc:
             logger.error("ai_service.rank_datasets vector_search_failed: %s", exc)
             raise EmbeddingError(str(exc)) from exc

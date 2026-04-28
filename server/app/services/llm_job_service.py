@@ -193,6 +193,9 @@ def get_job_status(job_id: str, job_manager: JobManager) -> JobStatusResponse:
         response.dataset_hash = dataset.get("dataset_hash")
         response.vector_spec = VectorSpec(**job.result["vectorSpec"])
         response.stats = DatasetStats(**job.result["stats"])
+        preview = job.result.get("preview") or {}
+        response.preview_column_names = preview.get("column_names")
+        response.preview_rows = preview.get("rows")
 
     return response
 
@@ -286,7 +289,9 @@ async def _process_embedding_job(
         ciphertext, nonce = encrypt_bytes(content_bytes, key, aad)
         dataset_url, dataset_hash = await upload_bytes(ciphertext, filename, settings)
 
-        await vectorstore_for_settings(settings).aadd_documents(
+        vectorstore = vectorstore_for_settings(settings)
+        await vectorstore.acreate_collection()
+        await vectorstore.aadd_documents(
             documents,
             ids=document_ids,
         )
@@ -325,6 +330,10 @@ async def _process_embedding_job(
                 "total_columns": len(column_names),
                 "empty_rows_skipped": empty_rows_skipped,
                 "has_header": has_header,
+            },
+            "preview": {
+                "column_names": column_names,
+                "rows": data_rows[:10],
             },
         }
 

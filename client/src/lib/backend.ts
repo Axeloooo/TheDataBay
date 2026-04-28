@@ -143,6 +143,11 @@ const realBackend = {
       },
     ),
 
+  getDatasetPreview: (listingId: string) =>
+    apiRequest<{ column_names: string[]; rows: string[][] }>(
+      `/api/v1/llm/datasets/${listingId}/preview`,
+    ),
+
   similaritySearch: async (
     payload: SimilaritySearchRequest,
   ): Promise<{ query: string; results: CardViewModel[]; count: number }> => {
