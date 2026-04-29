@@ -48,31 +48,13 @@ az account show --query "{subscriptionId:id, tenantId:tenantId}" -o json
 ```bash
 export ARM_SUBSCRIPTION_ID="<YOUR_SUBSCRIPTION_ID>"
 export ARM_TENANT_ID="<YOUR_TENANT_ID>"
-_ip_factory_repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-export KEY_VAULT_NAME="$(cd "${_ip_factory_repo_root}/infra/terraform/environments/production" && terraform output -raw key_vault_name 2>/dev/null || true)"
-export GITHUB_APP_PRIVATE_KEY_FILE="${_ip_factory_repo_root}/infra/k8s/development/github-app.pem"
+export KEY_VAULT_NAME="$(cd infra/terraform/environments/production && terraform output -raw key_vault_name 2>/dev/null || true)"
 
-export POSTGRES_URL="postgresql+psycopg://bridgemart:root@postgres:5432/bridgemart"
-export FRONTEND_URL="https://chiselware.org"
-export GITHUB_APP_ID="<VALUE>"
-export GITHUB_ORG="<VALUE>"
-export GITHUB_CLIENT_ID="<VALUE>"
-export GITHUB_CLIENT_SECRET="<VALUE>"
-export GITHUB_REDIRECT_URI="https://chiselware.org/api/v1/auth/github/callback"
-export LINKEDIN_CLIENT_ID="<VALUE>"
-export LINKEDIN_CLIENT_SECRET="<VALUE>"
-export LINKEDIN_REDIRECT_URI="https://chiselware.org/api/v1/auth/linkedin/callback"
-export TOKEN_ENC_KEY_B64="<VALUE>"
-export JWT_SECRET_KEY="<VALUE>"
-export INVITE_TOKEN_SECRET="<VALUE>"
-export SENDGRID_API_KEY="<VALUE>"
-export EMAIL_FROM="<VALUE>"
-export STRIPE_SECRET_KEY="<VALUE>"
-export STRIPE_SUCCESS_URL="https://chiselware.org/checkout/success"
-export STRIPE_CANCEL_URL="https://chiselware.org/checkout/cancel"
-export STRIPE_WEBHOOK_SECRET="<VALUE>"
+export POSTGRES_URL="postgresql+psycopg://bridgemart:<PASSWORD>@postgres:5432/bridgemart"
+export PINATA_API_KEY="<VALUE>"
+export PINATA_SECRET_KEY="<VALUE>"
+export SERVER_PRIVATE_KEY="<EVM_PRIVATE_KEY>"
 export POSTGRES_PASSWORD="<VALUE>"
-unset _ip_factory_repo_root
 ```
 
 3. Source the environment variables:
@@ -109,26 +91,10 @@ After Terraform completes, re-source the bootstrap file so `KEY_VAULT_NAME` reso
 source infra/terraform/environments/production/.env
 
 az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "POSTGRES-URL" --value "$POSTGRES_URL"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "FRONTEND-URL" --value "$FRONTEND_URL"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "GITHUB-APP-ID" --value "$GITHUB_APP_ID"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "GITHUB-ORG" --value "$GITHUB_ORG"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "GITHUB-CLIENT-ID" --value "$GITHUB_CLIENT_ID"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "GITHUB-CLIENT-SECRET" --value "$GITHUB_CLIENT_SECRET"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "GITHUB-REDIRECT-URI" --value "$GITHUB_REDIRECT_URI"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "LINKEDIN-CLIENT-ID" --value "$LINKEDIN_CLIENT_ID"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "LINKEDIN-CLIENT-SECRET" --value "$LINKEDIN_CLIENT_SECRET"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "LINKEDIN-REDIRECT-URI" --value "$LINKEDIN_REDIRECT_URI"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "TOKEN-ENC-KEY-B64" --value "$TOKEN_ENC_KEY_B64"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "JWT-SECRET-KEY" --value "$JWT_SECRET_KEY"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "INVITE-TOKEN-SECRET" --value "$INVITE_TOKEN_SECRET"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "SENDGRID-API-KEY" --value "$SENDGRID_API_KEY"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "EMAIL-FROM" --value "$EMAIL_FROM"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "STRIPE-SECRET-KEY" --value "$STRIPE_SECRET_KEY"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "STRIPE-SUCCESS-URL" --value "$STRIPE_SUCCESS_URL"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "STRIPE-CANCEL-URL" --value "$STRIPE_CANCEL_URL"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "STRIPE-WEBHOOK-SECRET" --value "$STRIPE_WEBHOOK_SECRET"
+az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "PINATA-API-KEY" --value "$PINATA_API_KEY"
+az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "PINATA-SECRET-KEY" --value "$PINATA_SECRET_KEY"
+az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "SERVER-PRIVATE-KEY" --value "$SERVER_PRIVATE_KEY"
 az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "POSTGRES-PASSWORD" --value "$POSTGRES_PASSWORD"
-az keyvault secret set --vault-name "$KEY_VAULT_NAME" --name "GITHUB-APP-PRIVATE-KEY" --file "$GITHUB_APP_PRIVATE_KEY_FILE"
 ```
 
 ## Phase 4: Build and Push Docker Images
@@ -231,7 +197,7 @@ kubectl apply -f infra/k8s/production/namespace.yaml
 kubectl apply -f infra/k8s/production/secret-provider-class.yaml
 
 # Deploy PostgreSQL (with pgvector)
-kubectl apply -f infra/k8s/production/mysql-statefulset.yaml
+kubectl apply -f infra/k8s/production/postgres-statefulset.yaml
 
 # Wait for PostgreSQL to be ready
 kubectl wait --namespace ip-factory \

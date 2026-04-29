@@ -32,5 +32,9 @@ data:
 
   # Smart contract (non-secret)
   CONTRACT_ABI_PATH: "server/app/contracts/Marketplace.json"
-  CHAIN_ID: "1"
-  RPC_URL: "https://mainnet.infura.io/v3/<INFURA_PROJECT_ID>"
+  CHAIN_ID: "84532"
+  RPC_URL: "https://sepolia.base.org"
+  # Replace with actual deployed contract addresses after `forge script` / deployment
+  CONTRACT_ADDRESS: "<MARKETPLACE_CONTRACT_ADDRESS>"
+  PAYMENT_TOKEN_ADDRESS: "<USDC_TOKEN_ADDRESS>"
+  CADC_TOKEN_ADDRESS: "<CADC_TOKEN_ADDRESS>"
