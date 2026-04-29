@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from app.services.ai_service import (
+from app.ai.service import (
     AIService,
     EmbeddingError,
     _aggregate_row_hits,
@@ -387,7 +387,7 @@ def test_no_ipfs_import_in_ai_service_module():
     against regression by asserting the symbol is absent from the module's
     namespace.
     """
-    import app.services.ai_service as ai_service_module
+    import app.ai.service as ai_service_module
 
     assert not hasattr(ai_service_module, "download_signature_embeddings"), (
         "download_signature_embeddings must not be imported in ai_service — "

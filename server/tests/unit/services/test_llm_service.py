@@ -1,7 +1,8 @@
 import pytest
 from fastapi import HTTPException
 
-from app.services import llm_service
+from app.ai import service as ai_service
+from app.shared import vectorstore as llm_service
 
 
 def test_warmup_model_success(monkeypatch, settings):
@@ -27,35 +28,19 @@ def test_warmup_model_failure(monkeypatch, settings):
     assert llm_service.warmup_model(settings) is False
 
 
-def test_parse_dataset_file_with_header():
-    content = "col1,col2\n1,2\n3,4\n"
-    rows, cols, has_header, skipped = llm_service.parse_dataset_file(content)
+def test_get_vectorstore_creates_pgvector_extension(monkeypatch):
+    captured = {}
 
-    assert has_header is True
-    assert cols == ["col1", "col2"]
-    assert rows == [["1", "2"], ["3", "4"]]
-    assert skipped == 0
+    class FakePGVector:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
 
+    monkeypatch.setattr(llm_service, "PGVector", FakePGVector)
+    monkeypatch.setattr(llm_service, "get_embeddings", lambda model: object())
 
-def test_parse_dataset_file_without_header():
-    content = "1,2\n3,4\n"
-    rows, cols, has_header, skipped = llm_service.parse_dataset_file(content)
+    llm_service.get_vectorstore("postgresql+psycopg://db", "nomic", 768)
 
-    assert has_header is False
-    assert cols == ["feature_0", "feature_1"]
-    assert rows == [["1", "2"], ["3", "4"]]
-    assert skipped == 0
-
-
-def test_parse_dataset_file_empty():
-    with pytest.raises(HTTPException):
-        llm_service.parse_dataset_file("")
-
-
-def test_record_to_text_extends_columns():
-    text = llm_service.record_to_text(["a", "b"], ["x"])
-    assert text == "Dataset row — x: a, col_1: b"
-
+    assert captured["create_extension"] is True
 
 
 @pytest.mark.asyncio
@@ -65,9 +50,9 @@ async def test_embed_query_success(monkeypatch, settings):
             assert text == "hello"
             return [0.1, 0.2, 0.3]
 
-    monkeypatch.setattr(llm_service, "get_embeddings", lambda model: FakeEmbeddings())
+    monkeypatch.setattr(ai_service, "get_embeddings", lambda model: FakeEmbeddings())
 
-    embedding, dim = await llm_service.embed_query("hello", settings)
+    embedding, dim = await ai_service.embed_query("hello", settings)
     assert embedding == [0.1, 0.2, 0.3]
     assert dim == 3
 
@@ -76,4 +61,4 @@ def test_embed_query_empty_raises(settings):
     with pytest.raises(HTTPException):
         import asyncio
 
-        asyncio.run(llm_service.embed_query("   ", settings))
+        asyncio.run(ai_service.embed_query("   ", settings))

@@ -72,6 +72,8 @@ make deploy-anvil
 make seed-anvil
 ```
 
+`make anvil` listens on `0.0.0.0:8545` by default so Tilt/Kubernetes backend pods can reach the host node. For a purely host-local chain, run `ANVIL_HOST=127.0.0.1 make anvil`.
+
 ### 2) Run backend
 
 ```bash
@@ -145,7 +147,7 @@ npm run start
 | ------------------------------------------------- | ----------------------------------------- |
 | `forge build`                                     | Compile contracts                         |
 | `forge test`                                      | Run solidity test suite                   |
-| `make anvil`                                      | Start local anvil node                    |
+| `make anvil`                                      | Start local anvil node on `0.0.0.0:8545`  |
 | `make deploy-anvil`                               | Deploy `Marketplace` to local anvil       |
 | `make seed-anvil`                                 | Seed deterministic demo listings on-chain |
 | `make getall`                                     | Read all on-chain items with `cast`       |
@@ -241,6 +243,8 @@ make getall
 
 `make deploy-anvil` also syncs the deployed marketplace address into local app config files used by the server and Tilt-based client/server deployments.
 
+For Tilt/Kubernetes, set `infra/k8s/development/secrets.yaml` `RPC_URL` to a host-reachable URL such as `http://host.docker.internal:8545`. Use `http://127.0.0.1:8545` only when the backend process itself runs directly on the host.
+
 ## 🧰 Troubleshooting
 
 ### MetaMask connected but create/buy fails
@@ -260,6 +264,12 @@ make getall
 - Check that the backend is calling the same deployed address saved in `evm/deployments/anvil_marketplace.addr`.
 - If you redeployed Anvil, re-run `make deploy-anvil` to sync `infra/k8s/development/secrets.yaml` and `server/.env`.
 - Restart the server resource after the config update so the new `CONTRACT_ADDRESS` is loaded.
+
+### Error: RPC node unreachable
+
+- Verify Anvil is running with `cd evm && make anvil`. The default target binds to `0.0.0.0:8545` so containers can reach it.
+- If the backend runs in Tilt/Kubernetes, set `infra/k8s/development/secrets.yaml` `RPC_URL` to `http://host.docker.internal:8545`, then restart the server resource so the secret is reloaded.
+- If the backend runs directly on your host with `uvicorn`, `RPC_URL=http://127.0.0.1:8545` is correct.
 
 ### `Marketplace__ItemDoesNotExist(bytes32)`
 

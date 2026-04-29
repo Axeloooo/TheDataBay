@@ -4,7 +4,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel, Session
 
 from app.models.agent import Agent, AgentPurchaseRequest, AgentRecommendation
-from app.schemas.agent_schema import (
+from app.agents.schemas import (
     AgentResponse,
     PurchaseRequestResponse,
     RecommendationResponse,

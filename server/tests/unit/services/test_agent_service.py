@@ -2,8 +2,8 @@ import asyncio
 import uuid
 from types import SimpleNamespace
 
-from app.services import agent_service
-from app.schemas.ai_schema import RankedDataset
+from app.agents import service as agent_service
+from app.ai.schemas import RankedDataset
 
 
 def make_ranked(listing_id: str, title: str, score: float) -> RankedDataset:

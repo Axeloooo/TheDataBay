@@ -631,7 +631,7 @@ The agentic layer applies an **in-memory sliding-window rate limiter** keyed by 
 - **Window type:** Sliding (timestamps older than 60 seconds are evicted before each check)
 - **Storage:** In-process memory — state resets on server restart and is not shared across multiple server instances
 
-The limiter is implemented in `server/app/services/rate_limiter.py` as `RateLimiter(max_calls=60, period=60.0)` and exported as the `agent_write_rate_limiter` FastAPI dependency.
+The limiter is implemented in `server/app/shared/rate_limiter.py` as `RateLimiter(max_calls=60, period=60.0)` and exported as the `agent_write_rate_limiter` FastAPI dependency.
 
 ### Rate-Limited Endpoints
 
@@ -927,7 +927,7 @@ The Marketplace smart contract sets `metadata_frozen: true` on a listing after i
 
 ### Rate Limiter is In-Process Only
 
-The sliding-window rate limiter stores state in memory within the FastAPI process. It resets on server restart and is not synchronized across multiple instances. For horizontally scaled or multi-process deployments, replace the in-memory implementation in `server/app/services/rate_limiter.py` with a Redis-backed limiter to enforce limits correctly across all instances.
+The sliding-window rate limiter stores state in memory within the FastAPI process. It resets on server restart and is not synchronized across multiple instances. For horizontally scaled or multi-process deployments, replace the in-memory implementation in `server/app/shared/rate_limiter.py` with a Redis-backed limiter to enforce limits correctly across all instances.
 
 ### Handle Uniqueness
 

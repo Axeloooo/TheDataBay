@@ -1,7 +1,7 @@
 import pytest
 
-from app.routers import contract_router
-from app.schemas.marketplace_schema import MarketplaceDataItem
+from app.contracts import router as contract_router
+from app.contracts.marketplace_schemas import MarketplaceDataItem
 
 LISTING_ID = "123e4567-e89b-12d3-a456-426614174000"
 

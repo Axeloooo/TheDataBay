@@ -6,9 +6,9 @@ Uses FastAPI TestClient with dependency overrides.  All external I/O
 tests stub AIService entirely.
 """
 
-from app.routers import ai_router
-from app.schemas.ai_schema import ErrorResponse, RankedDataset
-from app.services.ai_service import EmbeddingError
+from app.ai import router as ai_router
+from app.ai.schemas import ErrorResponse, RankedDataset
+from app.ai.service import EmbeddingError
 
 
 def make_ranked_dataset(listing_id: str, score: float = 0.85) -> RankedDataset:
@@ -179,3 +179,40 @@ def test_similarity_search_rejects_limit_above_max(client):
     assert response.status_code == 422
     body = response.json()
     assert body["error"] == "validation_error"
+
+
+def test_embed_query_returns_vector_payload(client, monkeypatch, settings):
+    async def fake_embed_query(query, resolved_settings):
+        return [0.25, 0.75], 2
+
+    monkeypatch.setattr(ai_router, "embed_query", fake_embed_query)
+
+    response = client.post(
+        "/api/v1/ai/embed/query",
+        json={"query": "weekly revenue"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "original_query": "weekly revenue",
+        "query_embedding": [0.25, 0.75],
+        "vector_spec": {
+            "model": settings.embedding_model,
+            "dimension": 2,
+        },
+    }
+
+
+def test_embed_query_validates_non_empty_query(client, monkeypatch):
+    async def fail_embed_query(query, settings):
+        raise AssertionError("embed_query should not be called")
+
+    monkeypatch.setattr(ai_router, "embed_query", fail_embed_query)
+
+    response = client.post("/api/v1/ai/embed/query", json={"query": ""})
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"] == "validation_error"
+    errors = body["details"]["errors"]
+    assert any(error["loc"][-1] == "query" for error in errors)

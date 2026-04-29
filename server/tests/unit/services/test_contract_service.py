@@ -6,7 +6,7 @@ from hexbytes import HexBytes
 from web3 import Web3
 from web3.datastructures import AttributeDict
 
-from app.services import contract_service
+from app.contracts import service as contract_service
 
 LISTING_ID = "123e4567-e89b-12d3-a456-426614174000"
 
@@ -93,6 +93,50 @@ def test_load_abi_invalid_json_raises_internal_config_error(tmp_path):
 
     assert exc_info.value.status_code == 500
     assert f"Contract ABI file is not valid JSON: {abi_path}" in exc_info.value.detail
+
+
+@pytest.mark.parametrize(
+    ("rpc_url", "expected"),
+    [
+        ("http://host.docker.internal:8545", "http://host.docker.internal:8545"),
+        (
+            "https://user:secret@example-rpc.invalid/v3/token?api_key=secret",
+            "https://example-rpc.invalid",
+        ),
+        ("not-a-url", "<invalid RPC_URL>"),
+    ],
+)
+def test_redact_rpc_url_strips_credentials_paths_and_queries(rpc_url, expected):
+    assert contract_service._redact_rpc_url(rpc_url) == expected
+
+
+def test_get_web3_unreachable_rpc_uses_redacted_detail(monkeypatch, settings):
+    class FakeProvider:
+        def __init__(self, rpc_url):
+            self.rpc_url = rpc_url
+
+    class FakeWeb3:
+        HTTPProvider = FakeProvider
+
+        def __init__(self, provider):
+            self.provider = provider
+
+        def is_connected(self):
+            return False
+
+    monkeypatch.setattr(contract_service, "Web3", FakeWeb3)
+    secret_rpc_settings = settings.model_copy(
+        update={
+            "rpc_url": "https://user:secret@example-rpc.invalid/v3/token?api_key=secret"
+        }
+    )
+
+    with pytest.raises(contract_service.HTTPException) as exc_info:
+        contract_service._get_web3(secret_rpc_settings)
+
+    assert exc_info.value.status_code == 502
+    assert exc_info.value.detail == "RPC node unreachable at https://example-rpc.invalid"
+    assert "secret" not in exc_info.value.detail
 
 
 def test_call_contract_read_translates_known_custom_error():
@@ -198,14 +242,15 @@ def test_item_view_to_schema_preserves_empty_signature_url_mapping():
     assert item.signature_hash == "0x" + "0" * 64
 
 
-def test_item_view_to_schema_uses_token_config_metadata(settings):
+def test_item_view_to_schema_derives_cadc_from_unmapped_18_decimal_token(settings):
     item_id = bytes.fromhex("03" * 32)
     payment_token = Web3.to_checksum_address(
         "0x0000000000000000000000000000000000000003"
     )
     configured_settings = settings.model_copy(
         update={
-            "payment_token_address": "0x0000000000000000000000000000000000000002"
+            "payment_token_address": "0x0000000000000000000000000000000000000002",
+            "cadc_token_address": "",
         }
     )
 
@@ -240,7 +285,7 @@ def test_item_view_to_schema_uses_token_config_metadata(settings):
         token_config_cache={},
     )
 
-    assert item.settlement_currency == "USDC"
+    assert item.settlement_currency == "CADC"
     assert item.settlement_decimals == 18
 
 

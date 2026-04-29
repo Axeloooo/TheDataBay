@@ -1,7 +1,6 @@
 import pytest
 
 from app.config.settings import Settings
-from app.services.job_manager import JobManager
 
 
 def make_settings(**overrides) -> Settings:
@@ -38,8 +37,3 @@ def make_settings(**overrides) -> Settings:
 @pytest.fixture
 def settings() -> Settings:
     return make_settings()
-
-
-@pytest.fixture
-def job_manager() -> JobManager:
-    return JobManager()

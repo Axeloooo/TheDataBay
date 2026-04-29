@@ -1,4 +1,4 @@
-from app.services.encryption_service import decrypt_bytes, encrypt_bytes, generate_key
+from app.shared.encryption import decrypt_bytes, encrypt_bytes, generate_key
 
 
 def test_encrypt_decrypt_roundtrip():

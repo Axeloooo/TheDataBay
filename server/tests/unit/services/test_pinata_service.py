@@ -4,7 +4,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.config.settings import Settings
-from app.services import pinata_service
+from app.shared import ipfs as pinata_service
 
 
 def make_settings(**overrides) -> Settings:

@@ -1,0 +1,1045 @@
+"""
+Marketplace smart contract service.
+"""
+
+import json
+import logging
+import re
+import uuid
+from collections.abc import Mapping
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List, Union
+from urllib.parse import urlsplit, urlunsplit
+
+from fastapi import HTTPException
+from ..datasets.schemas import WalletType
+from .marketplace_schemas import (
+    MarketplaceDataItem,
+    TOKEN_DECIMALS,
+)
+from web3 import Web3
+from web3.contract import Contract
+from web3.exceptions import BadFunctionCallOutput
+
+from ..config.settings import Settings
+
+logger = logging.getLogger(__name__)
+
+
+CUSTOM_ERROR_MAP = {
+    "0x1a16f5f1": (400, "Initial owner required."),
+    "0xb3be6278": (404, "Item does not exist."),
+    "0xa03a0beb": (409, "Item already exists."),
+    "0xedac3342": (400, "Price must be greater than zero."),
+    "0xac30c3e9": (400, "Price exceeds maximum."),
+    "0xfa52fef7": (400, "Title is required."),
+    "0x714224a9": (400, "Description is required."),
+    "0xa36746a8": (400, "Dataset URL is required."),
+    "0x9cb0e89c": (400, "Signature URL is required."),
+    "0xfecaeeb9": (400, "Already has access."),
+    "0x2f71df15": (400, "Invalid fee bps."),
+    "0xecc6ecf4": (400, "Fee recipient required."),
+    "0x5b62b0b8": (400, "Settlement token required."),
+    "0x0fc4fb8a": (400, "Token is not accepted."),
+    "0x2f82c416": (403, "Seller required for this action."),
+    "0xa71d74d8": (400, "Seller cannot buy own item."),
+    "0x59efb1b4": (400, "Item is frozen after purchase."),
+    "0x3f300bfd": (400, "Insufficient token allowance."),
+    "0x2f01e7fc": (400, "Insufficient token balance."),
+}
+
+CUSTOM_ERROR_REGEX = re.compile(r"custom error (0x[0-9a-fA-F]{8})")
+
+
+def _extract_selector_from_args(args: Any) -> str | None:
+    if not args:
+        return None
+    for arg in args:
+        if isinstance(arg, str):
+            if arg.startswith("0x") and len(arg) >= 10:
+                return arg[:10].lower()
+            match = CUSTOM_ERROR_REGEX.search(arg)
+            if match:
+                return match.group(1).lower()
+        elif isinstance(arg, (list, tuple)):
+            selector = _extract_selector_from_args(arg)
+            if selector:
+                return selector
+    return None
+
+
+def _maybe_raise_custom_error(exc: Exception, operation: str | None = None) -> None:
+    selector = _extract_selector_from_args(getattr(exc, "args", None))
+    if not selector:
+        selector = _extract_selector_from_args([str(exc)])
+    if not selector:
+        return
+    status, message = CUSTOM_ERROR_MAP.get(
+        selector, (400, f"Contract reverted ({selector}).")
+    )
+    detail = f"{message}"
+    if operation:
+        detail = f"{detail} operation={operation}"
+    raise HTTPException(status_code=status, detail=detail) from exc
+
+
+def _raise_bad_request(detail: str, exc: Exception) -> None:
+    logger.warning("%s: %s", detail, str(exc))
+    raise HTTPException(status_code=400, detail=detail) from exc
+
+
+def _raise_internal_config(detail: str, exc: Exception) -> None:
+    logger.exception("%s", detail)
+    raise HTTPException(status_code=500, detail=detail) from exc
+
+
+def _raise_upstream(detail: str, exc: Exception) -> None:
+    logger.exception("%s", detail)
+    raise HTTPException(status_code=502, detail=f"{detail}: {str(exc)}") from exc
+
+
+def _redact_rpc_url(rpc_url: str) -> str:
+    """Return an RPC URL safe for logs and client-facing errors."""
+
+    try:
+        parsed = urlsplit(rpc_url)
+    except ValueError:
+        return "<invalid RPC_URL>"
+
+    if not parsed.scheme or not parsed.hostname:
+        return "<invalid RPC_URL>"
+
+    netloc = parsed.hostname
+    try:
+        port = parsed.port
+    except ValueError:
+        return "<invalid RPC_URL>"
+    if port is not None:
+        netloc = f"{netloc}:{port}"
+    return urlunsplit((parsed.scheme, netloc, "", "", ""))
+
+
+def uuid_to_bytes32(id: Union[str, uuid.UUID]) -> bytes:
+    """Convert listing UUID string to bytes32 format.
+
+    Args:
+        id (Union[str, uuid.UUID]): Listing UUID string or UUID instance
+
+    Raises:
+        HTTPException: Raised if the id is not a valid UUID
+
+    Returns:
+        bytes: Listing ID in bytes32 format
+    """
+
+    try:
+        u = id if isinstance(id, uuid.UUID) else uuid.UUID(id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Invalid id UUID") from exc
+    return u.bytes + b"\x00" * 16
+
+
+def wallet_id(
+    wallet_type: Union[WalletType, str], address: str, settings: Settings
+) -> bytes:
+    """Generate wallet ID bytes from wallet type and address.
+
+    Args:
+        wallet_type (WalletType): Wallet type enum value
+        address (str): Wallet address or public key
+        settings (Settings): Application settings instance
+
+    Returns:
+        bytes: Wallet ID bytes generated by keccak256 hash
+    """
+
+    wallet_type_str = (
+        wallet_type.value.lower()
+        if isinstance(wallet_type, WalletType)
+        else str(wallet_type).lower()
+    )
+    if wallet_type_str == WalletType.EVM.value:
+        chain = f"eip155:{settings.chain_id}"
+        try:
+            checksum_address = Web3.to_checksum_address(address)
+        except ValueError as exc:
+            _raise_bad_request("Invalid EVM address provided", exc)
+            raise
+        addr = Web3.to_hex(Web3.to_bytes(hexstr=checksum_address))
+        payload = f"{chain}:{addr}"
+    elif wallet_type_str == WalletType.SOLANA.value:
+        payload = f"solana:{address}"
+    else:
+        payload = f"{wallet_type_str}:{address}"
+    return Web3.keccak(text=payload)
+
+
+@lru_cache(maxsize=1)
+def _load_abi(abi_path: str) -> List[Dict[str, Any]]:
+    """Load contract ABI from JSON file.
+
+    Args:
+        abi_path (str): Path to ABI JSON file
+
+    Returns:
+        List[Dict[str, Any]]: Contract ABI
+    """
+
+    try:
+        return json.loads(Path(abi_path).read_text())
+    except FileNotFoundError as exc:
+        _raise_internal_config(
+            f"Contract ABI file not found at path: {abi_path}",
+            exc,
+        )
+        raise
+    except json.JSONDecodeError as exc:
+        _raise_internal_config(
+            f"Contract ABI file is not valid JSON: {abi_path}",
+            exc,
+        )
+        raise
+
+
+def _get_web3(settings: Settings) -> Web3:
+    """Create and return a Web3 instance.
+
+    Args:
+        settings (Settings): Application settings instance
+
+    Returns:
+        Web3: Web3 instance
+    """
+
+    w3 = Web3(Web3.HTTPProvider(settings.rpc_url))
+    if not w3.is_connected():
+        safe_rpc_url = _redact_rpc_url(settings.rpc_url)
+        logger.error("RPC node is unreachable at %s", safe_rpc_url)
+        raise HTTPException(
+            status_code=502,
+            detail=f"RPC node unreachable at {safe_rpc_url}",
+        )
+    return w3
+
+
+def _get_contract(settings: Settings) -> Contract:
+    """Create and return a Contract instance.
+
+    Args:
+        settings (Settings): Application settings instance
+
+    Returns:
+        Contract: Contract instance
+    """
+
+    w3 = _get_web3(settings)
+    abi = _load_abi(settings.contract_abi_path)
+    try:
+        checksum_address = Web3.to_checksum_address(settings.contract_address)
+    except ValueError as exc:
+        _raise_internal_config("Invalid CONTRACT_ADDRESS configuration", exc)
+        raise
+    try:
+        return w3.eth.contract(address=checksum_address, abi=abi)
+    except Exception as exc:
+        _raise_internal_config("Failed to initialize contract client", exc)
+        raise
+
+
+def _contract_has_code(settings: Settings) -> bool:
+    w3 = _get_web3(settings)
+    try:
+        checksum_address = Web3.to_checksum_address(settings.contract_address)
+    except ValueError as exc:
+        _raise_internal_config("Invalid CONTRACT_ADDRESS configuration", exc)
+        raise
+    try:
+        code = w3.eth.get_code(checksum_address)
+    except Exception as exc:
+        _raise_upstream("Failed to fetch contract bytecode from RPC", exc)
+        raise
+    return len(code) > 0
+
+
+def _to_hex(value: Any) -> str:
+    if isinstance(value, (bytes, bytearray)):
+        return Web3.to_hex(value)
+    return str(value)
+
+
+def _payment_token_from_settings(settings: Settings) -> str | None:
+    if not settings.payment_token_address:
+        return None
+    try:
+        return Web3.to_checksum_address(settings.payment_token_address)
+    except ValueError as exc:
+        _raise_internal_config("Invalid PAYMENT_TOKEN_ADDRESS configuration", exc)
+        raise
+
+
+def _token_symbol_table(settings: Settings) -> dict[str, str]:
+    table = {}
+    for symbol, attr in [("USDC", "payment_token_address"), ("CADC", "cadc_token_address")]:
+        addr = getattr(settings, attr, "")
+        if not addr:
+            continue
+        try:
+            table[Web3.to_checksum_address(addr)] = symbol
+        except ValueError:
+            pass
+    return table
+
+
+def _settlement_currency_for_token(
+    payment_token: str,
+    settings: Settings | None,
+    decimals: int | None = None,
+) -> str:
+    fallback = "CADC" if decimals == TOKEN_DECIMALS["CADC"] else "USDC"
+    if settings is None:
+        return fallback
+    try:
+        token = Web3.to_checksum_address(payment_token)
+    except (ValueError, TypeError):
+        return fallback
+    return _token_symbol_table(settings).get(token, fallback)
+
+
+def _settlement_decimals_for_token(
+    payment_token: str,
+    contract: Contract | None,
+    token_config_cache: dict[str, int] | None,
+) -> int:
+    if contract is None:
+        return TOKEN_DECIMALS["USDC"]
+    try:
+        token = Web3.to_checksum_address(payment_token)
+    except (ValueError, TypeError):
+        return TOKEN_DECIMALS["USDC"]
+    if token == "0x0000000000000000000000000000000000000000":
+        return TOKEN_DECIMALS["USDC"]
+    if token_config_cache is not None and token in token_config_cache:
+        return token_config_cache[token]
+    config = _call_contract_read(
+        contract.functions.acceptedTokens(token), "acceptedTokens"
+    )
+    decimals = int(config[1])
+    if token_config_cache is not None:
+        token_config_cache[token] = decimals
+    return decimals
+
+
+def _item_view_to_schema(
+    raw: Any,
+    settings: Settings | None = None,
+    contract: Contract | None = None,
+    token_config_cache: dict[str, int] | None = None,
+) -> MarketplaceDataItem:
+    def _first_present(mapping: Mapping, *keys: str) -> Any:
+        for key in keys:
+            if key in mapping:
+                return mapping[key]
+        return None
+
+    if isinstance(raw, Mapping):
+        item_id = _first_present(raw, "itemId", "item_id", "id")
+        title = raw.get("title")
+        description = raw.get("description")
+        seller = raw.get("seller")
+        payment_token = (
+            _first_present(raw, "paymentToken", "payment_token")
+            or "0x0000000000000000000000000000000000000000"
+        )
+        price = raw.get("price")
+        dataset_url = _first_present(raw, "datasetUrl", "dataset_url")
+        dataset_hash = _first_present(raw, "datasetHash", "dataset_hash")
+        signature_url = _first_present(raw, "signatureUrl", "signature_url")
+        signature_hash = _first_present(raw, "signatureHash", "signature_hash")
+        exists = raw.get("exists")
+        purchase_count = (
+            raw.get("purchaseCount")
+            if "purchaseCount" in raw
+            else raw.get("purchase_count")
+        )
+    else:
+        (
+            item_id,
+            title,
+            description,
+            seller,
+            price,
+            dataset_url,
+            dataset_hash,
+            signature_url,
+            signature_hash,
+            exists,
+            purchase_count,
+            *rest,
+        ) = raw
+        payment_token = rest[0] if rest else "0x0000000000000000000000000000000000000000"
+
+    settlement_decimals = _settlement_decimals_for_token(
+        payment_token, contract, token_config_cache
+    )
+
+    return MarketplaceDataItem(
+        id=_to_hex(item_id),
+        title=title,
+        description=description,
+        seller=seller,
+        payment_token=payment_token,
+        price_atomic=str(int(price)),
+        settlement_currency=_settlement_currency_for_token(
+            payment_token, settings, settlement_decimals
+        ),
+        settlement_decimals=settlement_decimals,
+        dataset_url=dataset_url,
+        dataset_hash=_to_hex(dataset_hash),
+        signature_url=signature_url,
+        signature_hash=_to_hex(signature_hash),
+        exists=bool(exists),
+        purchase_count=int(purchase_count),
+    )
+
+
+def _send_tx(function, settings: Settings, value: int = 0) -> str:
+    """Send a transaction to the smart contract.
+
+    Args:
+        function: Contract function to call
+        settings (Settings): Application settings instance
+        value (int, optional): Amount of wei to send with the transaction. Defaults to 0.
+
+    Returns:
+        str: Transaction hash
+    """
+
+    w3 = _get_web3(settings)
+    try:
+        rpc_chain_id = w3.eth.chain_id
+    except Exception as exc:
+        _raise_upstream("Failed to fetch chain id from RPC", exc)
+    if rpc_chain_id != settings.chain_id:
+        logger.error(
+            "Chain ID mismatch. settings.chain_id=%s rpc.chain_id=%s",
+            settings.chain_id,
+            rpc_chain_id,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                f"Chain ID mismatch: settings={settings.chain_id}, rpc={rpc_chain_id}. "
+                "Update CHAIN_ID or RPC_URL."
+            ),
+        )
+    try:
+        account = w3.eth.account.from_key(
+            settings.server_private_key.get_secret_value()
+        )
+    except Exception as exc:
+        _raise_internal_config("Invalid SERVER_PRIVATE_KEY configuration", exc)
+    try:
+        tx = function.build_transaction(
+            {
+                "from": account.address,
+                "nonce": w3.eth.get_transaction_count(account.address, "pending"),
+                "chainId": settings.chain_id,
+                "value": value,
+            }
+        )
+    except Exception as exc:
+        _maybe_raise_custom_error(exc, "build_transaction")
+        _raise_upstream("Failed to build contract transaction", exc)
+    try:
+        tx["gas"] = w3.eth.estimate_gas(tx)
+    except Exception as exc:
+        _maybe_raise_custom_error(exc, "estimate_gas")
+        logger.warning(
+            "Gas estimation failed; using fallback gas limit 1000000. "
+            "from=%s nonce=%s value=%s error=%s",
+            account.address,
+            tx.get("nonce"),
+            value,
+            str(exc),
+        )
+        tx["gas"] = 1_000_000
+    try:
+        latest_block = w3.eth.get_block("latest")
+        base_fee = latest_block.get("baseFeePerGas", 0)
+        priority_fee = w3.to_wei(1, "gwei")
+        tx["maxPriorityFeePerGas"] = priority_fee
+        tx["maxFeePerGas"] = int(base_fee) * 2 + priority_fee
+        tx["type"] = "0x2"
+        tx.pop("gasPrice", None)
+    except Exception as exc:
+        _raise_upstream("Failed to configure transaction fee fields from RPC", exc)
+    try:
+        signed = account.sign_transaction(tx)
+        raw_tx = getattr(signed, "raw_transaction", None) or getattr(
+            signed, "rawTransaction", None
+        )
+        if raw_tx is None:
+            raise RuntimeError("Signed transaction payload is missing")
+        tx_hash = w3.eth.send_raw_transaction(raw_tx)
+        receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
+    except Exception as exc:
+        _maybe_raise_custom_error(exc, "send_raw_transaction")
+        logger.exception(
+            "Failed to submit tx. from=%s to=%s nonce=%s chainId=%s value=%s",
+            account.address,
+            tx.get("to"),
+            tx.get("nonce"),
+            tx.get("chainId"),
+            value,
+        )
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to submit transaction to RPC: {str(exc)}",
+        ) from exc
+    if receipt.status != 1:
+        logger.error("Contract transaction reverted. tx_hash=%s", tx_hash.hex())
+        raise HTTPException(status_code=502, detail="Transaction failed")
+    return tx_hash.hex()
+
+
+def _call_contract_read(callable_obj, operation: str):
+    try:
+        return callable_obj.call()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        if isinstance(exc, BadFunctionCallOutput):
+            logger.warning(
+                "Contract read hit missing or incompatible bytecode: %s", exc
+            )
+        _maybe_raise_custom_error(exc, operation)
+        _raise_upstream(f"Contract read failed: {operation}", exc)
+
+
+def max_price(settings: Settings) -> int:
+    """Get the maximum price allowed for listings.
+
+    Args:
+        settings (Settings): Application settings instance
+
+    Returns:
+        int: Maximum price allowed for listings
+    """
+
+    contract = _get_contract(settings)
+    token = _payment_token_from_settings(settings)
+    if token is None:
+        token = _call_contract_read(
+            contract.functions.acceptedTokenAt(0), "acceptedTokenAt"
+        )
+    config = _call_contract_read(
+        contract.functions.acceptedTokens(token), "acceptedTokens"
+    )
+    return int(config[2])
+
+
+def fee_bps(settings: Settings) -> int:
+    """Get the fee basis points configured in the contract.
+
+    Args:
+        settings (Settings): Application settings instance
+
+    Returns:
+        int: Fee basis points configured in the contract
+    """
+
+    return _call_contract_read(
+        _get_contract(settings).functions.feeBps(),
+        "feeBps",
+    )
+
+
+def fee_recipient(settings: Settings) -> str:
+    """Get the fee recipient address configured in the contract.
+
+    Args:
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Fee recipient address configured in the contract
+    """
+
+    return _call_contract_read(
+        _get_contract(settings).functions.feeRecipient(),
+        "feeRecipient",
+    )
+
+
+def owner(settings: Settings) -> str:
+    """Get the owner address of the contract.
+
+    Args:
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Owner address of the contract
+    """
+
+    return _call_contract_read(
+        _get_contract(settings).functions.owner(),
+        "owner",
+    )
+
+
+def get_item_view(listing_id: str, settings: Settings) -> MarketplaceDataItem:
+    """Get the item view for a specific listing.
+
+    Args:
+        listing_id (str): Listing UUID string
+        settings (Settings): Application settings instance
+
+    Returns:
+        MarketplaceDataItem: Item view data
+    """
+
+    logger.info("contract_service.get_item_view listing_id=%s", listing_id)
+    item_id = uuid_to_bytes32(listing_id)
+    contract = _get_contract(settings)
+    raw = _call_contract_read(
+        contract.functions.getItemView(item_id),
+        "getItemView",
+    )
+    return _item_view_to_schema(raw, settings=settings, contract=contract)
+
+
+def get_items(start: int, count: int, settings: Settings) -> List[MarketplaceDataItem]:
+    """Get a list of item views from the contract.
+
+    Args:
+        start (int): Starting index
+        count (int): Number of items to retrieve
+        settings (Settings): Application settings instance
+
+    Returns:
+        List[MarketplaceDataItem]: List of item views
+    """
+    logger.info("contract_service.get_items start=%s count=%s", start, count)
+    if not _contract_has_code(settings):
+        logger.warning(
+            "No Marketplace contract bytecode found at %s; returning empty paginated items list",
+            settings.contract_address,
+        )
+        return []
+    contract = _get_contract(settings)
+    raw_items = _call_contract_read(
+        contract.functions.getItems(start, count),
+        "getItems",
+    )
+    token_config_cache: dict[str, int] = {}
+    return [
+        _item_view_to_schema(
+            item,
+            settings=settings,
+            contract=contract,
+            token_config_cache=token_config_cache,
+        )
+        for item in raw_items
+    ]
+
+
+def get_all_items(settings: Settings) -> List[MarketplaceDataItem]:
+    """Get all item views from the contract.
+
+    Args:
+        settings (Settings): Application settings instance
+
+    Returns:
+        List[MarketplaceDataItem]: List of all item views
+    """
+
+    logger.info("contract_service.get_all_items")
+    if not _contract_has_code(settings):
+        logger.warning(
+            "No Marketplace contract bytecode found at %s; returning empty item list",
+            settings.contract_address,
+        )
+        return []
+    contract = _get_contract(settings)
+    raw_items = _call_contract_read(
+        contract.functions.getAllItems(),
+        "getAllItems",
+    )
+    token_config_cache: dict[str, int] = {}
+    return [
+        _item_view_to_schema(
+            item,
+            settings=settings,
+            contract=contract,
+            token_config_cache=token_config_cache,
+        )
+        for item in raw_items
+    ]
+
+
+def get_purchased_items_by_wallet(
+    wallet_type: Union[WalletType, str],
+    address: str,
+    settings: Settings,
+    start_block: int | None = None,
+    end_block: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[str, List[MarketplaceDataItem]]:
+    """Get purchased items by wallet using ItemPurchased events.
+
+    Args:
+        wallet_type (Union[WalletType, str]): Wallet type.
+        address (str): Wallet address/public key.
+        settings (Settings): Application settings.
+        start_block (int | None, optional): Start block inclusive.
+        end_block (int | None, optional): End block inclusive.
+        limit (int, optional): Max number of items.
+        offset (int, optional): Pagination offset.
+
+    Returns:
+        tuple[str, List[MarketplaceDataItem]]: WalletId hex and purchased items.
+    """
+
+    wallet_type_str = (
+        wallet_type.value.lower()
+        if isinstance(wallet_type, WalletType)
+        else str(wallet_type).lower()
+    )
+    if wallet_type_str != WalletType.EVM.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Purchased-items query currently supports only EVM wallets.",
+        )
+
+    contract = _get_contract(settings)
+    w3 = _get_web3(settings)
+
+    try:
+        buyer = Web3.to_checksum_address(address)
+    except ValueError as exc:
+        _raise_bad_request("Invalid EVM address provided", exc)
+        raise
+
+    latest_block = w3.eth.block_number
+    from_block = (
+        start_block if start_block is not None else max(0, latest_block - 50_000)
+    )
+    to_block = end_block if end_block is not None else latest_block
+    if from_block > to_block:
+        raise HTTPException(
+            status_code=400, detail="start_block cannot be greater than end_block"
+        )
+
+    logger.info(
+        "Fetching ItemPurchased events buyer=%s from=%s to=%s limit=%s offset=%s",
+        buyer,
+        from_block,
+        to_block,
+        limit,
+        offset,
+    )
+
+    try:
+        events = contract.events.ItemPurchased().get_logs(
+            from_block=from_block,
+            to_block=to_block,
+            argument_filters={"buyer": buyer},
+        )
+    except Exception as exc:
+        _raise_upstream("Failed to query ItemPurchased logs", exc)
+        raise
+
+    # newest first for UX
+    events = list(reversed(events))
+    unique_item_ids: list[bytes] = []
+    seen: set[str] = set()
+    for event in events:
+        args = getattr(event, "args", {})
+        item_id = args.get("itemId")
+        item_id_hex = _to_hex(item_id).lower()
+        if item_id_hex in seen:
+            continue
+        seen.add(item_id_hex)
+        unique_item_ids.append(item_id)
+
+    paged_item_ids = unique_item_ids[offset : offset + limit]
+    items: List[MarketplaceDataItem] = []
+    for item_id in paged_item_ids:
+        raw = _call_contract_read(
+            contract.functions.getItemView(item_id), "getItemView"
+        )
+        items.append(_item_view_to_schema(raw, settings=settings, contract=contract))
+
+    wallet_id_hex = Web3.to_hex(wallet_id(wallet_type_str, address, settings))
+    logger.info(
+        "Fetched purchased items buyer=%s wallet_id=%s count=%s",
+        buyer,
+        wallet_id_hex,
+        len(items),
+    )
+    return wallet_id_hex, items
+
+
+def has_access(id: str, wallet_id_bytes: bytes, settings: Settings) -> bool:
+    """Check if a wallet has access to a specific listing.
+
+    Args:
+        id (str): Listing UUID string
+        wallet_id_bytes (bytes): Wallet ID bytes
+        settings (Settings): Application settings instance
+
+    Returns:
+        bool: True if the wallet has access, False otherwise
+    """
+
+    logger.info("contract_service.has_access listing_id=%s", id)
+    item_id = uuid_to_bytes32(id)
+    return _call_contract_read(
+        _get_contract(settings).functions.hasAccess(item_id, wallet_id_bytes),
+        "hasAccess",
+    )
+
+
+def create_item(
+    listing_id: str,
+    title: str,
+    description: str,
+    seller: str,
+    payment_token: str,
+    price: int,
+    dataset_url: str,
+    dataset_hash: str,
+    signature_url: str,
+    signature_hash: str,
+    settings: Settings,
+) -> str:
+    """Create a new item listing in the contract.
+
+    Args:
+        listing_id (str): Listing UUID string
+        title (str): Item title
+        description (str): Item description
+        seller (str): Seller address
+        payment_token (str): ERC-20 token address used for payment
+        price (int): Item price in settlement token atomic units
+        dataset_url (str): Dataset URL
+        dataset_hash (str): Dataset hash
+        signature_url (str): Signature URL
+        signature_hash (str): Signature hash
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Transaction hash
+    """
+
+    logger.info(
+        "contract_service.create_item listing_id=%s seller=%s price=%s",
+        listing_id,
+        seller,
+        price,
+    )
+    contract = _get_contract(settings)
+    item_id = uuid_to_bytes32(listing_id)
+    try:
+        seller_address = Web3.to_checksum_address(seller)
+    except ValueError as exc:
+        _raise_bad_request("Invalid seller EVM address", exc)
+    try:
+        payment_token_address = Web3.to_checksum_address(payment_token)
+    except ValueError as exc:
+        _raise_bad_request("Invalid payment token EVM address", exc)
+    try:
+        dataset_hash_bytes = Web3.to_bytes(hexstr=dataset_hash)
+        signature_hash_bytes = Web3.to_bytes(hexstr=signature_hash)
+    except Exception as exc:
+        _raise_bad_request("Invalid dataset/signature hash format", exc)
+    tx = contract.functions.createItem(
+        item_id,
+        title,
+        description,
+        seller_address,
+        payment_token_address,
+        price,
+        dataset_url,
+        dataset_hash_bytes,
+        signature_url,
+        signature_hash_bytes,
+    )
+    return _send_tx(tx, settings)
+
+
+def buy_item(listing_id: str, value_wei: int, settings: Settings) -> str:
+    """Buy an item from the contract.
+
+    Args:
+        listing_id (str): Listing UUID string
+        value_wei (int): Settlement payment amount in settlement token atomic units
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Transaction hash
+    """
+
+    logger.info(
+        "contract_service.buy_item listing_id=%s value_wei=%s",
+        listing_id,
+        value_wei,
+    )
+    contract = _get_contract(settings)
+    item_id = uuid_to_bytes32(listing_id)
+
+    # Pre-check payment so we can return a clean 400 instead of a low-level revert.
+    item = _call_contract_read(contract.functions.getItemView(item_id), "getItemView")
+    price_wei = int(item[4])
+    fee_bps_value = int(_call_contract_read(contract.functions.feeBps(), "feeBps"))
+    fee_wei = (price_wei * fee_bps_value) // 10_000
+    required_wei = price_wei + fee_wei
+    if value_wei < required_wei:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Insufficient payment. required={required_wei} provided={value_wei} "
+                f"(price={price_wei}, fee_bps={fee_bps_value})"
+            ),
+        )
+
+    tx = contract.functions.buyItem(item_id)
+    return _send_tx(tx, settings)
+
+
+def update_dataset_url(listing_id: str, new_url: str, settings: Settings) -> str:
+    """Update the dataset URL for a specific listing.
+
+    Args:
+        listing_id (str): Listing UUID string
+        new_url (str): New dataset URL
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Transaction hash
+    """
+
+    contract = _get_contract(settings)
+    item_id = uuid_to_bytes32(listing_id)
+    tx = contract.functions.updateDatasetUrl(item_id, new_url)
+    return _send_tx(tx, settings)
+
+
+def update_signature(
+    listing_id: str, new_url: str, new_hash: str, settings: Settings
+) -> str:
+    """Update the signature URL and hash for a specific listing.
+
+    Args:
+        listing_id (str): Listing UUID string
+        new_url (str): New signature URL
+        new_hash (str): New signature hash
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Transaction hash
+    """
+
+    contract = _get_contract(settings)
+    item_id = uuid_to_bytes32(listing_id)
+    try:
+        new_hash_bytes = Web3.to_bytes(hexstr=new_hash)
+    except Exception as exc:
+        _raise_bad_request("Invalid signature hash format", exc)
+    tx = contract.functions.updateSignature(item_id, new_url, new_hash_bytes)
+    return _send_tx(tx, settings)
+
+
+def update_price(listing_id: str, new_price: int, settings: Settings) -> str:
+    """Update the price for a specific listing.
+
+    Args:
+        listing_id (str): Listing UUID string
+        new_price (int): New price for the item in settlement token atomic units
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Transaction hash
+    """
+
+    contract = _get_contract(settings)
+    item_id = uuid_to_bytes32(listing_id)
+    tx = contract.functions.updatePrice(item_id, new_price)
+    return _send_tx(tx, settings)
+
+
+def set_fee_config(
+    fee_recipient_addr: str, fee_bps_value: int, settings: Settings
+) -> str:
+    """Set the fee recipient address and fee basis points in the contract.
+
+    Args:
+        fee_recipient_addr (str): Fee recipient address
+        fee_bps_value (int): Fee basis points value
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Transaction hash
+    """
+
+    contract = _get_contract(settings)
+    try:
+        recipient = Web3.to_checksum_address(fee_recipient_addr)
+    except ValueError as exc:
+        _raise_bad_request("Invalid fee recipient EVM address", exc)
+    tx = contract.functions.setFeeConfig(recipient, fee_bps_value)
+    return _send_tx(tx, settings)
+
+
+def transfer_ownership(new_owner: str, settings: Settings) -> str:
+    """Transfer ownership of the contract to a new owner.
+
+    Args:
+        new_owner (str): New owner's address
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Transaction hash
+    """
+
+    contract = _get_contract(settings)
+    try:
+        owner_address = Web3.to_checksum_address(new_owner)
+    except ValueError as exc:
+        _raise_bad_request("Invalid new owner EVM address", exc)
+    tx = contract.functions.transferOwnership(owner_address)
+    return _send_tx(tx, settings)
+
+
+def renounce_ownership(settings: Settings) -> str:
+    """Renounce ownership of the contract.
+
+    Args:
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Transaction hash
+    """
+
+    contract = _get_contract(settings)
+    tx = contract.functions.renounceOwnership()
+    return _send_tx(tx, settings)
+
+
+def grant_access(listing_id: str, wallet_id_bytes: bytes, settings: Settings) -> str:
+    """Grant access to a wallet for a specific listing.
+
+    Args:
+        listing_id (str): Listing UUID string
+        wallet_id_bytes (bytes): Wallet ID in bytes
+        settings (Settings): Application settings instance
+
+    Returns:
+        str: Transaction hash
+    """
+
+    contract = _get_contract(settings)
+    item_id = uuid_to_bytes32(listing_id)
+    tx = contract.functions.grantAccess(item_id, wallet_id_bytes)
+    return _send_tx(tx, settings)

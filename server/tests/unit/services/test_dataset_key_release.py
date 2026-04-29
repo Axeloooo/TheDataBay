@@ -1,10 +1,10 @@
 import pytest
 from fastapi import HTTPException
 
-from app.routers.datasets_router import release_key
-from app.schemas.dataset_schema import KeyReleaseRequest
-from app.services import contract_service
-from app.services import dataset_key_repo
+from app.datasets.router import release_key
+from app.datasets.schemas import KeyReleaseRequest
+from app.contracts import service as contract_service
+from app.datasets import repository as dataset_key_repo
 
 
 class DummyRecord:

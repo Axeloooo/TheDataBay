@@ -4,7 +4,7 @@ from datetime import datetime
 from sqlalchemy import create_engine
 from sqlmodel import SQLModel, Session
 
-from app.services import dataset_key_repo
+from app.datasets import repository as dataset_key_repo
 
 
 @pytest.fixture

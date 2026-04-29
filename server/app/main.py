@@ -13,16 +13,13 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from .config.settings import Settings, get_settings
-from .routers import (
-    health_router,
-    llm_router,
-    ai_router,
-    datasets_router,
-    contract_router,
-)
-from .routers import agent_router
+from .health import router as health_router
+from .ai import router as ai_router
+from .datasets import router as datasets_router
+from .contracts import router as contract_router
+from .agents import router as agent_router
 from .database.engine import create_db_and_tables
-from .schemas.ai_schema import ErrorResponse
+from .shared.errors import ApiError, ErrorResponse, api_error_handler
 
 settings: Settings = get_settings()
 
@@ -102,8 +99,10 @@ async def validation_exception_handler(
         ).model_dump(),
     )
 
+
+app.add_exception_handler(ApiError, api_error_handler)
+
 app.include_router(health_router.router)
-app.include_router(llm_router.router)
 app.include_router(ai_router.router)
 app.include_router(datasets_router.router)
 app.include_router(contract_router.router)

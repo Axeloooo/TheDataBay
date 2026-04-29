@@ -10,12 +10,14 @@ DEPLOYMENTS_DIR := deployments
 ANVIL_ADDR_FILE := $(DEPLOYMENTS_DIR)/anvil_marketplace.addr
 ANVIL_USDC_ADDR_FILE := $(DEPLOYMENTS_DIR)/anvil_usdc.addr
 ANVIL_CADC_ADDR_FILE := $(DEPLOYMENTS_DIR)/anvil_cadc.addr
+ANVIL_HOST ?= 0.0.0.0
+ANVIL_PORT ?= 8545
 
 .PHONY: help anvil stop-anvil clean deploy-anvil addr usdc-addr cadc-addr fee getall create-item buy-item seed-anvil mint-usdc mint-cadc sync-local-contract-config
 
 help:
 	@echo "Targets:"
-	@echo "  anvil         - start anvil (port 8545)"
+	@echo "  anvil         - start anvil ($$ANVIL_HOST:$$ANVIL_PORT, defaults to $(ANVIL_HOST):$(ANVIL_PORT))"
 	@echo "  deploy-anvil  - deploy Marketplace to anvil and save address"
 	@echo "  sync-local-contract-config - update local app config files with deployed address"
 	@echo "  addr          - print deployed Marketplace address"
@@ -31,6 +33,7 @@ help:
 	@echo ""
 	@echo "Env in .env:"
 	@echo "  ANVIL_RPC_URL, ANVIL_PRIVATE_KEY, ANVIL_FEE_RECIPIENT, ANVIL_FEE_BPS, SEPOLIA_USDC_ADDRESS, SEPOLIA_CADC_ADDRESS"
+	@echo "  ANVIL_HOST, ANVIL_PORT"
 
 build:
 	mkdir -p ../server/app/contracts
@@ -39,11 +42,11 @@ build:
 
 
 anvil:
-	@anvil --host 127.0.0.1 --port 8545
+	@anvil --host $(ANVIL_HOST) --port $(ANVIL_PORT)
 
 # If you run anvil in background yourself, ignore this.
 stop-anvil:
-	@pkill -f "anvil --host 127.0.0.1 --port 8545" || true
+	@pkill -f "anvil --host $(ANVIL_HOST) --port $(ANVIL_PORT)" || pkill -f "anvil .*--port $(ANVIL_PORT)" || true
 
 clean:
 	@rm -rf $(DEPLOYMENTS_DIR)

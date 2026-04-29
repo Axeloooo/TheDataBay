@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from app.routers import datasets_router
+from app.datasets import router as datasets_router
 
 
 def test_release_key_returns_encryption_material(client, monkeypatch):

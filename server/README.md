@@ -82,97 +82,67 @@ The API will be available at:
 - `GET /health` - Service health check
 - `GET /health/ready` - Readiness check with dependency status
 
-### LLM (`/llm`)
+### Datasets (`/api/v1/datasets`)
 
-- `POST /llm/embed/batch` - **Dataset embedding pipeline** - Upload CSV or .data file for batch embedding generation
-- `POST /llm/embed/query` - **Query embedding pipeline** - Rewrite and embed query in one step
-- `POST /llm/rewrite` - **Query rewriting** - Rewrite natural language query for better retrieval
+- `POST /api/v1/datasets/embed` - Upload a CSV, index rows in PGVector, encrypt the raw dataset, upload it to IPFS, and return the completed dataset metadata synchronously
+- `POST /api/v1/datasets/{listing_id}/key` - Release encryption key material after on-chain access verification
+- `GET /api/v1/datasets/{listing_id}/preview` - Best-effort preview endpoint
 
 #### Dataset Embedding Pipeline
 
-The `/llm/embed/batch` endpoint implements a complete dataset ingestion and encoding pipeline:
+The `/api/v1/datasets/embed` endpoint implements a complete dataset ingestion pipeline:
 
 **Features:**
 
-- Accepts multipart file upload (.csv or .data format)
+- Accepts multipart CSV upload
 - Automatically detects headers in CSV files
-- Transforms each record into deterministic structured text using a stable template
-- Generates embeddings using Ollama embedding model
-- Returns signature (embedding vectors), vectorSpec metadata, and dataset statistics
+- Loads row documents through `CSVLoader` from `langchain_community`
+- Generates and stores row embeddings using LangChain PGVector
+- Encrypts the raw CSV with AES-GCM and uploads ciphertext to IPFS
+- Returns listing ID, dataset URL/hash, preview, vector spec, and dataset statistics
 
 **Example Request:**
 
 ```bash
-curl -X POST "http://localhost:8000/llm/embed/batch" \
+curl -X POST "http://localhost:8080/api/v1/datasets/embed" \
   -H "accept: application/json" \
   -H "Content-Type: multipart/form-data" \
-  -F "file=@sample_dataset.csv"
+  -F "file=@sample_dataset.csv" \
+  -F "title=Sample Dataset" \
+  -F "description=Example rows" \
+  -F "seller=0x0000000000000000000000000000000000000001" \
+  -F "price_atomic=1000000"
 ```
 
 **Response Format:**
 
 ```json
 {
-  "signature": [[0.1, 0.2, ...], [0.3, 0.4, ...], ...],
-  "vectorSpec": {
-    "model": "nomic-embed-text",
-    "dimension": 768
-  },
+  "listing_id": "123e4567-e89b-12d3-a456-426614174000",
+  "dataset_url": "ipfs://Qm...",
+  "dataset_hash": "0x...",
+  "preview": { "column_names": ["age"], "rows": [["63"]] },
   "stats": {
     "total_rows": 100,
     "total_columns": 5,
     "empty_rows_skipped": 2,
     "has_header": true
-  },
-  "filename": "sample_dataset.csv"
+  "vector_spec": {
+    "model": "nomic-embed-text",
+    "dimension": 768
+  }
 }
 ```
 
-**Record-to-Text Template:**
-Each dataset record is transformed using a deterministic template:
+### AI (`/api/v1/ai`)
 
-```
-column_name: value | column_name: value | ...
-```
-
-This ensures stable, consistent text representation for embedding generation.
-
-#### Query Rewriting and Embedding Pipeline
-
-**Query Rewriting (`POST /llm/rewrite`)**
-
-Rewrites natural language queries to make them more explicit and retrieval-friendly using a thinking model.
+- `POST /api/v1/ai/similarity-search` - Perform semantic similarity search
+- `POST /api/v1/ai/embed/query` - Embed a natural-language query
 
 **Example Request:**
 
 ```bash
-curl -X POST "http://localhost:8000/llm/rewrite" \
-  -H "Content-Type: application/json" \
-  -d '{"query": "heart disease data", "context": "medical dataset"}'
-```
-
-**Response:**
-
-```json
-{
-  "original_query": "heart disease data",
-  "rewritten_query": "medical dataset containing cardiovascular disease patient records with diagnostic features",
-  "model": "llama3.2:latest"
-}
-```
-
-**Query Embedding (`POST /llm/embed/query`)**
-
-Complete pipeline that:
-
-1. Rewrites query using thinking model for better retrieval
-2. Embeds the rewritten query using embedding model
-3. Returns vectorSpec compatible with dataset embeddings
-
-**Example Request:**
-
-```bash
-curl -X POST "http://localhost:8000/llm/embed/query" \
+curl -X POST "http://localhost:8080/api/v1/ai/embed/query" \
   -H "Content-Type: application/json" \
   -d '{"query": "patients with chest pain"}'
 ```
@@ -182,27 +152,13 @@ curl -X POST "http://localhost:8000/llm/embed/query" \
 ```json
 {
   "original_query": "patients with chest pain",
-  "rewritten_query": "medical records of patients presenting with chest pain symptoms",
   "query_embedding": [0.1, 0.2, ...],
-  "vectorSpec": {
+  "vector_spec": {
     "model": "nomic-embed-text",
     "dimension": 768
-  },
-  "rewrite_model": "llama3.2:latest"
+  }
 }
 ```
-
-**Key Features:**
-
-- Clear separation between rewriting (thinking model) and embedding (embedding model)
-- VectorSpec ensures compatibility with dataset embeddings
-- Context can be provided to inform query rewriting
-- Fallback to original query if rewriting fails
-
-### AI (`/ai`)
-
-- `POST /ai/similarity-search` - Perform similarity search
-- `POST /ai/score` - Score data using ML models
 
 ## Configuration
 
@@ -229,9 +185,9 @@ curl http://localhost:8000/health
 
 ### Adding New Endpoints
 
-1. Define Pydantic schemas in `app/schemas/`
-2. Implement business logic in `app/services/`
-3. Create route handlers in `app/routers/`
+1. Define Pydantic schemas in the relevant feature package, such as `app/datasets/schemas.py`
+2. Implement business logic in the feature service, such as `app/datasets/service.py`
+3. Create route handlers in the feature router, such as `app/datasets/router.py`
 4. Mount router in `app/main.py`
 
 ## Notes

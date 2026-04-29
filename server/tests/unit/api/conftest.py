@@ -52,7 +52,7 @@ from app import main as main_module
 from app.main import app
 from app.models.agent import Agent, AgentPurchaseRequest, AgentRecommendation
 from app.models.dataset_key import DatasetKey
-from app.routers import health_router
+from app.health import router as health_router
 
 _REGISTERED_MODELS = (
     Agent,

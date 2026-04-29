@@ -145,7 +145,7 @@ class SemanticSearchPage {
   }
 
   /**
-   * Waits up to 90 s for the embedding job to reach "Completed".
+   * Waits up to 90 s for dataset processing to reach "Completed".
    * Fails immediately with a clear message if an "Operation failed" error panel appears.
    */
   async waitForJobCompletion(): Promise<void> {
@@ -166,7 +166,7 @@ class SemanticSearchPage {
         .textContent()
         .catch(() => null);
       throw new Error(
-        `Upload job failed: "${detail?.trim() ?? "unknown error"}". ` +
+        `Dataset processing failed: "${detail?.trim() ?? "unknown error"}". ` +
           `Ensure the backend is running at ${BACKEND_URL}.`,
       );
     }

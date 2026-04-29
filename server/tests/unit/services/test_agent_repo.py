@@ -7,8 +7,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel, Session
 
-from app.schemas.agent_schema import AgentCreateRequest, AgentUpdateRequest
-from app.services import agent_repo
+from app.agents.schemas import AgentCreateRequest, AgentUpdateRequest
+from app.agents import repository as agent_repo
 
 
 @pytest.fixture

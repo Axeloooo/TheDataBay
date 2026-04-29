@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.models.agent import Agent, AgentPurchaseRequest, AgentRecommendation
-from app.routers import agent_router
+from app.agents import router as agent_router
 
 
 def make_agent(handle: str, **overrides) -> Agent:

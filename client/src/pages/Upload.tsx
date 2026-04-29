@@ -51,8 +51,7 @@ function Upload() {
   const settlementCurrency = useUploadStore((state) => state.settlementCurrency);
   const displayCurrency = useUploadStore((state) => state.displayCurrency);
   const file = useUploadStore((state) => state.file);
-  const job = useUploadStore((state) => state.job);
-  const jobStatus = useUploadStore((state) => state.jobStatus);
+  const embedResult = useUploadStore((state) => state.embedResult);
   const loading = useUploadStore((state) => state.loading);
   const error = useUploadStore((state) => state.error);
   const createTxHash = useUploadStore((state) => state.createTxHash);
@@ -74,44 +73,23 @@ function Upload() {
     (state) => state.initializeUploadState,
   );
   const submitUpload = useUploadStore((state) => state.submitUpload);
-  const startPolling = useUploadStore((state) => state.startPolling);
-  const stopPolling = useUploadStore((state) => state.stopPolling);
   const clearPendingSession = useUploadStore(
     (state) => state.clearPendingSession,
   );
   const createItemOnChain = useUploadStore((state) => state.createItemOnChain);
 
-  const hasSubmitted = !!job || !!persistedSession;
+  const hasSubmitted = !!embedResult || !!persistedSession;
 
   useEffect(() => {
     initializeUploadState(preferredCurrency);
   }, [initializeUploadState, preferredCurrency]);
 
-  useEffect(() => {
-    const activeJobId = job?.job_id ?? persistedSession?.jobId;
-    const activeStatus = jobStatus?.status ?? persistedSession?.status;
-
-    if (!activeJobId) return;
-    if (activeStatus === "completed" || activeStatus === "failed") return;
-
-    startPolling();
-
-    return () => {
-      stopPolling();
-    };
-  }, [
-    job?.job_id,
-    jobStatus?.status,
-    persistedSession?.jobId,
-    persistedSession?.status,
-    startPolling,
-    stopPolling,
-  ]);
-
   const computedStatus = useMemo(() => {
     if (loading) return "running";
-    return jobStatus?.status ?? persistedSession?.status ?? "queued";
-  }, [loading, jobStatus?.status, persistedSession?.status]);
+    if (embedResult || persistedSession?.status === "completed") return "completed";
+    if (persistedSession?.status === "failed") return "failed";
+    return "queued";
+  }, [embedResult, loading, persistedSession?.status]);
 
   const statusMeta = useMemo(() => {
     if (computedStatus === "completed") {
@@ -160,12 +138,15 @@ function Upload() {
   }, [displayCurrency, priceUsdc, rates, settlementCurrency]);
 
   const currentListingId =
-    jobStatus?.listing_id ?? persistedSession?.listingId ?? null;
+    embedResult?.listing_id ?? persistedSession?.listingId ?? null;
   const currentDatasetUrl =
-    jobStatus?.dataset_url ?? persistedSession?.datasetUrl;
+    embedResult?.dataset_url ?? persistedSession?.datasetUrl;
   const currentDatasetHash =
-    jobStatus?.dataset_hash ?? persistedSession?.datasetHash;
-  const effectiveStatus = jobStatus?.status ?? persistedSession?.status;
+    embedResult?.dataset_hash ?? persistedSession?.datasetHash;
+  const effectiveStatus =
+    embedResult || persistedSession?.status === "completed"
+      ? "completed"
+      : persistedSession?.status;
 
   const walletMismatch =
     !!address &&
@@ -179,14 +160,6 @@ function Upload() {
     } catch {
       toast.error("Failed to copy to clipboard");
     }
-  };
-
-  const formatDuration = (startMs: number, endMs: number) => {
-    const totalSeconds = Math.max(0, Math.floor((endMs - startMs) / 1000));
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    if (minutes > 0) return `${minutes}m ${seconds}s`;
-    return `${seconds}s`;
   };
 
   if (!isConnected) {
@@ -234,7 +207,7 @@ function Upload() {
           </p>
         </div>
 
-        {persistedSession && !jobStatus && (
+        {persistedSession && !embedResult && (
           <div className="mb-4 flex items-center justify-between rounded-lg border bg-amber-50 p-3 text-sm text-amber-900">
             <span>
               Resumed pending upload session for listing{" "}
@@ -371,23 +344,12 @@ function Upload() {
             </CardContent>
           </Card>
 
-          {(loading || jobStatus || persistedSession || error) && (
+          {(loading || embedResult || persistedSession || error) && (
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <CardTitle>Upload Status</CardTitle>
-                    {jobStatus?.status === "completed" &&
-                      jobStatus.started_at &&
-                      jobStatus.completed_at && (
-                        <span className="text-xs text-muted-foreground">
-                          Duration:{" "}
-                          {formatDuration(
-                            new Date(jobStatus.started_at).getTime(),
-                            new Date(jobStatus.completed_at).getTime(),
-                          )}
-                        </span>
-                      )}
                   </div>
                   <Badge variant="outline" className={statusMeta.badgeClass}>
                     <span
@@ -397,7 +359,7 @@ function Upload() {
                   </Badge>
                 </div>
                 <CardDescription>
-                  Track embedding job status and outputs
+                  Track dataset processing status and outputs
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
@@ -412,29 +374,6 @@ function Upload() {
                 )}
                 {error && (
                   <ErrorPanel title="Operation failed" message={error} />
-                )}
-
-                {(job || persistedSession) && (
-                  <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">Job ID</p>
-                    <div className="flex items-center gap-2">
-                      <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-xs break-all">
-                        {job?.job_id ?? persistedSession?.jobId}
-                      </code>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() =>
-                          copyToClipboard(
-                            job?.job_id ?? persistedSession?.jobId ?? "",
-                            "Job ID",
-                          )
-                        }
-                      >
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
                 )}
 
                 {currentListingId && (

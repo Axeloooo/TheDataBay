@@ -1,7 +1,9 @@
-import type { MarketplaceDataItem, AccessCheckResponse, WalletAccessRequest, PurchasedItemsRequest, PurchasedItemsResponse } from "@/types/contract";
-import type { KeyReleaseRequest, KeyReleaseResponse } from "@/types/dataset";
-import type { JobResponse, JobStatusResponse } from "@/types/llm";
-import type { SimilaritySearchRequest, SimilaritySearchResponse, ScoreLabel } from "@/types/ai";
+import type { MarketplaceDataItem, AccessCheckResponse, PurchasedItemsRequest, PurchasedItemsResponse } from "@/types/contract";
+import type {
+  DatasetEmbedResponse,
+  KeyReleaseResponse,
+} from "@/types/dataset";
+import type { CardViewModel, SimilaritySearchRequest, ScoreLabel } from "@/types/ai";
 import type { Agent, AgentListResponse, RecommendationListResponse, PurchaseRequest, PurchaseRequestListResponse } from "@/types/agent";
 import {
   MOCK_ITEMS,
@@ -21,12 +23,8 @@ function withBytes32Id(item: MarketplaceDataItem): MarketplaceDataItem {
 }
 
 export const mockBackend = {
-  submitEmbedBatch: (_formData: FormData): Promise<JobResponse> => {
+  submitDataset: (): Promise<DatasetEmbedResponse> => {
     return Promise.reject(new Error("Upload is not available in demo mode."));
-  },
-
-  getJobStatus: (_jobId: string): Promise<JobStatusResponse> => {
-    return Promise.reject(new Error("Job tracking is not available in demo mode."));
   },
 
   getMarketplaceItems: (): Promise<MarketplaceDataItem[]> => {
@@ -39,15 +37,15 @@ export const mockBackend = {
     return delay({ ...item });
   },
 
-  requestKeyRelease: (_listingId: string, _payload: KeyReleaseRequest): Promise<KeyReleaseResponse> => {
+  requestKeyRelease: (): Promise<KeyReleaseResponse> => {
     return Promise.reject(new Error("Key release is not available in demo mode."));
   },
 
-  checkAccess: (listingId: string, _payload: WalletAccessRequest): Promise<AccessCheckResponse> => {
+  checkAccess: (listingId: string): Promise<AccessCheckResponse> => {
     return delay({ has_access: MOCK_PURCHASED_IDS.has(listingId) });
   },
 
-  getDatasetPreview: (_listingId: string): Promise<{ column_names: string[]; rows: string[][] }> => {
+  getDatasetPreview: (): Promise<{ column_names: string[]; rows: string[][] }> => {
     return delay({
       column_names: ["age", "sex", "cp", "trestbps", "chol", "fbs", "restecg", "thalach", "exang", "num"],
       rows: [
@@ -58,28 +56,31 @@ export const mockBackend = {
     });
   },
 
-  similaritySearch: (payload: SimilaritySearchRequest): Promise<SimilaritySearchResponse> => {
+  similaritySearch: (
+    payload: SimilaritySearchRequest,
+  ): Promise<{ query: string; results: CardViewModel[]; count: number }> => {
     const q = payload.query.toLowerCase();
     const results = MOCK_ITEMS
       .filter((item) =>
         item.title.toLowerCase().includes(q) ||
         item.description.toLowerCase().includes(q)
       )
-      .map((item) => {
+      .map((item): CardViewModel => {
         const score = item.title.toLowerCase().includes(q) ? 0.95 : 0.72;
         const scoreLabel: ScoreLabel = score >= 0.9 ? "high" : score >= 0.7 ? "moderate" : "low";
         return {
-          listing_id: item.id,
-          title: item.title,
-          description: item.description,
-          seller: item.seller,
-          payment_token: item.payment_token,
-          price_atomic: Number(item.price_atomic ?? 0),
-          settlement_currency: item.settlement_currency ?? "USDC",
-          settlement_decimals: item.settlement_decimals ?? 6,
-          purchase_count: item.purchase_count ?? 0,
+          dataset: {
+            id: uuidToBytes32(item.id),
+            title: item.title,
+            description: item.description,
+            payment_token: item.payment_token,
+            price_atomic: String(item.price_atomic ?? 0),
+            settlement_currency: item.settlement_currency ?? "USDC",
+            settlement_decimals: item.settlement_decimals ?? 6,
+            purchase_count: item.purchase_count ?? 0,
+          },
           score,
-          score_label: scoreLabel,
+          scoreLabel,
         };
       });
     return delay({ query: payload.query, results, count: results.length });
