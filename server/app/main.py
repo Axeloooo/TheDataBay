@@ -1,5 +1,5 @@
 """
-BridgeMart FastAPI backend service.
+Ulenor FastAPI backend service.
 """
 
 from contextlib import asynccontextmanager
@@ -70,7 +70,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="FastAPI backend for BridgeMart AI workloads and API orchestration",
+    description="FastAPI backend for Ulenor AI workloads and API orchestration",
     docs_url="/api/v1/docs",
     redoc_url="/api/v1/redoc",
     lifespan=lifespan,

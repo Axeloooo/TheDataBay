@@ -14,37 +14,37 @@ spec:
     spec:
       containers:
         - name: client
-          image: bridgemart/client
+          image: ulenor/client
           env:
             - name: VITE_API_URL
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: ulenor-secrets
                   key: API_URL
             - name: VITE_CONTRACT_ADDRESS
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: ulenor-secrets
                   key: CONTRACT_ADDRESS
             - name: VITE_PAYMENT_TOKEN_ADDRESS
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: ulenor-secrets
                   key: PAYMENT_TOKEN_ADDRESS
             - name: VITE_CADC_TOKEN_ADDRESS
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: ulenor-secrets
                   key: CADC_TOKEN_ADDRESS
             - name: VITE_PINATA_GATEWAY_URL
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: ulenor-secrets
                   key: PINATA_GATEWAY_URL
             - name: VITE_WALLETCONNECT_PROJECT_ID
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: ulenor-secrets
                   key: WALLETCONNECT_PROJECT_ID
           resources:
             requests:

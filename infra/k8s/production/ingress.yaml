@@ -1,8 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ip-factory-ingress
-  namespace: ip-factory
+  name: ulenor-ingress
+  namespace: ulenor
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
@@ -11,10 +11,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - chiselware.org
-      secretName: ip-factory-tls
+        - ulenor.com
+      secretName: ulenor-tls
   rules:
-    - host: chiselware.org
+    - host: ulenor.com
       http:
         paths:
           - path: /

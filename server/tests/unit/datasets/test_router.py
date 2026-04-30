@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 DEFAULT_ENV = {
-    "APP_NAME": "BridgeMart API",
+    "APP_NAME": "Ulenor API",
     "APP_VERSION": "0.1.0",
     "ENVIRONMENT": "test",
     "HOST": "localhost",

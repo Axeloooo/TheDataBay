@@ -18,7 +18,7 @@ import {
 } from "@/constants/env";
 import { appKitStorage } from "@/src/lib/appkit-storage";
 
-const appName = Constants.expoConfig?.name ?? "BridgeMart";
+const appName = Constants.expoConfig?.name ?? "Ulenor";
 const appScheme = Constants.expoConfig?.scheme ?? "mobile";
 
 export const SUPPORTED_EVM_NETWORK: Network = {
@@ -28,7 +28,7 @@ export const SUPPORTED_EVM_NETWORK: Network = {
       ? "Ethereum"
       : ENV.CHAIN_ID === 11155111
         ? "Sepolia"
-        : "BridgeMart Localnet",
+        : "Ulenor Localnet",
   nativeCurrency: {
     name: "Ether",
     symbol: "ETH",
@@ -82,9 +82,9 @@ export function getAppKit(): ReturnType<typeof createAppKit> | null {
       projectId: ENV.WALLETCONNECT_PROJECT_ID,
       metadata: {
         name: appName,
-        description: "BridgeMart decentralized dataset marketplace",
-        url: "https://bridgemart.app",
-        icons: ["https://bridgemart.app/icon.png"],
+        description: "Ulenor decentralized dataset marketplace",
+        url: "https://ulenor.com",
+        icons: ["https://ulenor.com/icon.png"],
         redirect: {
           native: appScheme + "://",
         },

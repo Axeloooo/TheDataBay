@@ -238,7 +238,7 @@ export default function UploadScreen() {
             Upload, embed, and list from mobile
           </Text>
           <Text style={[styles.subtitle, { color: palette.subtleText }]}>
-            BridgeMart mobile mirrors the web listing flow: submit your CSV,
+            Ulenor mobile mirrors the web listing flow: submit your CSV,
             enter the USDC settlement amount, preview quote values, then create
             the on-chain listing with WalletConnect.
           </Text>

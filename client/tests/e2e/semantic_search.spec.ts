@@ -13,8 +13,8 @@ const __dirname: string = path.dirname(__filename);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const WALLET_STORAGE_KEY: string = "bridgemart_wallet_v4";
-const UPLOAD_STORAGE_KEY: string = "bridgemart_upload_store_v1";
+const WALLET_STORAGE_KEY: string = "ulenor_wallet_v4";
+const UPLOAD_STORAGE_KEY: string = "ulenor_upload_store_v1";
 const BACKEND_URL: string =
   process.env.E2E_BACKEND_URL ?? "http://localhost:8080";
 

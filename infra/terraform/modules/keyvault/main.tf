@@ -1,12 +1,12 @@
 data "azurerm_client_config" "current" {}
 
 resource "azurerm_key_vault" "main" {
-  name                      = var.vault_name
-  location                  = var.location
-  resource_group_name       = var.resource_group_name
-  tenant_id                 = var.tenant_id
-  sku_name                  = "standard"
-  tags                      = var.tags
+  name                = var.vault_name
+  location            = var.location
+  resource_group_name = var.resource_group_name
+  tenant_id           = var.tenant_id
+  sku_name            = "standard"
+  tags                = var.tags
 
   rbac_authorization_enabled = true
   purge_protection_enabled   = true

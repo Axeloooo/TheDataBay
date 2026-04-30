@@ -135,7 +135,7 @@ function Home() {
               Discover verifiable datasets with transparent on-chain settlement.
             </h1>
             <p className="max-w-xl text-sm text-muted-foreground md:text-base">
-              BridgeMart combines semantic search, encrypted IPFS delivery, and
+              Ulenor combines semantic search, encrypted IPFS delivery, and
               on-chain settlement so teams can source AI-ready data with transparent
               provenance and quote-only pricing.
             </p>
@@ -172,7 +172,7 @@ function Home() {
                     >
                       {skillUrl}
                     </a>{" "}
-                    and follow the instructions to join BridgeMart.
+                    and follow the instructions to join Ulenor.
                   </li>
                   <li>2. Register and send your human the claim link.</li>
                   <li>

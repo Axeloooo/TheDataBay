@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-BridgeMart is a decentralized dataset marketplace monorepo with four main components:
+Ulenor is a decentralized dataset marketplace monorepo with four main components:
 
 - `client/` — React + Vite web frontend
 - `mobile/` — Expo React Native mobile app

@@ -102,10 +102,10 @@ async function getOrInitProvider(): Promise<UniversalProvider> {
   initPromise = UniversalProvider.init({
     projectId: ENV.WALLETCONNECT_PROJECT_ID,
     metadata: {
-      name: "BridgeMart",
+      name: "Ulenor",
       description: "Decentralized dataset marketplace",
-      url: "https://bridgemart.app",
-      icons: ["https://bridgemart.app/icon.png"],
+      url: "https://ulenor.com",
+      icons: ["https://ulenor.com/icon.png"],
       redirect: { native: appScheme + "://" },
     },
   }).then((provider) => {

@@ -8,10 +8,10 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 /**
- * @title BridgeMart Marketplace (single-chain now, CCIP-ready later)
+ * @title Ulenor Marketplace (single-chain now, CCIP-ready later)
  * @author Axel Sanchez (@Axeloooo)
  * @notice ERC-20 purchases on one chain. Later: CCIP can call _purchase() after cross-chain funds arrive.
- * @custom:security-contact security@bridgemart.com
+ * @custom:security-contact security@ulenor.com
  */
 contract Marketplace is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;

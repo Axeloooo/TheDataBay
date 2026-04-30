@@ -9,7 +9,7 @@ from app.shared import ipfs as pinata_service
 
 def make_settings(**overrides) -> Settings:
     data = {
-        "APP_NAME": "BridgeMart API",
+        "APP_NAME": "Ulenor API",
         "APP_VERSION": "0.1.0",
         "ENVIRONMENT": "development",
         "HOST": "localhost",
@@ -31,7 +31,7 @@ def make_settings(**overrides) -> Settings:
         "CHAIN_ID": 31337,
         "RPC_URL": "http://127.0.0.1:8545",
         "SERVER_PRIVATE_KEY": "0x" + "11" * 32,
-        "POSTGRES_URL": "mysql+pymysql://user:password@localhost:3306/bridgemart?charset=utf8mb4",
+        "POSTGRES_URL": "mysql+pymysql://user:password@localhost:3306/ulenor?charset=utf8mb4",
     }
     data.update(overrides)
     return Settings(_env_file=None, **data)

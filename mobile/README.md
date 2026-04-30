@@ -1,6 +1,6 @@
-# BridgeMart Mobile
+# Ulenor Mobile
 
-Expo + React Native mobile app for the BridgeMart decentralized dataset marketplace.
+Expo + React Native mobile app for the Ulenor decentralized dataset marketplace.
 
 ## Features
 
@@ -25,7 +25,7 @@ Expo + React Native mobile app for the BridgeMart decentralized dataset marketpl
 - Node.js 20+
 - Expo CLI (`npm install -g expo-cli`)
 - Expo Go app on your device, or an iOS/Android simulator
-- The BridgeMart backend running at `http://localhost:8080`
+- The Ulenor backend running at `http://localhost:8080`
 
 ### Install Dependencies
 

@@ -1,5 +1,6 @@
 """Integration test for DatasetEmbedService against a real pgvector DB."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -21,12 +22,13 @@ def _make_settings() -> Settings:
     return Settings(
         _env_file=None,
         **{
-            "APP_NAME": "BridgeMart API",
+            "APP_NAME": "Ulenor API",
             "APP_VERSION": "0.1.0",
             "ENVIRONMENT": "test",
             "HOST": "localhost",
             "PORT": 8080,
             "CORS_ORIGINS": ["http://localhost:5173"],
+            "OLLAMA_HOST": "http://localhost:11434",
             "EMBEDDING_MODEL": "nomic-embed-text",
             "EMBEDDING_DIMENSION": DIM,
             "MAX_FILE_SIZE_MB": 50,
@@ -46,7 +48,7 @@ def _make_settings() -> Settings:
             "CHAIN_ID": 31337,
             "RPC_URL": "http://127.0.0.1:8545",
             "SERVER_PRIVATE_KEY": "0x" + "11" * 32,
-            "POSTGRES_URL": "postgresql://user:password@localhost:5432/bridgemart",
+            "POSTGRES_URL": "postgresql://user:password@localhost:5432/ulenor",
         },
     )
 
@@ -79,15 +81,13 @@ async def _delete_rows(factory, listing_id: str) -> None:
     async with factory() as session:
         async with session.begin():
             await session.execute(
-                text(
-                    """
+                text("""
                     DELETE FROM langchain_pg_embedding e
                     USING langchain_pg_collection c
                     WHERE e.collection_id = c.uuid
                       AND c.name = 'dataset_rows'
                       AND e.cmetadata->>'listing_id' = :lid
-                    """
-                ),
+                    """),
                 {"lid": listing_id},
             )
             await session.execute(
@@ -112,42 +112,30 @@ async def test_embed_persists_rows_and_dataset_key(
         async def acreate_collection(self):
             async with committing_factory() as session:
                 async with session.begin():
-                    await session.execute(
-                        text(
-                            """
+                    await session.execute(text("""
                             INSERT INTO langchain_pg_collection (uuid, name, cmetadata)
                             VALUES ('00000000-0000-0000-0000-000000000001', 'dataset_rows', '{}')
                             ON CONFLICT (name) DO NOTHING
-                            """
-                        )
-                    )
+                            """))
 
         async def aadd_documents(self, documents, ids):
             async with committing_factory() as session:
                 async with session.begin():
                     for doc, doc_id in zip(documents, ids):
                         await session.execute(
-                            text(
-                                """
+                            text("""
                                 INSERT INTO langchain_pg_embedding
                                     (id, collection_id, embedding, document, cmetadata)
                                 VALUES
                                     (:id, '00000000-0000-0000-0000-000000000001',
                                      CAST(:embedding AS vector(768)), :document,
                                      CAST(:metadata AS jsonb))
-                                """
-                            ),
+                                """),
                             {
                                 "id": doc_id,
                                 "embedding": str([0.1] * DIM),
                                 "document": doc.page_content,
-                                "metadata": (
-                                    '{"listing_id": "%s", "row_index": %s}'
-                                    % (
-                                        doc.metadata["listing_id"],
-                                        doc.metadata["row_index"],
-                                    )
-                                ),
+                                "metadata": json.dumps(doc.metadata),
                             },
                         )
 
@@ -181,18 +169,16 @@ async def test_embed_persists_rows_and_dataset_key(
 
         async with committing_factory() as verify_session:
             emb_result = await verify_session.execute(
-                text(
-                    """
+                text("""
                     SELECT COUNT(*)
                     FROM langchain_pg_embedding e
                     JOIN langchain_pg_collection c ON c.uuid = e.collection_id
                     WHERE c.name = 'dataset_rows'
                       AND e.cmetadata->>'listing_id' = :lid
-                    """
-                ),
+                    """),
                 {"lid": response.listing_id},
             )
-            assert emb_result.scalar_one() == 5
+            assert emb_result.scalar_one() == 8
 
             key_result = await verify_session.execute(
                 text(

@@ -1,13 +1,13 @@
-# BridgeMart
+# Ulenor
 
-[![CI](https://github.com/Axeloooo/BridgeMart/actions/workflows/test.yml/badge.svg)](https://github.com/Axeloooo/BridgeMart/actions/workflows/test.yml)
-[![Release](https://github.com/Axeloooo/BridgeMart/actions/workflows/release.yml/badge.svg)](https://github.com/Axeloooo/BridgeMart/actions/workflows/release.yml)
-[![Tag](https://img.shields.io/github/v/tag/Axeloooo/BridgeMart?label=tag)](https://github.com/Axeloooo/BridgeMart/tags)
-[![License](https://img.shields.io/github/license/Axeloooo/BridgeMart)](https://github.com/Axeloooo/BridgeMart/blob/main/LICENSE)
-[![Issues](https://img.shields.io/github/issues/Axeloooo/BridgeMart)](https://github.com/Axeloooo/BridgeMart/issues)
-[![Pull Requests](https://img.shields.io/github/issues-pr/Axeloooo/BridgeMart)](https://github.com/Axeloooo/BridgeMart/pulls)
-[![Contributors](https://img.shields.io/github/contributors/Axeloooo/BridgeMart)](https://github.com/Axeloooo/BridgeMart/graphs/contributors)
-[![Repo Size](https://img.shields.io/github/repo-size/Axeloooo/BridgeMart)](https://github.com/Axeloooo/BridgeMart)
+[![CI](https://github.com/Axeloooo/Ulenor/actions/workflows/test.yml/badge.svg)](https://github.com/Axeloooo/Ulenor/actions/workflows/test.yml)
+[![Release](https://github.com/Axeloooo/Ulenor/actions/workflows/release.yml/badge.svg)](https://github.com/Axeloooo/Ulenor/actions/workflows/release.yml)
+[![Tag](https://img.shields.io/github/v/tag/Axeloooo/Ulenor?label=tag)](https://github.com/Axeloooo/Ulenor/tags)
+[![License](https://img.shields.io/github/license/Axeloooo/Ulenor)](https://github.com/Axeloooo/Ulenor/blob/main/LICENSE)
+[![Issues](https://img.shields.io/github/issues/Axeloooo/Ulenor)](https://github.com/Axeloooo/Ulenor/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/Axeloooo/Ulenor)](https://github.com/Axeloooo/Ulenor/pulls)
+[![Contributors](https://img.shields.io/github/contributors/Axeloooo/Ulenor)](https://github.com/Axeloooo/Ulenor/graphs/contributors)
+[![Repo Size](https://img.shields.io/github/repo-size/Axeloooo/Ulenor)](https://github.com/Axeloooo/Ulenor)
 
 Decentralized dataset marketplace with encrypted dataset delivery, on-chain listing/payment, and semantic discovery.
 
@@ -25,7 +25,7 @@ Decentralized dataset marketplace with encrypted dataset delivery, on-chain list
 
 ## 🔭 Overview
 
-BridgeMart includes:
+Ulenor includes:
 
 - `client/`: React + Vite frontend
 - `mobile/`: Expo React Native app (wallet, search, upload, purchases)
@@ -157,9 +157,9 @@ npm run start
 
 | Command                                                                             | What it does         |
 | ----------------------------------------------------------------------------------- | -------------------- |
-| `docker build -f infra/development/docker/client.Dockerfile -t bridgemart/client .` | Build frontend image |
-| `docker build -f infra/development/docker/server.Dockerfile -t bridgemart/server .` | Build backend image  |
-| `docker images \| grep bridgemart`                                                  | Verify built images  |
+| `docker build -f infra/development/docker/client.Dockerfile -t ulenor/client .` | Build frontend image |
+| `docker build -f infra/development/docker/server.Dockerfile -t ulenor/server .` | Build backend image  |
+| `docker images \| grep ulenor`                                                  | Verify built images  |
 
 ### ☸️ Minikube / Kubernetes / Tilt
 

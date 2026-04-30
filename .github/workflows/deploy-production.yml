@@ -1,0 +1,174 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+env:
+  IMAGE_REPOSITORY: ulenor
+  IMAGE_TAG: ${{ github.sha }}
+  PRODUCTION_DOMAIN: ${{ vars.PRODUCTION_DOMAIN || 'ulenor.com' }}
+  PINATA_GATEWAY_URL: ${{ vars.PINATA_GATEWAY_URL || 'https://gateway.pinata.cloud' }}
+  VITE_CHAIN_ID: ${{ vars.VITE_CHAIN_ID || '84532' }}
+  VITE_WALLETCONNECT_PROJECT_ID: ${{ vars.VITE_WALLETCONNECT_PROJECT_ID }}
+  VITE_CONTRACT_ADDRESS: ${{ vars.VITE_CONTRACT_ADDRESS }}
+  VITE_PAYMENT_TOKEN_ADDRESS: ${{ vars.VITE_PAYMENT_TOKEN_ADDRESS }}
+  VITE_CADC_TOKEN_ADDRESS: ${{ vars.VITE_CADC_TOKEN_ADDRESS }}
+
+jobs:
+  deploy:
+    name: Build, Push, and Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Validate production inputs
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          AKS_CLUSTER_NAME: ${{ vars.AKS_CLUSTER_NAME }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+        run: |
+          set -euo pipefail
+          : "${ACR_LOGIN_SERVER:?Set repository variable ACR_LOGIN_SERVER}"
+          : "${AKS_CLUSTER_NAME:?Set repository variable AKS_CLUSTER_NAME}"
+          : "${AZURE_RESOURCE_GROUP:?Set repository variable AZURE_RESOURCE_GROUP}"
+          : "${KEY_VAULT_NAME:?Set repository variable KEY_VAULT_NAME}"
+          if [[ "$PRODUCTION_DOMAIN" == http://* || "$PRODUCTION_DOMAIN" == https://* ]]; then
+            echo "PRODUCTION_DOMAIN must be a host like ulenor.com, not a URL."
+            exit 1
+          fi
+
+      - name: Azure login
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to Azure Container Registry
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+        run: |
+          set -euo pipefail
+          ACR_NAME="${ACR_LOGIN_SERVER%%.azurecr.io}"
+          az acr login --name "$ACR_NAME"
+
+      - name: Build and push API image
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+        run: |
+          set -euo pipefail
+          docker build \
+            -f infra/docker/production/server.Dockerfile \
+            -t "$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY/api:$IMAGE_TAG" \
+            .
+          docker push "$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY/api:$IMAGE_TAG"
+
+      - name: Build and push UI image
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+        run: |
+          set -euo pipefail
+          PRODUCTION_URL="https://$PRODUCTION_DOMAIN"
+          docker build \
+            -f infra/docker/production/client.Dockerfile \
+            --build-arg VITE_API_URL="$PRODUCTION_URL" \
+            --build-arg VITE_SERVER_URL="$PRODUCTION_URL" \
+            --build-arg VITE_PINATA_GATEWAY_URL="$PINATA_GATEWAY_URL" \
+            --build-arg VITE_WALLETCONNECT_PROJECT_ID="$VITE_WALLETCONNECT_PROJECT_ID" \
+            --build-arg VITE_CONTRACT_ADDRESS="$VITE_CONTRACT_ADDRESS" \
+            --build-arg VITE_PAYMENT_TOKEN_ADDRESS="$VITE_PAYMENT_TOKEN_ADDRESS" \
+            --build-arg VITE_CADC_TOKEN_ADDRESS="$VITE_CADC_TOKEN_ADDRESS" \
+            --build-arg VITE_CHAIN_ID="$VITE_CHAIN_ID" \
+            -t "$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY/ui:$IMAGE_TAG" \
+            .
+          docker push "$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY/ui:$IMAGE_TAG"
+
+      - name: Set AKS context
+        uses: azure/aks-set-context@v5
+        with:
+          resource-group: ${{ vars.AZURE_RESOURCE_GROUP }}
+          cluster-name: ${{ vars.AKS_CLUSTER_NAME }}
+
+      - name: Resolve AKS Key Vault identity
+        env:
+          AKS_CLUSTER_NAME: ${{ vars.AKS_CLUSTER_NAME }}
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+        run: |
+          set -euo pipefail
+          SECRETS_PROVIDER_CLIENT_ID="$(az aks show \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AKS_CLUSTER_NAME" \
+            --query addonProfiles.azureKeyvaultSecretsProvider.identity.clientId \
+            -o tsv)"
+          echo "SECRETS_PROVIDER_CLIENT_ID=$SECRETS_PROVIDER_CLIENT_ID" >> "$GITHUB_ENV"
+
+      - name: Render Kubernetes manifests
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+          KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          set -euo pipefail
+          RENDER_DIR="$RUNNER_TEMP/ulenor-k8s"
+          mkdir -p "$RENDER_DIR"
+          cp -R infra/k8s/production/. "$RENDER_DIR/"
+          find "$RENDER_DIR" -type f -name '*.yaml' -exec perl -pi -e '
+            s|<ACR_LOGIN_SERVER>|$ENV{ACR_LOGIN_SERVER}|g;
+            s|<TAG>|$ENV{IMAGE_TAG}|g;
+            s|<KEY_VAULT_NAME>|$ENV{KEY_VAULT_NAME}|g;
+            s|<AZURE_TENANT_ID>|$ENV{AZURE_TENANT_ID}|g;
+            s|<SECRETS_PROVIDER_CLIENT_ID>|$ENV{SECRETS_PROVIDER_CLIENT_ID}|g;
+            s|ulenor\.com|$ENV{PRODUCTION_DOMAIN}|g;
+          ' {} +
+          if grep -RInE '<[A-Z0-9_]+>' "$RENDER_DIR"; then
+            echo "Unrendered Kubernetes placeholders remain."
+            exit 1
+          fi
+          echo "K8S_RENDER_DIR=$RENDER_DIR" >> "$GITHUB_ENV"
+
+      - name: Deploy Kubernetes manifests
+        run: |
+          set -euo pipefail
+          kubectl apply -f "$K8S_RENDER_DIR/namespace.yaml"
+          kubectl apply -f "$K8S_RENDER_DIR/secret-provider-class.yaml"
+          kubectl apply -f "$K8S_RENDER_DIR/postgres-statefulset.yaml"
+          kubectl apply -f "$K8S_RENDER_DIR/ollama-deployment.yaml"
+          kubectl wait --namespace ulenor \
+            --for=condition=ready pod \
+            --selector=app=postgres \
+            --timeout=180s
+          kubectl wait --namespace ulenor \
+            --for=condition=ready pod \
+            --selector=app=ollama \
+            --timeout=600s
+          kubectl apply -f "$K8S_RENDER_DIR/cert-manager/cluster-issuer.yaml"
+          kubectl apply -f "$K8S_RENDER_DIR/backend-deployment.yaml"
+          kubectl apply -f "$K8S_RENDER_DIR/frontend-deployment.yaml"
+          kubectl apply -f "$K8S_RENDER_DIR/ingress.yaml"
+          kubectl apply -f "$K8S_RENDER_DIR/hpa.yaml"
+          kubectl apply -f "$K8S_RENDER_DIR/pdb.yaml"
+
+      - name: Verify rollout
+        run: |
+          set -euo pipefail
+          kubectl rollout status deployment/backend -n ulenor --timeout=180s
+          kubectl rollout status deployment/frontend -n ulenor --timeout=180s
+          kubectl get pods -n ulenor
+          kubectl get ingress -n ulenor

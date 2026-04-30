@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     cors_origins: list[str] = Field(alias="CORS_ORIGINS")
 
     # Ollama settings
+    ollama_host: str = Field(default="http://localhost:11434", alias="OLLAMA_HOST")
     embedding_model: str = Field(alias="EMBEDDING_MODEL")
     embedding_dimension: int = Field(default=768, alias="EMBEDDING_DIMENSION")
 

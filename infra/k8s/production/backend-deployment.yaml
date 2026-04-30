@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: backend
-  namespace: ip-factory
+  namespace: ulenor
 spec:
   replicas: 1
   selector:
@@ -22,33 +22,145 @@ spec:
       containers:
         - name: api
           # Replace <ACR_LOGIN_SERVER> and <TAG> after terraform apply and docker push
-          image: <ACR_LOGIN_SERVER>/ip-factory/api:<TAG>
+          image: <ACR_LOGIN_SERVER>/ulenor/api:<TAG>
           ports:
             - containerPort: 8080
-          envFrom:
-            - configMapRef:
-                name: ip-factory-config
           env:
+            - name: APP_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: APP_NAME
+            - name: APP_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: APP_VERSION
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: ENVIRONMENT
+            - name: HOST
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: HOST
+            - name: PORT
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: PORT
+            - name: CORS_ORIGINS
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: CORS_ORIGINS
+            - name: OLLAMA_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: OLLAMA_HOST
+            - name: EMBEDDING_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: EMBEDDING_MODEL
+            - name: EMBEDDING_DIMENSION
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: EMBEDDING_DIMENSION
+            - name: MAX_FILE_SIZE_MB
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: MAX_FILE_SIZE_MB
+            - name: MAX_DATASET_ROWS
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: MAX_DATASET_ROWS
+            - name: EMBEDDING_CHUNK_SIZE
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: EMBEDDING_CHUNK_SIZE
+            - name: TOP_K
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: TOP_K
+            - name: K_ROWS
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: K_ROWS
+            - name: SIMILARITY_THRESHOLD
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: SIMILARITY_THRESHOLD
+            - name: CACHE_MAXSIZE
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: CACHE_MAXSIZE
             - name: POSTGRES_URL
               valueFrom:
                 secretKeyRef:
-                  name: ip-factory-secrets
+                  name: ulenor-secrets
                   key: POSTGRES_URL
             - name: PINATA_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: ip-factory-secrets
+                  name: ulenor-secrets
                   key: PINATA_API_KEY
             - name: PINATA_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: ip-factory-secrets
+                  name: ulenor-secrets
                   key: PINATA_SECRET_KEY
+            - name: PINATA_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: PINATA_GATEWAY_URL
             - name: SERVER_PRIVATE_KEY
               valueFrom:
                 secretKeyRef:
-                  name: ip-factory-secrets
+                  name: ulenor-secrets
                   key: SERVER_PRIVATE_KEY
+            - name: CONTRACT_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: CONTRACT_ADDRESS
+            - name: PAYMENT_TOKEN_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: PAYMENT_TOKEN_ADDRESS
+            - name: CADC_TOKEN_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: CADC_TOKEN_ADDRESS
+            - name: CONTRACT_ABI_PATH
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: CONTRACT_ABI_PATH
+            - name: CHAIN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: CHAIN_ID
+            - name: RPC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: RPC_URL
           resources:
             requests:
               cpu: "100m"
@@ -78,13 +190,13 @@ spec:
             driver: secrets-store.csi.k8s.io
             readOnly: true
             volumeAttributes:
-              secretProviderClass: ip-factory-secrets-provider
+              secretProviderClass: ulenor-secrets-provider
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: backend-svc
-  namespace: ip-factory
+  namespace: ulenor
 spec:
   selector:
     app: backend

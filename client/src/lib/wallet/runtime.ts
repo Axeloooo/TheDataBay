@@ -129,10 +129,10 @@ class WalletRuntimeImpl implements WalletRuntime {
         chains: [configuredChain],
         showQrModal: true,
         metadata: {
-          name: "BridgeMart",
+          name: "Ulenor",
           description: "Decentralized dataset marketplace",
-          url: "https://bridgemart.app",
-          icons: ["https://bridgemart.app/icon.png"],
+          url: "https://ulenor.com",
+          icons: ["https://ulenor.com/icon.png"],
         },
       });
 

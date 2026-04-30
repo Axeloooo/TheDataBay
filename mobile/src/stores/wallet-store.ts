@@ -27,7 +27,7 @@ type WalletStore = WalletConnectionSnapshot &
     subscribeToRuntime: () => () => void;
   };
 
-const STORAGE_KEY = "bridgemart_wallet_store_v2";
+const STORAGE_KEY = "ulenor_wallet_store_v2";
 
 const initialConnection: WalletConnectionSnapshot = {
   address: null,

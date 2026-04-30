@@ -8,12 +8,13 @@ from pydantic import SecretStr, ValidationError
 from app.config.settings import Settings, get_settings
 
 ENV_TEMPLATE = """
-APP_NAME="BridgeMart API"
+APP_NAME="Ulenor API"
 APP_VERSION="0.1.0"
 ENVIRONMENT="development"
 HOST="localhost"
 PORT="8080"
 CORS_ORIGINS=["http://localhost:5173", "http://localhost:3000"]
+OLLAMA_HOST="http://ollama-svc:11434"
 EMBEDDING_MODEL="nomic-embed-text"
 MAX_FILE_SIZE_MB=50
 MAX_DATASET_ROWS=50000
@@ -31,7 +32,7 @@ CONTRACT_ABI_PATH="/tmp/Marketplace.json"
 CHAIN_ID=31337
 RPC_URL="http://127.0.0.1:8545"
 SERVER_PRIVATE_KEY="0x1111111111111111111111111111111111111111111111111111111111111111"
-POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/bridgemart"
+POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/ulenor"
 """
 
 
@@ -50,6 +51,7 @@ def clear_relevant_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "HOST",
         "PORT",
         "CORS_ORIGINS",
+        "OLLAMA_HOST",
         "EMBEDDING_MODEL",
         "MAX_FILE_SIZE_MB",
         "MAX_DATASET_ROWS",
@@ -79,7 +81,7 @@ def test_settings_loads_from_env_file(tmp_path, monkeypatch):
 
     s = Settings(_env_file=env_file)
 
-    assert s.app_name == "BridgeMart API"
+    assert s.app_name == "Ulenor API"
     assert s.app_version == "0.1.0"
     assert s.environment == "development"
 
@@ -88,6 +90,7 @@ def test_settings_loads_from_env_file(tmp_path, monkeypatch):
 
     assert s.cors_origins == ["http://localhost:5173", "http://localhost:3000"]
 
+    assert s.ollama_host == "http://ollama-svc:11434"
     assert s.embedding_model == "nomic-embed-text"
 
     assert s.max_file_size_mb == 50
@@ -113,7 +116,7 @@ def test_settings_loads_from_env_file(tmp_path, monkeypatch):
     assert isinstance(s.database_url, SecretStr)
     assert (
         s.database_url.get_secret_value()
-        == "postgresql+psycopg://user:password@localhost:5432/bridgemart"
+        == "postgresql+psycopg://user:password@localhost:5432/ulenor"
     )
 
 
@@ -122,12 +125,13 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
     env_file = write_env(
         tmp_path,
         """
-        APP_NAME="BridgeMart API"
+        APP_NAME="Ulenor API"
         APP_VERSION="0.1.0"
         ENVIRONMENT="development"
         HOST="0.0.0.0"
         PORT=8080
         CORS_ORIGINS=["http://a.com"]
+        OLLAMA_HOST="http://ollama:11434"
         EMBEDDING_MODEL="m"
         MAX_FILE_SIZE_MB="123"
         MAX_DATASET_ROWS="456"
@@ -144,13 +148,14 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
         CHAIN_ID="31337"
         RPC_URL="http://127.0.0.1:8545"
         SERVER_PRIVATE_KEY="0x1111111111111111111111111111111111111111111111111111111111111111"
-        POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/bridgemart"
+        POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/ulenor"
         """,
     )
 
     s = Settings(_env_file=env_file)
 
     assert isinstance(s.port, int) and s.port == 8080
+    assert s.ollama_host == "http://ollama:11434"
     assert isinstance(s.max_file_size_mb, int) and s.max_file_size_mb == 123
     assert isinstance(s.max_dataset_rows, int) and s.max_dataset_rows == 456
     assert isinstance(s.embedding_chunk_size, int) and s.embedding_chunk_size == 789
@@ -190,7 +195,7 @@ def test_missing_required_vars_raises_validation_error(tmp_path, monkeypatch):
     env_file = write_env(
         tmp_path,
         """
-        APP_NAME="BridgeMart API"
+        APP_NAME="Ulenor API"
         APP_VERSION="0.1.0"
         """,
     )
@@ -217,7 +222,7 @@ def test_invalid_cors_origins_format_raises(tmp_path, monkeypatch):
     env_file = write_env(
         tmp_path,
         """
-        APP_NAME="BridgeMart API"
+        APP_NAME="Ulenor API"
         APP_VERSION="0.1.0"
         ENVIRONMENT="development"
         HOST="localhost"
@@ -239,7 +244,7 @@ def test_invalid_cors_origins_format_raises(tmp_path, monkeypatch):
         CHAIN_ID=31337
         RPC_URL="http://127.0.0.1:8545"
         SERVER_PRIVATE_KEY="0x1111111111111111111111111111111111111111111111111111111111111111"
-        POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/bridgemart"
+        POSTGRES_URL="postgresql+psycopg://user:password@localhost:5432/ulenor"
         """,
     )
 
@@ -282,7 +287,7 @@ def test_get_settings_cache_behavior(monkeypatch, tmp_path):
     )
     monkeypatch.setenv(
         "POSTGRES_URL",
-        "postgresql+psycopg://user:password@localhost:5432/bridgemart",
+        "postgresql+psycopg://user:password@localhost:5432/ulenor",
     )
 
     get_settings.cache_clear()

@@ -5,7 +5,7 @@ from app.config.settings import Settings
 
 def make_settings(**overrides) -> Settings:
     data = {
-        "APP_NAME": "BridgeMart API",
+        "APP_NAME": "Ulenor API",
         "APP_VERSION": "0.1.0",
         "ENVIRONMENT": "development",
         "HOST": "localhost",
@@ -28,7 +28,7 @@ def make_settings(**overrides) -> Settings:
         "CHAIN_ID": 31337,
         "RPC_URL": "http://127.0.0.1:8545",
         "SERVER_PRIVATE_KEY": "0x" + "11" * 32,
-        "POSTGRES_URL": "postgresql://user:password@localhost:5432/bridgemart",
+        "POSTGRES_URL": "postgresql://user:password@localhost:5432/ulenor",
     }
     data.update(overrides)
     return Settings(_env_file=None, **data)

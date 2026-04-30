@@ -24,7 +24,7 @@ function HowItWorks() {
       icon: Search,
       title: "Search by Meaning",
       description:
-        "Describe what your model needs in plain language. BridgeMart ranks datasets by semantic similarity — so the right asset surfaces even when the listing uses different words.",
+        "Describe what your model needs in plain language. Ulenor ranks datasets by semantic similarity — so the right asset surfaces even when the listing uses different words.",
     },
     {
       icon: Shield,

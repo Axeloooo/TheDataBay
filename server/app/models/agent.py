@@ -2,7 +2,7 @@
 SQLModel for agentic integration layer.
 
 Defines Agent, AgentRecommendation, and AgentPurchaseRequest models
-for autonomous agent participation in the BridgeMart marketplace.
+for autonomous agent participation in the Ulenor marketplace.
 """
 
 from datetime import datetime, timezone

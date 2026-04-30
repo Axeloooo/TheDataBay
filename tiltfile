@@ -23,7 +23,7 @@ k8s_resource(
 ### UI ###
 
 docker_build_with_restart(
-    "bridgemart/client",
+    "ulenor/client",
     ".",
     dockerfile="./infra/docker/development/client.Dockerfile",
     entrypoint="npm run dev -- --host 0.0.0.0 --port 5173",
@@ -37,7 +37,7 @@ k8s_resource("client", port_forwards=5173, labels="client")
 ### API ###
 
 docker_build_with_restart(
-    "bridgemart/server",
+    "ulenor/server",
     ".",
     dockerfile="./infra/docker/development/server.Dockerfile",
     entrypoint="fastapi dev app/main.py --host 0.0.0.0 --port 8080",

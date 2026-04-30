@@ -20,10 +20,10 @@ from app.ai.service import (
     _score_label,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_item(listing_id: str, title: str = "Test Dataset") -> SimpleNamespace:
     return SimpleNamespace(
@@ -37,7 +37,6 @@ def make_item(listing_id: str, title: str = "Test Dataset") -> SimpleNamespace:
         settlement_decimals=6,
         purchase_count=0,
     )
-
 
 
 def make_service(
@@ -58,6 +57,7 @@ def make_service(
         "HOST": "localhost",
         "PORT": 8080,
         "CORS_ORIGINS": ["http://localhost"],
+        "OLLAMA_HOST": "http://localhost:11434",
         "EMBEDDING_MODEL": "nomic-embed-text",
         "MAX_FILE_SIZE_MB": 50,
         "MAX_DATASET_ROWS": 50000,
@@ -87,10 +87,13 @@ def make_service(
     contract_listing_fetcher = MagicMock(return_value=contract_items)
 
     if embedding_raises is not None:
+
         async def embedding_fn(text, settings):
             raise embedding_raises
+
     else:
         vec = embedding_vec or [0.1] * 768
+
         async def embedding_fn(text, settings):
             return vec, len(vec)
 
@@ -103,9 +106,16 @@ def make_service(
     return service, vectorstore, contract_listing_fetcher
 
 
-def make_doc(listing_id: str | None) -> SimpleNamespace:
-    metadata = {} if listing_id is None else {"listing_id": listing_id}
-    return SimpleNamespace(metadata=metadata)
+def make_doc(
+    listing_id: str | None,
+    *,
+    page_content: str = "",
+    metadata: dict | None = None,
+) -> SimpleNamespace:
+    merged_metadata = {} if listing_id is None else {"listing_id": listing_id}
+    if metadata:
+        merged_metadata.update(metadata)
+    return SimpleNamespace(metadata=merged_metadata, page_content=page_content)
 
 
 # ---------------------------------------------------------------------------
@@ -116,12 +126,14 @@ def make_doc(listing_id: str | None) -> SimpleNamespace:
 # bytes32 hex → UUID normalisation (Critical #1 fix)
 # ---------------------------------------------------------------------------
 
+
 class TestBytes32HexToUuid:
     """Verify the contract-id normalisation used to join pgvector hits with contract items."""
 
     def test_converts_known_uuid_roundtrip(self):
         # Simulate uuid_to_bytes32 then Web3.to_hex: uuid → bytes32 hex → uuid
         import uuid as _uuid
+
         original = "a8b3f2c1-47b3-4d8e-9f3e-123456789abc"
         u = _uuid.UUID(original)
         # bytes32 = 16 UUID bytes + 16 zero bytes
@@ -164,22 +176,19 @@ class TestClamp:
 
 
 class TestScoreLabel:
-    def test_high_above_066(self):
-        assert _score_label(0.67) == "high"
+    def test_high_at_075(self):
+        assert _score_label(0.75) == "high"
 
-    def test_high_boundary_just_above(self):
-        assert _score_label(0.661) == "high"
+    def test_moderate_below_075(self):
+        assert _score_label(0.749) == "moderate"
 
-    def test_moderate_above_033_below_066(self):
+    def test_moderate_at_050(self):
         assert _score_label(0.5) == "moderate"
 
-    def test_moderate_boundary_just_above(self):
-        assert _score_label(0.331) == "moderate"
+    def test_low_below_050(self):
+        assert _score_label(0.499) == "low"
 
-    def test_low_at_033(self):
-        assert _score_label(0.33) == "low"
-
-    def test_low_below_033(self):
+    def test_low_above_threshold_band(self):
         assert _score_label(0.1) == "low"
 
     def test_low_at_zero(self):
@@ -250,16 +259,19 @@ def test_negative_raw_score_clamped_to_zero():
 # rank_datasets — score_label derivation
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("raw_score,expected_label", [
-    (0.9,  "high"),
-    (0.67, "high"),
-    (0.66, "moderate"),   # not > 0.66, so moderate
-    (0.5,  "moderate"),
-    (0.34, "moderate"),
-    (0.33, "low"),        # not > 0.33, so low
-    (0.1,  "low"),
-    (0.0,  "low"),
-])
+
+@pytest.mark.parametrize(
+    "raw_score,expected_label",
+    [
+        (0.9, "high"),
+        (0.75, "high"),
+        (0.74, "moderate"),
+        (0.5, "moderate"),
+        (0.49, "low"),
+        (0.1, "low"),
+        (0.0, "low"),
+    ],
+)
 def test_score_label_derivation(raw_score: float, expected_label: str):
     items = [make_item("0xDDD")]
     service, _, _ = make_service(
@@ -275,6 +287,7 @@ def test_score_label_derivation(raw_score: float, expected_label: str):
 # ---------------------------------------------------------------------------
 # rank_datasets — threshold filtering
 # ---------------------------------------------------------------------------
+
 
 def test_threshold_filtering_happens_after_clamping():
     """Score is clamped first; then compared against threshold."""
@@ -311,6 +324,7 @@ def test_threshold_filters_low_clamped_score():
 # rank_datasets — stale hits
 # ---------------------------------------------------------------------------
 
+
 def test_stale_pgvector_hit_is_skipped():
     """A listing_id returned by pgvector that is not in contract items is skipped.
 
@@ -326,7 +340,10 @@ def test_stale_pgvector_hit_is_skipped():
 
     live_item = make_item(live_bytes32_hex, "Live Dataset")
     service, _, _ = make_service(
-        row_hits=[(make_doc("stale-uuid-not-on-chain"), 0.1), (make_doc(live_uuid), 0.3)],
+        row_hits=[
+            (make_doc("stale-uuid-not-on-chain"), 0.1),
+            (make_doc(live_uuid), 0.3),
+        ],
         contract_items=[live_item],
     )
 
@@ -351,6 +368,7 @@ def test_all_stale_returns_empty_list():
 # rank_datasets — empty pgvector result
 # ---------------------------------------------------------------------------
 
+
 def test_empty_repo_hits_returns_empty_list():
     service, _, _ = make_service(
         row_hits=[],
@@ -365,6 +383,7 @@ def test_empty_repo_hits_returns_empty_list():
 # ---------------------------------------------------------------------------
 # rank_datasets — EmbeddingError
 # ---------------------------------------------------------------------------
+
 
 def test_embedding_failure_raises_embedding_error():
     from fastapi import HTTPException as FastAPIHTTPException
@@ -418,14 +437,27 @@ def test_rank_datasets_overfetches_rows_for_listing_aggregation():
     asyncio.run(service.rank_datasets("query", limit=20))
 
     assert (
-        vectorstore.asimilarity_search_with_score_by_vector.await_args.kwargs["k"]
-        == 200
+        vectorstore.asimilarity_search_with_score_by_vector.await_args.kwargs["k"] == 2
     )
+
+
+def test_rank_datasets_caps_final_results_with_top_k():
+    items = [make_item(f"listing-{index}") for index in range(12)]
+    row_hits = [
+        (make_doc(f"listing-{index}", page_content=f"heart age data {index}"), 0.05)
+        for index in range(12)
+    ]
+    service, _, _ = make_service(row_hits=row_hits, contract_items=items)
+
+    results = asyncio.run(service.rank_datasets("heart age", limit=20))
+
+    assert len(results) == 10
 
 
 # ---------------------------------------------------------------------------
 # rank_datasets — field mapping
 # ---------------------------------------------------------------------------
+
 
 def test_ranked_dataset_fields_are_mapped_correctly():
     """Verify all RankedDataset fields are populated from the contract item.
@@ -452,14 +484,114 @@ def test_ranked_dataset_fields_are_mapped_correctly():
 
     assert len(results) == 1
     r = results[0]
-    assert r.listing_id == listing_uuid   # UUID format, not bytes32 hex
+    assert r.listing_id == listing_uuid  # UUID format, not bytes32 hex
     assert r.title == "Climate Data"
     assert r.description == "Climate measurements"
     assert r.seller == "0xSellerAddr"
     assert r.payment_token == "0x0000000000000000000000000000000000000002"
-    assert r.price_atomic == 250          # int, not str
+    assert r.price_atomic == 250  # int, not str
     assert r.settlement_currency == "USDC"
     assert r.settlement_decimals == 6
     assert r.purchase_count == 0
     assert isinstance(r.score, float)
     assert r.score_label in ("high", "moderate", "low")
+
+
+def test_dog_and_cat_queries_do_not_promote_dense_only_matches():
+    items = [make_item("heart-listing", "Heart CSV")]
+    service, _, _ = make_service(
+        row_hits=[
+            (
+                make_doc(
+                    "heart-listing",
+                    page_content="Heart dataset. age = 37; sex = male; chol = 263",
+                    metadata={
+                        "doc_type": "row",
+                        "columns": ["age", "sex", "chol"],
+                        "numeric_fields": {"age": 37, "chol": 263},
+                        "text_fields": {"sex": "male"},
+                    },
+                ),
+                0.05,
+            )
+        ],
+        contract_items=items,
+        similarity_threshold=0.3,
+    )
+
+    assert asyncio.run(service.rank_datasets("dog", limit=10)) == []
+    assert asyncio.run(service.rank_datasets("cat", limit=10)) == []
+
+
+def test_age_column_evidence_retains_out_of_range_age_as_low_relevance():
+    items = [make_item("heart-listing", "Heart CSV")]
+    service, _, _ = make_service(
+        row_hits=[
+            (
+                make_doc(
+                    "heart-listing",
+                    page_content="Heart dataset. age = 37; chol = 263",
+                    metadata={
+                        "doc_type": "row",
+                        "columns": ["age", "chol"],
+                        "numeric_fields": {"age": 37, "chol": 263},
+                    },
+                ),
+                0.45,
+            )
+        ],
+        contract_items=items,
+        similarity_threshold=0.3,
+    )
+
+    results = asyncio.run(service.rank_datasets("age 18", limit=10))
+
+    assert len(results) == 1
+    assert results[0].listing_id == "heart-listing"
+    assert results[0].score_label == "low"
+    assert 0.3 <= results[0].score < 0.5
+
+
+def test_numeric_and_field_evidence_ranks_heart_dataset_above_unrelated_listing():
+    items = [
+        make_item("unrelated-listing", "Retail sales"),
+        make_item("heart-listing", "Heart disease sample"),
+    ]
+    service, _, _ = make_service(
+        row_hits=[
+            (
+                make_doc(
+                    "unrelated-listing",
+                    page_content="Retail data. revenue = 263; store = west",
+                    metadata={
+                        "doc_type": "row",
+                        "columns": ["revenue", "store"],
+                        "numeric_fields": {"revenue": 263},
+                        "text_fields": {"store": "west"},
+                    },
+                ),
+                0.12,
+            ),
+            (
+                make_doc(
+                    "heart-listing",
+                    page_content="Heart dataset. age = 37; sex = male; cholesterol/chol = 263",
+                    metadata={
+                        "doc_type": "row",
+                        "columns": ["age", "sex", "chol"],
+                        "numeric_fields": {"age": 37, "chol": 263},
+                        "text_fields": {"sex": "male"},
+                    },
+                ),
+                0.2,
+            ),
+        ],
+        contract_items=items,
+        similarity_threshold=0.3,
+    )
+
+    results = asyncio.run(service.rank_datasets("men age 37 with chol 266", limit=10))
+
+    assert results[0].listing_id == "heart-listing"
+    assert "unrelated-listing" not in [result.listing_id for result in results[:1]]
+    assert results[0].score_label in {"high", "moderate"}

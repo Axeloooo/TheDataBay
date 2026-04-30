@@ -43,7 +43,7 @@ type UploadStore = {
   createItemOnChain: (address: string | null) => Promise<string | null>;
 };
 
-const STORAGE_KEY = "bridgemart_upload_store_v3";
+const STORAGE_KEY = "ulenor_upload_store_v3";
 const ZERO_BYTES32 = `0x${"0".repeat(64)}`;
 
 function settlementDecimalsFor(currency: SettlementCurrency): number {

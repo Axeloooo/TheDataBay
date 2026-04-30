@@ -1,7 +1,7 @@
 def test_health_check_returns_service_metadata(
     client, override_settings, settings_factory
 ):
-    settings = settings_factory(APP_NAME="BridgeMart Health", APP_VERSION="1.2.3")
+    settings = settings_factory(APP_NAME="Ulenor Health", APP_VERSION="1.2.3")
     override_settings(settings=settings)
 
     response = client.get("/health/")
@@ -10,7 +10,7 @@ def test_health_check_returns_service_metadata(
     assert response.json() == {
         "status": "healthy",
         "version": "1.2.3",
-        "service": "BridgeMart Health",
+        "service": "Ulenor Health",
     }
 
 

@@ -6,12 +6,12 @@ function readEnv(name: string, fallback = "") {
 }
 
 const config: ExpoConfig = {
-  name: "BridgeMart",
-  slug: "mobile",
+  name: "Ulenor",
+  slug: "ulenor",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: "mobile",
+  scheme: "ulenor",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {

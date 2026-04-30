@@ -1,6 +1,6 @@
-# BridgeMart FastAPI Backend
+# Ulenor FastAPI Backend
 
-FastAPI backend service for BridgeMart AI workloads and API orchestration.
+FastAPI backend service for Ulenor AI workloads and API orchestration.
 
 ## Project Structure
 
@@ -96,8 +96,10 @@ The `/api/v1/datasets/embed` endpoint implements a complete dataset ingestion pi
 
 - Accepts multipart CSV upload
 - Automatically detects headers in CSV files
-- Loads row documents through `CSVLoader` from `langchain_community`
-- Generates and stores row embeddings using LangChain PGVector
+- Loads CSV rows with LangChain `CSVLoader`
+- Normalizes row text and typed metadata for tabular evidence scoring
+- Splits table context with `RecursiveCharacterTextSplitter`
+- Stores row/chunk embeddings with LangChain PGVector + Ollama embeddings
 - Encrypts the raw CSV with AES-GCM and uploads ciphertext to IPFS
 - Returns listing ID, dataset URL/hash, preview, vector spec, and dataset statistics
 
@@ -168,7 +170,7 @@ Key settings:
 
 - `OLLAMA_HOST` - Ollama server URL (default: http://localhost:11434)
 - `EMBEDDING_MODEL` - Model for embeddings (default: nomic-embed-text)
-- `THINKING_MODEL` - Model for query rewriting (default: llama3.2:latest)
+- `SIMILARITY_THRESHOLD` - Minimum calibrated relevance score (production default: 0.30)
 - `CORS_ORIGINS` - Allowed CORS origins (default: http://localhost:5173)
 
 ## Development

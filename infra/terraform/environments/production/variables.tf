@@ -7,7 +7,7 @@ variable "location" {
 variable "project_name" {
   description = "Project name used for resource naming"
   type        = string
-  default     = "research"
+  default     = "ulenor"
 }
 
 variable "environment" {
@@ -89,5 +89,5 @@ variable "aks_subnet_prefix" {
 variable "domain_name" {
   description = "Domain name for DNS zone"
   type        = string
-  default     = "chiselware.org"
+  default     = "ulenor.com"
 }

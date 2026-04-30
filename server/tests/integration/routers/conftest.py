@@ -9,7 +9,7 @@ collection.  This mirrors the pattern used in tests/unit/api/conftest.py.
 import os
 
 _REQUIRED_DEFAULTS = {
-    "APP_NAME": "BridgeMart API",
+    "APP_NAME": "Ulenor API",
     "APP_VERSION": "0.1.0",
     "ENVIRONMENT": "test",
     "HOST": "localhost",
@@ -31,7 +31,7 @@ _REQUIRED_DEFAULTS = {
     "CHAIN_ID": "31337",
     "RPC_URL": "http://127.0.0.1:8545",
     "SERVER_PRIVATE_KEY": "0x" + "11" * 32,
-    "POSTGRES_URL": "postgresql://user:password@localhost:5432/bridgemart",
+    "POSTGRES_URL": "postgresql://user:password@localhost:5432/ulenor",
 }
 
 for _key, _val in _REQUIRED_DEFAULTS.items():

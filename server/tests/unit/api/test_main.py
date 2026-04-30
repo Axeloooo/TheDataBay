@@ -10,7 +10,7 @@ def test_root_returns_service_info_and_request_id(
     client, override_settings, settings_factory, caplog
 ):
     settings = settings_factory(
-        APP_NAME="BridgeMart Test API",
+        APP_NAME="Ulenor Test API",
         APP_VERSION="9.9.9",
         ENVIRONMENT="test",
     )
@@ -23,7 +23,7 @@ def test_root_returns_service_info_and_request_id(
     assert response.status_code == 200
     assert response.headers["x-request-id"]
     assert response.json() == {
-        "service": "BridgeMart Test API",
+        "service": "Ulenor Test API",
         "version": "9.9.9",
         "environment": "test",
         "links": {

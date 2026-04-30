@@ -41,7 +41,7 @@ export type FxRates = {
   updatedAt: number;
 };
 
-const FX_CACHE_KEY = "bridgemart_fx_rates_v1";
+const FX_CACHE_KEY = "ulenor_fx_rates_v1";
 const DEFAULT_TTL_MS = 60_000;
 
 export async function fetchFxRates(): Promise<FxRates> {

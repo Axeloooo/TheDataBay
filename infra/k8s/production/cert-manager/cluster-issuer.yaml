@@ -5,7 +5,7 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: admin@chiselware.org
+    email: admin@ulenor.com
     privateKeySecretRef:
       name: letsencrypt-prod-private-key
     solvers:

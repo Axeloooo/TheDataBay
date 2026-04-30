@@ -16,7 +16,7 @@ def _seed_required_env() -> None:
     """Provide import-time settings for app.main during test collection."""
 
     defaults = {
-        "APP_NAME": "BridgeMart API",
+        "APP_NAME": "Ulenor API",
         "APP_VERSION": "0.1.0",
         "ENVIRONMENT": "test",
         "HOST": "localhost",
@@ -64,7 +64,7 @@ _REGISTERED_MODELS = (
 
 def make_settings(**overrides: Any) -> Settings:
     data = {
-        "APP_NAME": "BridgeMart API",
+        "APP_NAME": "Ulenor API",
         "APP_VERSION": "0.1.0",
         "ENVIRONMENT": "development",
         "HOST": "localhost",

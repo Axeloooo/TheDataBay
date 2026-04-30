@@ -13,6 +13,9 @@ docs/
 # Dotenv file
 .env
 
+# Terraform local working directories
+.terraform/
+
 # Logs
 logs
 *.log

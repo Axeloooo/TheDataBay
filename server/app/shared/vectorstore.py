@@ -9,16 +9,21 @@ DATASET_ROWS_COLLECTION = "dataset_rows"
 
 
 @lru_cache(maxsize=32)
-def get_embeddings(model: str) -> OllamaEmbeddings:
+def get_embeddings(model: str, base_url: str) -> OllamaEmbeddings:
     """Return a cached LangChain Ollama embeddings client for a model."""
-    return OllamaEmbeddings(model=model)
+    return OllamaEmbeddings(model=model, base_url=base_url)
 
 
 @lru_cache(maxsize=32)
-def get_vectorstore(connection: str, model: str, embedding_dimension: int) -> PGVector:
+def get_vectorstore(
+    connection: str,
+    model: str,
+    ollama_host: str,
+    embedding_dimension: int,
+) -> PGVector:
     """Return a cached async LangChain PGVector store for dataset rows."""
     return PGVector(
-        embeddings=get_embeddings(model),
+        embeddings=get_embeddings(model, ollama_host),
         collection_name=DATASET_ROWS_COLLECTION,
         connection=connection,
         embedding_length=embedding_dimension,
@@ -33,6 +38,7 @@ def vectorstore_for_settings(settings: Settings) -> PGVector:
     return get_vectorstore(
         settings.psycopg_database_url,
         settings.embedding_model,
+        settings.ollama_host,
         settings.embedding_dimension,
     )
 
@@ -48,7 +54,9 @@ def warmup_model(settings: Settings) -> bool:
     """
 
     try:
-        vector = get_embeddings(settings.embedding_model).embed_query("warmup")
+        vector = get_embeddings(
+            settings.embedding_model, settings.ollama_host
+        ).embed_query("warmup")
         actual_dim = len(vector)
         if actual_dim != settings.embedding_dimension:
             raise ValueError(
