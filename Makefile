@@ -237,7 +237,7 @@ sync-contract-config:
 	echo "Syncing deployed addresses to .env and secrets.yaml..."; \
 	if [ -f ".env" ]; then \
 		perl -0pi -e 's/^CONTRACT_ADDRESS=.*$$/CONTRACT_ADDRESS="'"$$ADDR"'"/m' .env; \
-		perl -0pi -e 's/^PAYMENT_TOKEN_ADDRESS=.*$$/PAYMENT_TOKEN_ADDRESS="'"$$TOKEN"'"/m' .env; \
+		perl -0pi -e 's/^USDC_TOKEN_ADDRESS=.*$$/USDC_TOKEN_ADDRESS="'"$$TOKEN"'"/m' .env; \
 		perl -0pi -e 's/^CADC_TOKEN_ADDRESS=.*$$/CADC_TOKEN_ADDRESS="'"$$CADC_TOKEN"'"/m' .env; \
 		echo "Updated .env"; \
 	fi; \
@@ -245,7 +245,7 @@ sync-contract-config:
 		cp "infra/k8s/development/secrets.yaml" "infra/k8s/development/secrets.yaml.bak"; \
 		perl -0pi -e 's/CONTRACT_ADDRESS: *"?[^"\n]*"?/CONTRACT_ADDRESS: "'"$$ADDR"'"/' \
 			infra/k8s/development/secrets.yaml; \
-		perl -0pi -e 's/PAYMENT_TOKEN_ADDRESS: *"?[^"\n]*"?/PAYMENT_TOKEN_ADDRESS: "'"$$TOKEN"'"/' \
+		perl -0pi -e 's/USDC_TOKEN_ADDRESS: *"?[^"\n]*"?/USDC_TOKEN_ADDRESS: "'"$$TOKEN"'"/' \
 			infra/k8s/development/secrets.yaml; \
 		perl -0pi -e 's/CADC_TOKEN_ADDRESS: *"?[^"\n]*"?/CADC_TOKEN_ADDRESS: "'"$$CADC_TOKEN"'"/' \
 			infra/k8s/development/secrets.yaml; \

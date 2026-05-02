@@ -18,7 +18,7 @@ import { normalizeAtomicString } from "@/lib/atomic";
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS as
   | string
   | undefined;
-const PAYMENT_TOKEN_ADDRESS = import.meta.env.VITE_PAYMENT_TOKEN_ADDRESS as
+const USDC_TOKEN_ADDRESS = import.meta.env.VITE_USDC_TOKEN_ADDRESS as
   | string
   | undefined;
 const CADC_TOKEN_ADDRESS = import.meta.env.VITE_CADC_TOKEN_ADDRESS as
@@ -59,25 +59,25 @@ function getContractAddress(): string {
   }
 }
 
-export function getPaymentTokenAddress(): string {
-  if (!PAYMENT_TOKEN_ADDRESS) {
-    throw new Error("Missing VITE_PAYMENT_TOKEN_ADDRESS");
+export function getUsdcTokenAddress(): string {
+  if (!USDC_TOKEN_ADDRESS) {
+    throw new Error("Missing VITE_USDC_TOKEN_ADDRESS");
   }
-  const normalized = PAYMENT_TOKEN_ADDRESS.trim();
+  const normalized = USDC_TOKEN_ADDRESS.trim();
   if (!normalized) {
-    throw new Error("VITE_PAYMENT_TOKEN_ADDRESS is empty");
+    throw new Error("VITE_USDC_TOKEN_ADDRESS is empty");
   }
   try {
     const address = getAddress(normalized);
     if (address === ZeroAddress) {
-      throw new Error("VITE_PAYMENT_TOKEN_ADDRESS cannot be zero.");
+      throw new Error("VITE_USDC_TOKEN_ADDRESS cannot be zero.");
     }
     return address;
   } catch (error) {
     if (error instanceof Error && error.message.includes("cannot be zero")) {
       throw error;
     }
-    throw new Error(`Invalid VITE_PAYMENT_TOKEN_ADDRESS: ${normalized}`);
+    throw new Error(`Invalid VITE_USDC_TOKEN_ADDRESS: ${normalized}`);
   }
 }
 
@@ -103,12 +103,12 @@ export function getCadcTokenAddress(): string {
   }
 }
 
-export function getPaymentTokenAddressForCurrency(
+export function getUsdcTokenAddressForCurrency(
   currency: SettlementCurrency,
 ): string {
   switch (currency) {
     case "USDC":
-      return getPaymentTokenAddress();
+      return getUsdcTokenAddress();
     case "CADC":
       return getCadcTokenAddress();
   }
@@ -224,7 +224,7 @@ export async function getFeeBps(): Promise<bigint> {
 export async function buyItemTx(
   listingIdBytes32: string,
   priceAtomic: bigint,
-  paymentTokenAddress: string,
+  usdcTokenAddress: string,
 ): Promise<string> {
   try {
     const provider = await getEvmProvider();
@@ -234,7 +234,7 @@ export async function buyItemTx(
     const feeBps = await contract.feeBps();
     const fee = (priceAtomic * BigInt(feeBps)) / 10_000n;
     const total = priceAtomic + fee;
-    const paymentToken = getAddress(paymentTokenAddress);
+    const paymentToken = getAddress(usdcTokenAddress);
     if (paymentToken === ZeroAddress) {
       throw new Error("Marketplace payment token is not configured.");
     }

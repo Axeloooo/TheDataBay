@@ -249,7 +249,7 @@ def test_item_view_to_schema_derives_cadc_from_unmapped_18_decimal_token(setting
     )
     configured_settings = settings.model_copy(
         update={
-            "payment_token_address": "0x0000000000000000000000000000000000000002",
+            "usdc_token_address": "0x0000000000000000000000000000000000000002",
             "cadc_token_address": "",
         }
     )
@@ -294,7 +294,7 @@ def test_item_view_to_schema_without_configured_payment_token_returns_usdc_fallb
     payment_token = Web3.to_checksum_address(
         "0x0000000000000000000000000000000000000004"
     )
-    unconfigured_settings = settings.model_copy(update={"payment_token_address": ""})
+    unconfigured_settings = settings.model_copy(update={"usdc_token_address": ""})
 
     item = contract_service._item_view_to_schema(
         AttributeDict(
@@ -332,7 +332,7 @@ def test_settlement_currency_for_token_resolves_cadc_address(settings):
 
 
 def test_settlement_currency_for_token_resolves_usdc_address(settings):
-    usdc_address = settings.payment_token_address
+    usdc_address = settings.usdc_token_address
 
     result = contract_service._settlement_currency_for_token(usdc_address, settings)
 
@@ -372,7 +372,7 @@ def test_max_price_reads_first_accepted_token_config(monkeypatch, settings):
         lambda _settings: SimpleNamespace(functions=FakeFunctions()),
     )
 
-    unconfigured_settings = settings.model_copy(update={"payment_token_address": ""})
+    unconfigured_settings = settings.model_copy(update={"usdc_token_address": ""})
 
     assert contract_service.max_price(unconfigured_settings) == 123456
     assert captured == {
@@ -384,7 +384,7 @@ def test_max_price_reads_first_accepted_token_config(monkeypatch, settings):
 def test_max_price_prefers_configured_payment_token(monkeypatch, settings):
     configured_settings = settings.model_copy(
         update={
-            "payment_token_address": "0x0000000000000000000000000000000000000002"
+            "usdc_token_address": "0x0000000000000000000000000000000000000002"
         }
     )
     captured = {}

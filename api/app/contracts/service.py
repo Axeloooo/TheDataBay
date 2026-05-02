@@ -269,18 +269,18 @@ def _to_hex(value: Any) -> str:
 
 
 def _payment_token_from_settings(settings: Settings) -> str | None:
-    if not settings.payment_token_address:
+    if not settings.usdc_token_address:
         return None
     try:
-        return Web3.to_checksum_address(settings.payment_token_address)
+        return Web3.to_checksum_address(settings.usdc_token_address)
     except ValueError as exc:
-        _raise_internal_config("Invalid PAYMENT_TOKEN_ADDRESS configuration", exc)
+        _raise_internal_config("Invalid USDC_TOKEN_ADDRESS configuration", exc)
         raise
 
 
 def _token_symbol_table(settings: Settings) -> dict[str, str]:
     table = {}
-    for symbol, attr in [("USDC", "payment_token_address"), ("CADC", "cadc_token_address")]:
+    for symbol, attr in [("USDC", "usdc_token_address"), ("CADC", "cadc_token_address")]:
         addr = getattr(settings, attr, "")
         if not addr:
             continue
@@ -846,7 +846,7 @@ def create_item(
     except ValueError as exc:
         _raise_bad_request("Invalid seller EVM address", exc)
     try:
-        payment_token_address = Web3.to_checksum_address(payment_token)
+        usdc_token_address = Web3.to_checksum_address(payment_token)
     except ValueError as exc:
         _raise_bad_request("Invalid payment token EVM address", exc)
     try:
@@ -859,7 +859,7 @@ def create_item(
         title,
         description,
         seller_address,
-        payment_token_address,
+        usdc_token_address,
         price,
         dataset_url,
         dataset_hash_bytes,

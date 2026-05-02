@@ -242,7 +242,7 @@ For Tilt/Kubernetes, set `infra/k8s/development/secrets.yaml` `RPC_URL` to a hos
 - Verify MetaMask network is your anvil chain (`31337` by default).
 - Verify selected account matches expected seller flow for `createItem`.
 - Verify `VITE_CONTRACT_ADDRESS` points to deployed contract on the same chain.
-- Verify `VITE_PAYMENT_TOKEN_ADDRESS` points to the accepted USDC token for that deployment.
+- Verify `VITE_USDC_TOKEN_ADDRESS` points to the accepted USDC token for that deployment.
 
 ### Error: no contract code found at configured address
 

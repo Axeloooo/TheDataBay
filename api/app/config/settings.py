@@ -60,7 +60,7 @@ class Settings(BaseSettings):
 
     # Smart contract settings
     contract_address: str = Field(alias="CONTRACT_ADDRESS")
-    payment_token_address: str = Field(default="", alias="PAYMENT_TOKEN_ADDRESS")
+    usdc_token_address: str = Field(default="", alias="USDC_TOKEN_ADDRESS")
     cadc_token_address: str = Field(default="", alias="CADC_TOKEN_ADDRESS")
     contract_abi_path: str = Field(alias="CONTRACT_ABI_PATH")
     chain_id: int = Field(alias="CHAIN_ID")

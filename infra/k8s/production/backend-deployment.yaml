@@ -157,11 +157,11 @@ spec:
                 secretKeyRef:
                   name: thedatabay-secrets
                   key: CONTRACT_ADDRESS
-            - name: PAYMENT_TOKEN_ADDRESS
+            - name: USDC_TOKEN_ADDRESS
               valueFrom:
                 secretKeyRef:
                   name: thedatabay-secrets
-                  key: PAYMENT_TOKEN_ADDRESS
+                  key: USDC_TOKEN_ADDRESS
             - name: CADC_TOKEN_ADDRESS
               valueFrom:
                 secretKeyRef:

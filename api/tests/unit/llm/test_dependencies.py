@@ -20,7 +20,7 @@ def make_settings(**overrides: object) -> Settings:
         "PINATA_SECRET_KEY": "s",
         "PINATA_GATEWAY_URL": "https://gateway.pinata.cloud",
         "CONTRACT_ADDRESS": "0x0000000000000000000000000000000000000000",
-        "PAYMENT_TOKEN_ADDRESS": "0x0000000000000000000000000000000000000002",
+        "USDC_TOKEN_ADDRESS": "0x0000000000000000000000000000000000000002",
         "CONTRACT_ABI_PATH": "/tmp/Marketplace.json",
         "CHAIN_ID": 31337,
         "RPC_URL": "http://127.0.0.1:8545",

@@ -32,7 +32,7 @@ PINATA_API_KEY="k"
 PINATA_SECRET_KEY="s"
 PINATA_GATEWAY_URL="https://gateway.pinata.cloud"
 CONTRACT_ADDRESS="0x0000000000000000000000000000000000000000"
-PAYMENT_TOKEN_ADDRESS="0x0000000000000000000000000000000000000002"
+USDC_TOKEN_ADDRESS="0x0000000000000000000000000000000000000002"
 CONTRACT_ABI_PATH="/tmp/Marketplace.json"
 CHAIN_ID=31337
 RPC_URL="http://127.0.0.1:8545"
@@ -77,7 +77,7 @@ def clear_relevant_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "PINATA_SECRET_KEY",
         "PINATA_GATEWAY_URL",
         "CONTRACT_ADDRESS",
-        "PAYMENT_TOKEN_ADDRESS",
+        "USDC_TOKEN_ADDRESS",
         "CONTRACT_ABI_PATH",
         "CHAIN_ID",
         "RPC_URL",
@@ -127,7 +127,7 @@ def test_settings_loads_from_env_file(tmp_path, monkeypatch):
     assert s.pinata_secret_key.get_secret_value() == "s"
     assert s.pinata_gateway_url == "https://gateway.pinata.cloud"
     assert s.contract_address == "0x0000000000000000000000000000000000000000"
-    assert s.payment_token_address == "0x0000000000000000000000000000000000000002"
+    assert s.usdc_token_address == "0x0000000000000000000000000000000000000002"
     assert s.contract_abi_path == "/tmp/Marketplace.json"
     assert s.chain_id == 31337
     assert s.rpc_url == "http://127.0.0.1:8545"

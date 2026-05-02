@@ -25,8 +25,8 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_CONTRACT_ADDRESS": JSON.stringify(
         env.CONTRACT_ADDRESS || ""
       ),
-      "import.meta.env.VITE_PAYMENT_TOKEN_ADDRESS": JSON.stringify(
-        env.PAYMENT_TOKEN_ADDRESS || ""
+      "import.meta.env.VITE_USDC_TOKEN_ADDRESS": JSON.stringify(
+        env.USDC_TOKEN_ADDRESS || ""
       ),
       "import.meta.env.VITE_CADC_TOKEN_ADDRESS": JSON.stringify(
         env.CADC_TOKEN_ADDRESS || ""
