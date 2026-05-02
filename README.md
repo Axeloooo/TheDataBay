@@ -1,13 +1,13 @@
-# Ulenor
+# TheDataBay
 
-[![CI](https://github.com/Axeloooo/Ulenor/actions/workflows/test.yml/badge.svg)](https://github.com/Axeloooo/Ulenor/actions/workflows/test.yml)
-[![Release](https://github.com/Axeloooo/Ulenor/actions/workflows/release.yml/badge.svg)](https://github.com/Axeloooo/Ulenor/actions/workflows/release.yml)
-[![Tag](https://img.shields.io/github/v/tag/Axeloooo/Ulenor?label=tag)](https://github.com/Axeloooo/Ulenor/tags)
-[![License](https://img.shields.io/github/license/Axeloooo/Ulenor)](https://github.com/Axeloooo/Ulenor/blob/main/LICENSE)
-[![Issues](https://img.shields.io/github/issues/Axeloooo/Ulenor)](https://github.com/Axeloooo/Ulenor/issues)
-[![Pull Requests](https://img.shields.io/github/issues-pr/Axeloooo/Ulenor)](https://github.com/Axeloooo/Ulenor/pulls)
-[![Contributors](https://img.shields.io/github/contributors/Axeloooo/Ulenor)](https://github.com/Axeloooo/Ulenor/graphs/contributors)
-[![Repo Size](https://img.shields.io/github/repo-size/Axeloooo/Ulenor)](https://github.com/Axeloooo/Ulenor)
+[![CI](https://github.com/Axeloooo/TheDataBay/actions/workflows/test.yml/badge.svg)](https://github.com/Axeloooo/TheDataBay/actions/workflows/test.yml)
+[![Release](https://github.com/Axeloooo/TheDataBay/actions/workflows/release.yml/badge.svg)](https://github.com/Axeloooo/TheDataBay/actions/workflows/release.yml)
+[![Tag](https://img.shields.io/github/v/tag/Axeloooo/TheDataBay?label=tag)](https://github.com/Axeloooo/TheDataBay/tags)
+[![License](https://img.shields.io/github/license/Axeloooo/TheDataBay)](https://github.com/Axeloooo/TheDataBay/blob/main/LICENSE)
+[![Issues](https://img.shields.io/github/issues/Axeloooo/TheDataBay)](https://github.com/Axeloooo/TheDataBay/issues)
+[![Pull Requests](https://img.shields.io/github/issues-pr/Axeloooo/TheDataBay)](https://github.com/Axeloooo/TheDataBay/pulls)
+[![Contributors](https://img.shields.io/github/contributors/Axeloooo/TheDataBay)](https://github.com/Axeloooo/TheDataBay/graphs/contributors)
+[![Repo Size](https://img.shields.io/github/repo-size/Axeloooo/TheDataBay)](https://github.com/Axeloooo/TheDataBay)
 
 Decentralized dataset marketplace with encrypted dataset delivery, on-chain listing/payment, and semantic discovery.
 
@@ -25,7 +25,7 @@ Decentralized dataset marketplace with encrypted dataset delivery, on-chain list
 
 ## 🔭 Overview
 
-Ulenor includes:
+TheDataBay includes:
 
 - `client/`: React + Vite frontend
 - `mobile/`: Expo React Native app (wallet, search, upload, purchases)
@@ -135,23 +135,23 @@ npm run start
 
 ### ⛓️ EVM / Foundry (`evm/`)
 
-| Command                          | What it does                                          |
-| -------------------------------- | ----------------------------------------------------- |
-| `make evm-build`                 | Compile contracts, export ABI to `api/app/contracts/` |
-| `make evm-test`                  | Run Solidity test suite                               |
-| `make anvil`                     | Start local Anvil node on `0.0.0.0:8545`              |
-| `make deploy-anvil`              | Deploy `Marketplace` to local Anvil                   |
-| `make seed-anvil`                | Seed deterministic demo listings on-chain             |
-| `make mint-tokens-anvil`         | Mint MockUSDC + MockCADC on Anvil                     |
-| `make mint-tokens-base-sepolia`  | Mint MockUSDC + MockCADC on Base Sepolia               |
+| Command                         | What it does                                          |
+| ------------------------------- | ----------------------------------------------------- |
+| `make evm-build`                | Compile contracts, export ABI to `api/app/contracts/` |
+| `make evm-test`                 | Run Solidity test suite                               |
+| `make anvil`                    | Start local Anvil node on `0.0.0.0:8545`              |
+| `make deploy-anvil`             | Deploy `Marketplace` to local Anvil                   |
+| `make seed-anvil`               | Seed deterministic demo listings on-chain             |
+| `make mint-tokens-anvil`        | Mint MockUSDC + MockCADC on Anvil                     |
+| `make mint-tokens-base-sepolia` | Mint MockUSDC + MockCADC on Base Sepolia              |
 
 ### 🐳 Docker
 
 | Command                                                                             | What it does         |
 | ----------------------------------------------------------------------------------- | -------------------- |
-| `docker build -f infra/development/docker/client.Dockerfile -t ulenor/client .` | Build frontend image |
-| `docker build -f infra/development/docker/server.Dockerfile -t ulenor/server .` | Build backend image  |
-| `docker images \| grep ulenor`                                                  | Verify built images  |
+| `docker build -f infra/development/docker/client.Dockerfile -t thedatabay/client .` | Build frontend image |
+| `docker build -f infra/development/docker/server.Dockerfile -t thedatabay/server .` | Build backend image  |
+| `docker images \| grep thedatabay`                                                  | Verify built images  |
 
 ### ☸️ Minikube / Kubernetes / Tilt
 

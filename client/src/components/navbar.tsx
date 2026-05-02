@@ -92,7 +92,7 @@ function Navbar() {
           </div>
           <div className="min-w-0 leading-tight">
             <div className="font-display truncate text-base font-semibold">
-              Ulenor
+              TheDataBay
             </div>
             <div className="truncate text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
               On-chain dataset exchange

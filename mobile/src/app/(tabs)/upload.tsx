@@ -238,7 +238,7 @@ export default function UploadScreen() {
             Upload, embed, and list from mobile
           </Text>
           <Text style={[styles.subtitle, { color: palette.subtleText }]}>
-            Ulenor mobile mirrors the web listing flow: submit your CSV,
+            TheDataBay mobile mirrors the web listing flow: submit your CSV,
             enter the USDC settlement amount, preview quote values, then create
             the on-chain listing with WalletConnect.
           </Text>
@@ -340,7 +340,8 @@ export default function UploadScreen() {
           />
           {priceEquivalent !== null ? (
             <Text style={[styles.fieldHint, { color: palette.subtleText }]}>
-              Quote preview: {formatCurrencyAmount(priceEquivalent, quoteCurrency)}
+              Quote preview:{" "}
+              {formatCurrencyAmount(priceEquivalent, quoteCurrency)}
             </Text>
           ) : null}
 

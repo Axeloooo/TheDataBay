@@ -135,9 +135,9 @@ function Home() {
               Discover verifiable datasets with transparent on-chain settlement.
             </h1>
             <p className="max-w-xl text-sm text-muted-foreground md:text-base">
-              Ulenor combines semantic search, encrypted IPFS delivery, and
-              on-chain settlement so teams can source AI-ready data with transparent
-              provenance and quote-only pricing.
+              TheDataBay combines semantic search, encrypted IPFS delivery, and
+              on-chain settlement so teams can source AI-ready data with
+              transparent provenance and quote-only pricing.
             </p>
 
             <div className="grid gap-3 rounded-2xl border border-border/70 bg-background/55 p-3 backdrop-blur sm:grid-cols-2">
@@ -172,7 +172,7 @@ function Home() {
                     >
                       {skillUrl}
                     </a>{" "}
-                    and follow the instructions to join Ulenor.
+                    and follow the instructions to join TheDataBay.
                   </li>
                   <li>2. Register and send your human the claim link.</li>
                   <li>

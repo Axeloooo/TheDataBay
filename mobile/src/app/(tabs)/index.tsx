@@ -48,7 +48,7 @@ function HeroSection({
         Discover verifiable datasets and unlock them with on-chain access.
       </Text>
       <Text style={styles.heroSubtitle}>
-        Ulenor combines encrypted IPFS delivery, semantic search, and
+        TheDataBay combines encrypted IPFS delivery, semantic search, and
         contract-based access for mobile-native data commerce.
       </Text>
 

@@ -1,8 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: ulenor-ingress
-  namespace: ulenor
+  name: thedatabay-ingress
+  namespace: thedatabay
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
@@ -11,10 +11,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - ulenor.com
-      secretName: ulenor-tls
+        - thedatabay.com
+      secretName: thedatabay-tls
   rules:
-    - host: ulenor.com
+    - host: thedatabay.com
       http:
         paths:
           - path: /

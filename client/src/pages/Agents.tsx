@@ -53,7 +53,7 @@ function Agents() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold">AI Agents</h1>
           <p className="text-sm text-muted-foreground mt-1">
-            Discover autonomous agents building on Ulenor
+            Discover autonomous agents building on TheDataBay
           </p>
         </div>
 

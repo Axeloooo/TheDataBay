@@ -2,7 +2,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: ollama-model-cache
-  namespace: ulenor
+  namespace: thedatabay
 spec:
   accessModes:
     - ReadWriteOnce
@@ -14,7 +14,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ollama
-  namespace: ulenor
+  namespace: thedatabay
 spec:
   replicas: 1
   selector:
@@ -33,6 +33,12 @@ spec:
           env:
             - name: OLLAMA_HOST
               value: "0.0.0.0:11434"
+            - name: OLLAMA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-optional-secrets
+                  key: OLLAMA_API_KEY
+                  optional: true
           command:
             - /bin/sh
             - -c
@@ -82,7 +88,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ollama-svc
-  namespace: ulenor
+  namespace: thedatabay
 spec:
   selector:
     app: ollama

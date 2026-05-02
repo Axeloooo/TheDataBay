@@ -6,12 +6,12 @@ function readEnv(name: string, fallback = "") {
 }
 
 const config: ExpoConfig = {
-  name: "Ulenor",
-  slug: "ulenor",
+  name: "TheDataBay",
+  slug: "thedatabay",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: "ulenor",
+  scheme: "thedatabay",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {

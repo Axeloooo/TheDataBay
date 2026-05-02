@@ -53,7 +53,7 @@ type UploadStore = {
   createListingOnChain: (address: string | null) => Promise<string | null>;
 };
 
-const STORAGE_KEY = "ulenor_upload_store_v1";
+const STORAGE_KEY = "thedatabay_upload_store_v1";
 const ZERO_BYTES32 = `0x${"0".repeat(64)}`;
 
 function statusToUploadStatus(status: string | null | undefined): UploadStatus {

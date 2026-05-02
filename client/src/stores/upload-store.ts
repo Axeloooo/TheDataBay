@@ -3,7 +3,10 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { toast } from "sonner";
 import { parseUnits } from "ethers";
 import { backend } from "@/lib/backend";
-import { createItemTx, getPaymentTokenAddressForCurrency } from "@/lib/marketplace";
+import {
+  createItemTx,
+  getPaymentTokenAddressForCurrency,
+} from "@/lib/marketplace";
 import { uuidToBytes32 } from "@/lib/ids";
 import { fireConfettiBurst } from "@/lib/confetti";
 import type { DisplayCurrency } from "@/lib/fx";
@@ -43,7 +46,7 @@ type UploadStore = {
   createItemOnChain: (address: string | null) => Promise<string | null>;
 };
 
-const STORAGE_KEY = "ulenor_upload_store_v3";
+const STORAGE_KEY = "thedatabay_upload_store_v3";
 const ZERO_BYTES32 = `0x${"0".repeat(64)}`;
 
 function settlementDecimalsFor(currency: SettlementCurrency): number {
@@ -168,16 +171,16 @@ export const useUploadStore = create<UploadStore>()(
             dataset_url: session.datasetUrl,
             dataset_hash: session.datasetHash,
             preview: session.preview ?? { column_names: [], rows: [] },
-            stats:
-              session.stats ??
-              {
-                total_rows: 0,
-                total_columns: 0,
-                has_header: false,
-                empty_rows_skipped: 0,
-              },
-            vector_spec:
-              session.vectorSpec ?? { model: "nomic-embed-text", dimension: 768 },
+            stats: session.stats ?? {
+              total_rows: 0,
+              total_columns: 0,
+              has_header: false,
+              empty_rows_skipped: 0,
+            },
+            vector_spec: session.vectorSpec ?? {
+              model: "nomic-embed-text",
+              dimension: 768,
+            },
           };
         }
 
@@ -228,7 +231,12 @@ export const useUploadStore = create<UploadStore>()(
 
         try {
           const response = await backend.submitDataset(formData);
-          const nextSession = sessionFromResult(response, state, address, priceAtomic);
+          const nextSession = sessionFromResult(
+            response,
+            state,
+            address,
+            priceAtomic,
+          );
           saveUploadSession(nextSession);
           toast.success("Dataset prepared", {
             description:
@@ -259,11 +267,14 @@ export const useUploadStore = create<UploadStore>()(
       createItemOnChain: async (address) => {
         const state = get();
         const currentListingId =
-          state.embedResult?.listing_id ?? state.persistedSession?.listingId ?? null;
+          state.embedResult?.listing_id ??
+          state.persistedSession?.listingId ??
+          null;
         const currentDatasetUrl =
           state.embedResult?.dataset_url ?? state.persistedSession?.datasetUrl;
         const currentDatasetHash =
-          state.embedResult?.dataset_hash ?? state.persistedSession?.datasetHash;
+          state.embedResult?.dataset_hash ??
+          state.persistedSession?.datasetHash;
 
         if (!address) {
           set({ error: "Connect wallet to create item." });

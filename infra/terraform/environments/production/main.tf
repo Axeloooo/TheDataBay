@@ -15,6 +15,42 @@ locals {
     owner       = var.owner
     managed-by  = "terraform"
   }
+  runtime_secret_names = toset([
+    "APP-NAME",
+    "APP-VERSION",
+    "CACHE-MAXSIZE",
+    "CADC-TOKEN-ADDRESS",
+    "CHAIN-ID",
+    "CONTRACT-ABI-PATH",
+    "CONTRACT-ADDRESS",
+    "CORS-ORIGINS",
+    "DATASET-SUMMARY-COUNT",
+    "DATASET-SUMMARY-SAMPLE-ROWS",
+    "ENVIRONMENT",
+    "HOST",
+    "LLM-BASE-URL",
+    "LLM-CHAT-MODEL",
+    "LLM-EMBEDDING-DIMENSION",
+    "LLM-EMBEDDING-MODEL",
+    "LLM-PROVIDER",
+    "LLM-THINK",
+    "MAX-DATASET-ROWS",
+    "MAX-FILE-SIZE-MB",
+    "PAYMENT-TOKEN-ADDRESS",
+    "PINATA-API-KEY",
+    "PINATA-GATEWAY-URL",
+    "PINATA-SECRET-KEY",
+    "PORT",
+    "POSTGRES-PASSWORD",
+    "POSTGRES-URL",
+    "RPC-URL",
+    "SERVER-PRIVATE-KEY",
+    "SIMILARITY-THRESHOLD",
+    "TOP-K",
+  ])
+  optional_runtime_secret_names = toset([
+    "OLLAMA-API-KEY",
+  ])
 }
 
 resource "azurerm_resource_group" "main" {

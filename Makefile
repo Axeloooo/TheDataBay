@@ -1,5 +1,5 @@
 # =============================================================================
-# Ulenor monorepo Makefile
+# TheDataBay monorepo Makefile
 # Run from the repo root. Requires: forge, cast, anvil, tilt, kubectl, terraform
 # Copy .env.example → .env and fill in secrets before running EVM targets.
 # =============================================================================
@@ -35,7 +35,7 @@ ANVIL_PORT         ?= 8545
 # ── Help ─────────────────────────────────────────────────────────────────────
 help:
 	@echo ""
-	@echo "Ulenor Makefile"
+	@echo "TheDataBay Makefile"
 	@echo ""
 	@echo "Dev environment:"
 	@echo "  dev-up                   Start full local stack (Tilt + Minikube)"
@@ -200,7 +200,7 @@ k8s-deploy-prod:
 	@kubectl apply -f infra/k8s/production/namespace.yaml
 	@kubectl apply -f infra/k8s/production/secret-provider-class.yaml
 	@kubectl apply -f infra/k8s/production/postgres-statefulset.yaml
-	@kubectl wait --namespace ulenor --for=condition=ready pod \
+	@kubectl wait --namespace thedatabay --for=condition=ready pod \
 		--selector=app=postgres --timeout=180s
 	@kubectl apply -f infra/k8s/production/cert-manager/cluster-issuer.yaml
 	@kubectl apply -f infra/k8s/production/backend-deployment.yaml
@@ -208,18 +208,18 @@ k8s-deploy-prod:
 	@kubectl apply -f infra/k8s/production/ingress.yaml
 	@kubectl apply -f infra/k8s/production/hpa.yaml
 	@kubectl apply -f infra/k8s/production/pdb.yaml
-	@kubectl rollout status deployment/backend -n ulenor --timeout=180s
-	@kubectl rollout status deployment/frontend -n ulenor --timeout=180s
+	@kubectl rollout status deployment/backend -n thedatabay --timeout=180s
+	@kubectl rollout status deployment/frontend -n thedatabay --timeout=180s
 	@echo "Production deploy complete."
 
 k8s-status:
-	@kubectl get pods -n ulenor
+	@kubectl get pods -n thedatabay
 	@echo ""
 	@kubectl get svc -n ingress-nginx ingress-nginx-controller 2>/dev/null || true
 
 k8s-rollback:
-	@kubectl rollout undo deployment/backend -n ulenor
-	@kubectl rollout undo deployment/frontend -n ulenor
+	@kubectl rollout undo deployment/backend -n thedatabay
+	@kubectl rollout undo deployment/frontend -n thedatabay
 
 # ── Meta ─────────────────────────────────────────────────────────────────────
 test: evm-test api-test

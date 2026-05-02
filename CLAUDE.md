@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Ulenor is a decentralized dataset marketplace monorepo with four main components:
+TheDataBay is a decentralized dataset marketplace monorepo with four main components:
 
 - `client/` — React + Vite web frontend
 - `mobile/` — Expo React Native mobile app
@@ -163,7 +163,7 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 | `typescript-advanced-types`   | `.agents/skills/typescript-advanced-types/`   | Complex TS generics, utility types, or type-level constraints                    |
 | `vercel-react-best-practices` | `.agents/skills/vercel-react-best-practices/` | `client/` React/Vite changes, performance, rendering, and data-fetching patterns |
 | `vercel-react-native-skills`  | `.agents/skills/vercel-react-native-skills/`  | `mobile/` Expo/React Native features, performance, and platform APIs             |
-| `writing-plans`               | `.agents/skills/writing-plans/`               | Specs or multi-step implementation plans that should be written before coding     |
+| `writing-plans`               | `.agents/skills/writing-plans/`               | Specs or multi-step implementation plans that should be written before coding    |
 
 ## Specs & Planning
 

@@ -2,7 +2,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: backend-pdb
-  namespace: ulenor
+  namespace: thedatabay
 spec:
   minAvailable: 1
   selector:
@@ -13,7 +13,7 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: frontend-pdb
-  namespace: ulenor
+  namespace: thedatabay
 spec:
   minAvailable: 1
   selector:

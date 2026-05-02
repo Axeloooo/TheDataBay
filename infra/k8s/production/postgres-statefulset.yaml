@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres
-  namespace: ulenor
+  namespace: thedatabay
 spec:
   clusterIP: None
   selector:
@@ -15,7 +15,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
-  namespace: ulenor
+  namespace: thedatabay
 spec:
   serviceName: postgres
   replicas: 1
@@ -36,12 +36,12 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: ulenor-secrets
+                  name: thedatabay-secrets
                   key: POSTGRES_PASSWORD
             - name: POSTGRES_DB
-              value: "ulenor"
+              value: "thedatabay"
             - name: POSTGRES_USER
-              value: "ulenor"
+              value: "thedatabay"
           resources:
             requests:
               cpu: "100m"
@@ -54,7 +54,7 @@ spec:
               command:
                 - pg_isready
                 - -U
-                - ulenor
+                - thedatabay
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -75,7 +75,7 @@ spec:
             driver: secrets-store.csi.k8s.io
             readOnly: true
             volumeAttributes:
-              secretProviderClass: ulenor-secrets-provider
+              secretProviderClass: thedatabay-secrets-provider
   volumeClaimTemplates:
     - metadata:
         name: postgres-data

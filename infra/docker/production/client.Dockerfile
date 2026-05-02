@@ -7,8 +7,8 @@ RUN npm ci
 
 COPY client ./
 
-ARG VITE_API_URL=https://ulenor.com
-ARG VITE_SERVER_URL=https://ulenor.com
+ARG VITE_API_URL=https://thedatabay.com
+ARG VITE_SERVER_URL=https://thedatabay.com
 ARG VITE_PINATA_GATEWAY_URL=https://gateway.pinata.cloud
 ARG VITE_WALLETCONNECT_PROJECT_ID=
 ARG VITE_CONTRACT_ADDRESS=

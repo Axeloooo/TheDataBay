@@ -11,12 +11,12 @@ output "kube_config_raw" {
 
 output "kubelet_identity_object_id" {
   description = "Kubelet identity object ID"
-  value       = azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id
+  value       = try(azurerm_kubernetes_cluster.main.kubelet_identity[0].object_id, null)
 }
 
 output "key_vault_secrets_provider_identity_object_id" {
   description = "Key Vault Secrets Provider addon identity object ID"
-  value       = azurerm_kubernetes_cluster.main.key_vault_secrets_provider[0].secret_identity[0].object_id
+  value       = try(azurerm_kubernetes_cluster.main.key_vault_secrets_provider[0].secret_identity[0].object_id, null)
 }
 
 output "node_resource_group" {

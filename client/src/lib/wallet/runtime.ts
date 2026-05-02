@@ -129,10 +129,10 @@ class WalletRuntimeImpl implements WalletRuntime {
         chains: [configuredChain],
         showQrModal: true,
         metadata: {
-          name: "Ulenor",
+          name: "TheDataBay",
           description: "Decentralized dataset marketplace",
-          url: "https://ulenor.com",
-          icons: ["https://ulenor.com/icon.png"],
+          url: "https://thedatabay.com",
+          icons: ["https://thedatabay.com/icon.png"],
         },
       });
 

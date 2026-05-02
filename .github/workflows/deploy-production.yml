@@ -15,9 +15,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  IMAGE_REPOSITORY: ulenor
+  IMAGE_REPOSITORY: thedatabay
   IMAGE_TAG: ${{ github.sha }}
-  PRODUCTION_DOMAIN: ${{ vars.PRODUCTION_DOMAIN || 'ulenor.com' }}
+  PRODUCTION_DOMAIN: ${{ vars.PRODUCTION_DOMAIN || 'thedatabay.com' }}
   PINATA_GATEWAY_URL: ${{ vars.PINATA_GATEWAY_URL || 'https://gateway.pinata.cloud' }}
   VITE_CHAIN_ID: ${{ vars.VITE_CHAIN_ID || '84532' }}
   VITE_WALLETCONNECT_PROJECT_ID: ${{ vars.VITE_WALLETCONNECT_PROJECT_ID }}
@@ -50,7 +50,7 @@ jobs:
           : "${AZURE_RESOURCE_GROUP:?Set repository variable AZURE_RESOURCE_GROUP}"
           : "${KEY_VAULT_NAME:?Set repository variable KEY_VAULT_NAME}"
           if [[ "$PRODUCTION_DOMAIN" == http://* || "$PRODUCTION_DOMAIN" == https://* ]]; then
-            echo "PRODUCTION_DOMAIN must be a host like ulenor.com, not a URL."
+            echo "PRODUCTION_DOMAIN must be a host like thedatabay.com, not a URL."
             exit 1
           fi
 
@@ -126,7 +126,7 @@ jobs:
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         run: |
           set -euo pipefail
-          RENDER_DIR="$RUNNER_TEMP/ulenor-k8s"
+          RENDER_DIR="$RUNNER_TEMP/thedatabay-k8s"
           mkdir -p "$RENDER_DIR"
           cp -R infra/k8s/production/. "$RENDER_DIR/"
           find "$RENDER_DIR" -type f -name '*.yaml' -exec perl -pi -e '
@@ -135,7 +135,7 @@ jobs:
             s|<KEY_VAULT_NAME>|$ENV{KEY_VAULT_NAME}|g;
             s|<AZURE_TENANT_ID>|$ENV{AZURE_TENANT_ID}|g;
             s|<SECRETS_PROVIDER_CLIENT_ID>|$ENV{SECRETS_PROVIDER_CLIENT_ID}|g;
-            s|ulenor\.com|$ENV{PRODUCTION_DOMAIN}|g;
+            s|thedatabay\.com|$ENV{PRODUCTION_DOMAIN}|g;
           ' {} +
           if grep -RInE '<[A-Z0-9_]+>' "$RENDER_DIR"; then
             echo "Unrendered Kubernetes placeholders remain."
@@ -150,11 +150,11 @@ jobs:
           kubectl apply -f "$K8S_RENDER_DIR/secret-provider-class.yaml"
           kubectl apply -f "$K8S_RENDER_DIR/postgres-statefulset.yaml"
           kubectl apply -f "$K8S_RENDER_DIR/ollama-deployment.yaml"
-          kubectl wait --namespace ulenor \
+          kubectl wait --namespace thedatabay \
             --for=condition=ready pod \
             --selector=app=postgres \
             --timeout=180s
-          kubectl wait --namespace ulenor \
+          kubectl wait --namespace thedatabay \
             --for=condition=ready pod \
             --selector=app=ollama \
             --timeout=600s
@@ -168,7 +168,7 @@ jobs:
       - name: Verify rollout
         run: |
           set -euo pipefail
-          kubectl rollout status deployment/backend -n ulenor --timeout=180s
-          kubectl rollout status deployment/frontend -n ulenor --timeout=180s
-          kubectl get pods -n ulenor
-          kubectl get ingress -n ulenor
+          kubectl rollout status deployment/backend -n thedatabay --timeout=180s
+          kubectl rollout status deployment/frontend -n thedatabay --timeout=180s
+          kubectl get pods -n thedatabay
+          kubectl get ingress -n thedatabay

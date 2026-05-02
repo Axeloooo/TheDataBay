@@ -23,17 +23,17 @@ spec:
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: ulenor-secrets
+                  name: thedatabay-secrets
                   key: POSTGRES_DB
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: ulenor-secrets
+                  name: thedatabay-secrets
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: ulenor-secrets
+                  name: thedatabay-secrets
                   key: POSTGRES_PASSWORD
           volumeMounts:
             - name: postgres-data

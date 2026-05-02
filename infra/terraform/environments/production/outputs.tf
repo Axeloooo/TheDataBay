@@ -27,3 +27,13 @@ output "dns_zone_name_servers" {
   description = "DNS zone name servers"
   value       = module.networking.dns_zone_name_servers
 }
+
+output "runtime_secret_names" {
+  description = "Canonical Azure Key Vault secret names required by Kubernetes runtime configuration"
+  value       = sort(tolist(local.runtime_secret_names))
+}
+
+output "optional_runtime_secret_names" {
+  description = "Optional Kubernetes secret names used only when corresponding providers require them"
+  value       = sort(tolist(local.optional_runtime_secret_names))
+}

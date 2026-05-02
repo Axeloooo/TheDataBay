@@ -5,7 +5,11 @@ import UniversalProvider from "@walletconnect/universal-provider";
 import Constants from "expo-constants";
 
 import { ENV, getMissingWalletConfig } from "@/constants/env";
-import type { WalletConnectorType, WalletRuntime, WalletSessionSnapshot } from "./types";
+import type {
+  WalletConnectorType,
+  WalletRuntime,
+  WalletSessionSnapshot,
+} from "./types";
 
 const appScheme = Constants.expoConfig?.scheme ?? "mobile";
 
@@ -71,7 +75,12 @@ let pendingApproval: (() => Promise<unknown>) | null = null;
 const listeners = new Set<(snapshot: WalletSessionSnapshot) => void>();
 
 let currentSnapshot: WalletSessionSnapshot = buildSnapshot(
-  null, null, null, null, false, false,
+  null,
+  null,
+  null,
+  null,
+  false,
+  false,
 );
 
 function notifyListeners(snapshot: WalletSessionSnapshot): void {
@@ -81,7 +90,9 @@ function notifyListeners(snapshot: WalletSessionSnapshot): void {
   }
 }
 
-function snapshotFromProvider(provider: UniversalProvider): WalletSessionSnapshot {
+function snapshotFromProvider(
+  provider: UniversalProvider,
+): WalletSessionSnapshot {
   if (!provider.session) {
     return buildSnapshot(null, null, null, null, false, false);
   }
@@ -102,33 +113,53 @@ async function getOrInitProvider(): Promise<UniversalProvider> {
   initPromise = UniversalProvider.init({
     projectId: ENV.WALLETCONNECT_PROJECT_ID,
     metadata: {
-      name: "Ulenor",
+      name: "TheDataBay",
       description: "Decentralized dataset marketplace",
-      url: "https://ulenor.com",
-      icons: ["https://ulenor.com/icon.png"],
+      url: "https://thedatabay.com",
+      icons: ["https://thedatabay.com/icon.png"],
       redirect: { native: appScheme + "://" },
     },
   }).then((provider) => {
     providerInstance = provider;
     initPromise = null;
 
-    provider.on("session_event", ({ event }: { event: { name: string; data: unknown }; chainId: string }) => {
-      if (!providerInstance) return;
-      if (event.name === "accountsChanged" || event.name === "chainChanged") {
-        notifyListeners(snapshotFromProvider(providerInstance));
-      }
-    });
+    provider.on(
+      "session_event",
+      ({
+        event,
+      }: {
+        event: { name: string; data: unknown };
+        chainId: string;
+      }) => {
+        if (!providerInstance) return;
+        if (event.name === "accountsChanged" || event.name === "chainChanged") {
+          notifyListeners(snapshotFromProvider(providerInstance));
+        }
+      },
+    );
 
     provider.on("disconnect", () => {
       notifyListeners(buildSnapshot(null, null, null, null, false, false));
     });
 
-    provider.on("session_update", ({ session }: { session: { namespaces?: { eip155?: { accounts?: string[] } }; peer?: { metadata?: { name?: string; icons?: string[] } } } }) => {
-      if (!providerInstance) return;
-      const { address, chainId } = parseAccountsFromSession(session);
-      const { walletName, walletIcon } = getPeerMeta(session);
-      notifyListeners(buildSnapshot(address, chainId, walletName, walletIcon, true, false));
-    });
+    provider.on(
+      "session_update",
+      ({
+        session,
+      }: {
+        session: {
+          namespaces?: { eip155?: { accounts?: string[] } };
+          peer?: { metadata?: { name?: string; icons?: string[] } };
+        };
+      }) => {
+        if (!providerInstance) return;
+        const { address, chainId } = parseAccountsFromSession(session);
+        const { walletName, walletIcon } = getPeerMeta(session);
+        notifyListeners(
+          buildSnapshot(address, chainId, walletName, walletIcon, true, false),
+        );
+      },
+    );
 
     return provider;
   });
@@ -181,7 +212,14 @@ const walletRuntimeImpl: WalletRuntime = {
 
     const { address, chainId } = parseAccountsFromSession(session);
     const { walletName, walletIcon } = getPeerMeta(session);
-    const snapshot = buildSnapshot(address, chainId, walletName, walletIcon, true, false);
+    const snapshot = buildSnapshot(
+      address,
+      chainId,
+      walletName,
+      walletIcon,
+      true,
+      false,
+    );
 
     notifyListeners(snapshot);
 
@@ -226,7 +264,9 @@ const walletRuntimeImpl: WalletRuntime = {
     return null;
   },
 
-  subscribeSession(listener: (snapshot: WalletSessionSnapshot) => void): () => void {
+  subscribeSession(
+    listener: (snapshot: WalletSessionSnapshot) => void,
+  ): () => void {
     listeners.add(listener);
     // Immediately emit current state so subscriber is up to date
     listener(currentSnapshot);
@@ -239,7 +279,9 @@ const walletRuntimeImpl: WalletRuntime = {
     const provider = await getOrInitProvider();
 
     if (!provider.session) {
-      throw new Error("No active WalletConnect session. Connect a wallet first.");
+      throw new Error(
+        "No active WalletConnect session. Connect a wallet first.",
+      );
     }
 
     return provider;
@@ -258,7 +300,10 @@ const walletRuntimeImpl: WalletRuntime = {
     });
   },
 
-  getConnectionMetadata(): { configError: string | null; availableConnectors: WalletConnectorType[] } {
+  getConnectionMetadata(): {
+    configError: string | null;
+    availableConnectors: WalletConnectorType[];
+  } {
     const missing = getMissingWalletConfig();
 
     if (missing.length > 0) {

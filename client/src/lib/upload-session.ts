@@ -31,7 +31,7 @@ export type PersistedUploadSession = {
   toastNotifiedStatus?: "completed" | "failed" | null;
 };
 
-const STORAGE_KEY = "ulenor_upload_session_v1";
+const STORAGE_KEY = "thedatabay_upload_session_v1";
 
 export function loadUploadSession(): PersistedUploadSession | null {
   try {

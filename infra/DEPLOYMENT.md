@@ -1,10 +1,10 @@
-# Ulenor Production Deployment Runbook
+# TheDataBay Production Deployment Runbook
 
 This runbook provisions the Azure production foundation once, stores runtime
-secrets in Azure Key Vault, builds Ulenor images into Azure Container Registry,
+secrets in Azure Key Vault, builds TheDataBay images into Azure Container Registry,
 and deploys the Kubernetes manifests to AKS.
 
-Production origin: `https://ulenor.com`
+Production origin: `https://thedatabay.com`
 
 ## Prerequisites
 
@@ -25,21 +25,21 @@ az account set --subscription "<YOUR_SUBSCRIPTION_ID>"
 ## Phase 1: Bootstrap Terraform Remote State
 
 Run once per Azure subscription. The storage account name must be globally
-unique; change `ulenortfstate` if Azure reports it is already taken, and keep
+unique; change `thedatabaytfstate` if Azure reports it is already taken, and keep
 `infra/terraform/backend.tf` in sync.
 
 ```bash
-az group create --name ulenor-tfstate-rg --location mexicocentral
+az group create --name thedatabay-tfstate-rg --location mexicocentral
 
 az storage account create \
-  --name ulenortfstate \
-  --resource-group ulenor-tfstate-rg \
+  --name thedatabaytfstate \
+  --resource-group thedatabay-tfstate-rg \
   --location mexicocentral \
   --sku Standard_LRS
 
 az storage container create \
   --name tfstate \
-  --account-name ulenortfstate
+  --account-name thedatabaytfstate
 ```
 
 ## Phase 2: Provision Azure Infrastructure
@@ -58,23 +58,27 @@ export ARM_SUBSCRIPTION_ID="<YOUR_SUBSCRIPTION_ID>"
 export ARM_TENANT_ID="<YOUR_TENANT_ID>"
 export KEY_VAULT_NAME="$(cd infra/terraform/environments/production && terraform output -raw key_vault_name 2>/dev/null || true)"
 
-export APP_NAME="Ulenor API"
+export APP_NAME="TheDataBay API"
 export APP_VERSION="0.1.0"
 export ENVIRONMENT="production"
 export HOST="0.0.0.0"
 export PORT="8080"
-export CORS_ORIGINS='["https://ulenor.com"]'
-export OLLAMA_HOST="http://ollama-svc:11434"
-export EMBEDDING_MODEL="nomic-embed-text"
-export EMBEDDING_DIMENSION="768"
+export CORS_ORIGINS='["https://thedatabay.com"]'
+export LLM_PROVIDER="ollama"
+export LLM_BASE_URL="http://ollama-svc:11434"
+export LLM_CHAT_MODEL="deepseek-v4-flash:cloud"
+export LLM_EMBEDDING_MODEL="nomic-embed-text"
+export LLM_EMBEDDING_DIMENSION="768"
+export LLM_THINK="false"
+export OLLAMA_API_KEY=""
+export DATASET_SUMMARY_COUNT="5"
+export DATASET_SUMMARY_SAMPLE_ROWS="20"
 export MAX_FILE_SIZE_MB="50"
 export MAX_DATASET_ROWS="50000"
-export EMBEDDING_CHUNK_SIZE="256"
 export TOP_K="10"
-export K_ROWS="100"
 export SIMILARITY_THRESHOLD="0.30"
 export CACHE_MAXSIZE="100"
-export POSTGRES_URL="postgresql+psycopg://ulenor:<PASSWORD>@postgres:5432/ulenor"
+export POSTGRES_URL="postgresql+psycopg://thedatabay:<PASSWORD>@postgres:5432/thedatabay"
 export POSTGRES_PASSWORD="<VALUE>"
 export PINATA_API_KEY="<VALUE>"
 export PINATA_SECRET_KEY="<VALUE>"
@@ -98,7 +102,7 @@ terraform init
 terraform plan
 terraform apply
 
-terraform output -json > /tmp/ulenor-tf-outputs.json
+terraform output -json > /tmp/thedatabay-tf-outputs.json
 export ACR_LOGIN_SERVER="$(terraform output -raw acr_login_server)"
 export KEY_VAULT_NAME="$(terraform output -raw key_vault_name)"
 ```
@@ -123,14 +127,17 @@ set_secret ENVIRONMENT "$ENVIRONMENT"
 set_secret HOST "$HOST"
 set_secret PORT "$PORT"
 set_secret CORS-ORIGINS "$CORS_ORIGINS"
-set_secret OLLAMA-HOST "$OLLAMA_HOST"
-set_secret EMBEDDING-MODEL "$EMBEDDING_MODEL"
-set_secret EMBEDDING-DIMENSION "$EMBEDDING_DIMENSION"
+set_secret LLM-PROVIDER "$LLM_PROVIDER"
+set_secret LLM-BASE-URL "$LLM_BASE_URL"
+set_secret LLM-CHAT-MODEL "$LLM_CHAT_MODEL"
+set_secret LLM-EMBEDDING-MODEL "$LLM_EMBEDDING_MODEL"
+set_secret LLM-EMBEDDING-DIMENSION "$LLM_EMBEDDING_DIMENSION"
+set_secret LLM-THINK "$LLM_THINK"
+set_secret DATASET-SUMMARY-COUNT "$DATASET_SUMMARY_COUNT"
+set_secret DATASET-SUMMARY-SAMPLE-ROWS "$DATASET_SUMMARY_SAMPLE_ROWS"
 set_secret MAX-FILE-SIZE-MB "$MAX_FILE_SIZE_MB"
 set_secret MAX-DATASET-ROWS "$MAX_DATASET_ROWS"
-set_secret EMBEDDING-CHUNK-SIZE "$EMBEDDING_CHUNK_SIZE"
 set_secret TOP-K "$TOP_K"
-set_secret K-ROWS "$K_ROWS"
 set_secret SIMILARITY-THRESHOLD "$SIMILARITY_THRESHOLD"
 set_secret CACHE-MAXSIZE "$CACHE_MAXSIZE"
 set_secret POSTGRES-URL "$POSTGRES_URL"
@@ -161,35 +168,35 @@ az acr login --name "$ACR_NAME"
 
 docker build \
   -f infra/docker/production/server.Dockerfile \
-  -t "$ACR_LOGIN_SERVER/ulenor/api:$TAG" \
+  -t "$ACR_LOGIN_SERVER/thedatabay/api:$TAG" \
   .
-docker push "$ACR_LOGIN_SERVER/ulenor/api:$TAG"
+docker push "$ACR_LOGIN_SERVER/thedatabay/api:$TAG"
 
 docker build \
   -f infra/docker/production/client.Dockerfile \
-  --build-arg VITE_API_URL=https://ulenor.com \
-  --build-arg VITE_SERVER_URL=https://ulenor.com \
+  --build-arg VITE_API_URL=https://thedatabay.com \
+  --build-arg VITE_SERVER_URL=https://thedatabay.com \
   --build-arg VITE_PINATA_GATEWAY_URL=https://gateway.pinata.cloud \
   --build-arg VITE_WALLETCONNECT_PROJECT_ID="<WALLETCONNECT_PROJECT_ID>" \
   --build-arg VITE_CONTRACT_ADDRESS="$CONTRACT_ADDRESS" \
   --build-arg VITE_PAYMENT_TOKEN_ADDRESS="$PAYMENT_TOKEN_ADDRESS" \
   --build-arg VITE_CADC_TOKEN_ADDRESS="$CADC_TOKEN_ADDRESS" \
   --build-arg VITE_CHAIN_ID=84532 \
-  -t "$ACR_LOGIN_SERVER/ulenor/ui:$TAG" \
+  -t "$ACR_LOGIN_SERVER/thedatabay/ui:$TAG" \
   .
-docker push "$ACR_LOGIN_SERVER/ulenor/ui:$TAG"
+docker push "$ACR_LOGIN_SERVER/thedatabay/ui:$TAG"
 
 echo "Images pushed:"
-echo "$ACR_LOGIN_SERVER/ulenor/api:$TAG"
-echo "$ACR_LOGIN_SERVER/ulenor/ui:$TAG"
+echo "$ACR_LOGIN_SERVER/thedatabay/api:$TAG"
+echo "$ACR_LOGIN_SERVER/thedatabay/ui:$TAG"
 ```
 
 ## Phase 5: Configure kubectl
 
 ```bash
 az aks get-credentials \
-  --resource-group ulenor-production-rg \
-  --name ulenor-production-aks \
+  --resource-group thedatabay-production-rg \
+  --name thedatabay-production-aks \
   --overwrite-existing
 
 kubectl get nodes
@@ -228,13 +235,13 @@ KEY_VAULT_NAME="$(cd infra/terraform/environments/production && terraform output
 TAG="$(git rev-parse --short HEAD)"
 TENANT_ID="$(az account show --query tenantId -o tsv)"
 SECRETS_PROVIDER_CLIENT_ID="$(az aks show \
-  --resource-group ulenor-production-rg \
-  --name ulenor-production-aks \
+  --resource-group thedatabay-production-rg \
+  --name thedatabay-production-aks \
   --query addonProfiles.azureKeyvaultSecretsProvider.identity.clientId \
   -o tsv)"
 export ACR_LOGIN_SERVER KEY_VAULT_NAME TAG TENANT_ID SECRETS_PROVIDER_CLIENT_ID
 
-RENDER_DIR="/tmp/ulenor-k8s-$TAG"
+RENDER_DIR="/tmp/thedatabay-k8s-$TAG"
 rm -rf "$RENDER_DIR"
 mkdir -p "$RENDER_DIR"
 cp -R infra/k8s/production/. "$RENDER_DIR/"
@@ -258,15 +265,23 @@ Deploy in order:
 ```bash
 kubectl apply -f "$RENDER_DIR/namespace.yaml"
 kubectl apply -f "$RENDER_DIR/secret-provider-class.yaml"
+
+if [ -n "$OLLAMA_API_KEY" ]; then
+  kubectl create secret generic thedatabay-optional-secrets \
+    -n thedatabay \
+    --from-literal=OLLAMA_API_KEY="$OLLAMA_API_KEY" \
+    --dry-run=client -o yaml | kubectl apply -f -
+fi
+
 kubectl apply -f "$RENDER_DIR/postgres-statefulset.yaml"
 kubectl apply -f "$RENDER_DIR/ollama-deployment.yaml"
 
-kubectl wait --namespace ulenor \
+kubectl wait --namespace thedatabay \
   --for=condition=ready pod \
   --selector=app=postgres \
   --timeout=180s
 
-kubectl wait --namespace ulenor \
+kubectl wait --namespace thedatabay \
   --for=condition=ready pod \
   --selector=app=ollama \
   --timeout=600s
@@ -278,26 +293,26 @@ kubectl apply -f "$RENDER_DIR/ingress.yaml"
 kubectl apply -f "$RENDER_DIR/hpa.yaml"
 kubectl apply -f "$RENDER_DIR/pdb.yaml"
 
-kubectl rollout status deployment/backend -n ulenor --timeout=180s
-kubectl rollout status deployment/ollama -n ulenor --timeout=600s
-kubectl rollout status deployment/frontend -n ulenor --timeout=180s
+kubectl rollout status deployment/backend -n thedatabay --timeout=180s
+kubectl rollout status deployment/ollama -n thedatabay --timeout=600s
+kubectl rollout status deployment/frontend -n thedatabay --timeout=180s
 ```
 
 ## Phase 9: Configure DNS
 
 The public entrypoint is the `ingress-nginx-controller` `LoadBalancer` service
-external IP. Create an apex `A` record for `ulenor.com` that points to that IP.
+external IP. Create an apex `A` record for `thedatabay.com` that points to that IP.
 Do not point DNS at `backend-svc`, `frontend-svc`, pod IPs, or node IPs.
 
 ```bash
 kubectl get svc -n ingress-nginx ingress-nginx-controller -w
 
 INGRESS_IP="$(kubectl get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.status.loadBalancer.ingress[0].ip}')"
-echo "Create A record: ulenor.com -> $INGRESS_IP"
+echo "Create A record: thedatabay.com -> $INGRESS_IP"
 
 az network dns record-set a add-record \
-  --resource-group ulenor-production-rg \
-  --zone-name ulenor.com \
+  --resource-group thedatabay-production-rg \
+  --zone-name thedatabay.com \
   --record-set-name "@" \
   --ipv4-address "$INGRESS_IP"
 ```
@@ -317,11 +332,11 @@ Required GitHub secrets:
 
 Required GitHub variables:
 
-- `AZURE_RESOURCE_GROUP=ulenor-production-rg`
-- `AKS_CLUSTER_NAME=ulenor-production-aks`
+- `AZURE_RESOURCE_GROUP=thedatabay-production-rg`
+- `AKS_CLUSTER_NAME=thedatabay-production-aks`
 - `ACR_LOGIN_SERVER=<terraform output acr_login_server>`
 - `KEY_VAULT_NAME=<terraform output key_vault_name>`
-- `PRODUCTION_DOMAIN=ulenor.com`
+- `PRODUCTION_DOMAIN=thedatabay.com`
 
 Recommended GitHub variables for the static web build:
 
@@ -338,49 +353,59 @@ manual one-time operation unless production change control says otherwise.
 ## Phase 11: Verify Deployment
 
 ```bash
-kubectl get pods -n ulenor
+kubectl get pods -n thedatabay
 kubectl get svc -n ingress-nginx ingress-nginx-controller
-kubectl get ingress -n ulenor
+kubectl get ingress -n thedatabay
 
-curl https://ulenor.com/
-curl https://ulenor.com/api/v1/
+curl https://thedatabay.com/
+curl https://thedatabay.com/api/v1/
 
-kubectl exec -n ulenor deploy/ollama -- ollama list | grep nomic-embed-text
-kubectl exec -n ulenor deploy/backend -- printenv OLLAMA_HOST
-kubectl exec -n ulenor deploy/backend -- python - <<'PY'
-from app.shared.vectorstore import warmup_model
+kubectl exec -n thedatabay deploy/ollama -- ollama list | grep nomic-embed-text
+kubectl exec -n thedatabay deploy/ollama -- sh -c 'test -z "$OLLAMA_API_KEY" && echo "OLLAMA_API_KEY unset" || echo "OLLAMA_API_KEY set"'
+kubectl exec -n thedatabay deploy/backend -- printenv LLM_BASE_URL
+kubectl exec -n thedatabay deploy/backend -- sh -c 'test -z "$OLLAMA_API_KEY" && echo "OLLAMA_API_KEY unset" || echo "OLLAMA_API_KEY set"'
+kubectl exec -n thedatabay deploy/backend -- python - <<'PY'
+import asyncio
+
 from app.config.settings import get_settings
-raise SystemExit(0 if warmup_model(get_settings()) else 1)
+from app.llm.services.ollama_provider import OllamaLLMService
+
+async def main() -> int:
+    settings = get_settings()
+    result = await OllamaLLMService.from_settings(settings).embed_text("warmup")
+    return 0 if result.dimension == settings.llm_embedding_dimension else 1
+
+raise SystemExit(asyncio.run(main()))
 PY
 
-curl -sS https://ulenor.com/api/v1/ai/similarity-search \
+curl -sS https://thedatabay.com/api/v1/ai/similarity-search \
   -H 'content-type: application/json' \
   -d '{"query":"dog","limit":10}'
 
-curl -sS https://ulenor.com/api/v1/ai/similarity-search \
+curl -sS https://thedatabay.com/api/v1/ai/similarity-search \
   -H 'content-type: application/json' \
   -d '{"query":"men age 37 with chol 266","limit":10}'
 
-kubectl describe certificate ulenor-tls -n ulenor
+kubectl describe certificate thedatabay-tls -n thedatabay
 kubectl logs -n cert-manager -l app=cert-manager --tail=50
 ```
 
 After deploying this search/indexing change, re-embed or backfill pre-launch
-datasets so PGVector contains the new row and chunk document metadata. Search
-sanity checks should confirm that `dog` and `cat` return no default matches,
-`age 18` can surface low-relevance age-column datasets, and `men age 37 with
-chol 266` ranks the heart/table sample above unrelated listings.
+datasets so PGVector contains the new `dataset_summaries` documents. Search
+sanity checks should confirm that off-domain queries return no default matches
+and dataset-oriented queries return whole marketplace listings with
+`best_summary` evidence.
 
 ## Rollback
 
 ```bash
-kubectl rollout undo deployment/backend -n ulenor
-kubectl rollout undo deployment/frontend -n ulenor
+kubectl rollout undo deployment/backend -n thedatabay
+kubectl rollout undo deployment/frontend -n thedatabay
 ```
 
 Rollback to a specific revision:
 
 ```bash
-kubectl rollout history deployment/backend -n ulenor
-kubectl rollout undo deployment/backend --to-revision=<N> -n ulenor
+kubectl rollout history deployment/backend -n thedatabay
+kubectl rollout undo deployment/backend --to-revision=<N> -n thedatabay
 ```

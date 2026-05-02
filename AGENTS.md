@@ -4,7 +4,7 @@ This file provides guidance to AI Agents when working with code in this reposito
 
 ## Project Overview
 
-Ulenor is a decentralized dataset marketplace monorepo with four main components:
+TheDataBay is a decentralized dataset marketplace monorepo with four main components:
 
 - `client/` — React + Vite web frontend
 - `mobile/` — Expo React Native mobile app

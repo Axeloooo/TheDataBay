@@ -1,5 +1,5 @@
 location                 = "mexicocentral"
-project_name             = "ulenor"
+project_name             = "thedatabay"
 environment              = "production"
 owner                    = "axelsanchez"
 aks_kubernetes_version   = "1.33"
@@ -13,4 +13,4 @@ aks_os_disk_size_gb      = 30
 acr_sku                  = "Basic"
 vnet_address_space       = ["10.0.0.0/8"]
 aks_subnet_prefix        = "10.240.0.0/16"
-domain_name              = "ulenor.com"
+domain_name              = "thedatabay.com"

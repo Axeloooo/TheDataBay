@@ -51,3 +51,4 @@ secrets.yaml
 notes.txt
 test-results/
 playwright-report/
+infra/k8s/development/secrets.yaml.bak
