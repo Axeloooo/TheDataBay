@@ -57,7 +57,7 @@ const config: ExpoConfig = {
       "PINATA_GATEWAY_URL",
       "https://gateway.pinata.cloud",
     ),
-    walletConnectProjectId: readEnv("WALLET_CONNECT_PROJECT_ID"),
+    walletConnectProjectId: readEnv("WALLETCONNECT_PROJECT_ID"),
     contractAddress: readEnv("CONTRACT_ADDRESS"),
     paymentTokenAddress: readEnv("PAYMENT_TOKEN_ADDRESS"),
     cadcTokenAddress: readEnv("CADC_TOKEN_ADDRESS"),
