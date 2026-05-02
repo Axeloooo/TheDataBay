@@ -37,15 +37,38 @@ contract HelperConfig is Script {
     /**
      * @dev Sets the active network configuration based on the chain ID.
      *
-     * Sepolia: Reads from environment variables.
+     * Base Sepolia (84532): Reads from BASE_SEPOLIA_* environment variables.
+     * Sepolia (11155111): Reads from SEPOLIA_* environment variables.
      * Anvil (default): Uses default values.
      */
     constructor() {
-        if (block.chainid == 11155111) {
+        if (block.chainid == 84532) {
+            activeNetworkConfig = getBaseSepoliaConfig();
+        } else if (block.chainid == 11155111) {
             activeNetworkConfig = getSepoliaEthConfig();
         } else {
             activeNetworkConfig = getOrCreateAnvilEthConfig();
         }
+    }
+
+    /**
+     * @dev Returns the Base Sepolia network configuration.
+     */
+    function getBaseSepoliaConfig() public view returns (NetworkConfig memory) {
+        uint256 pk = vm.envUint("BASE_SEPOLIA_PRIVATE_KEY");
+        address deployer = vm.addr(pk);
+
+        return NetworkConfig({
+            deployKey: pk,
+            usdcToken: vm.envOr("BASE_SEPOLIA_USDC_ADDRESS", address(0)),
+            usdcDecimals: uint8(vm.envOr("BASE_SEPOLIA_USDC_DECIMALS", uint256(DEFAULT_USDC_DECIMALS))),
+            usdcMaxPrice: vm.envOr("BASE_SEPOLIA_USDC_MAX_PRICE", DEFAULT_USDC_MAX_PRICE),
+            cadcToken: vm.envOr("BASE_SEPOLIA_CADC_ADDRESS", address(0)),
+            cadcDecimals: uint8(vm.envOr("BASE_SEPOLIA_CADC_DECIMALS", uint256(DEFAULT_CADC_DECIMALS))),
+            cadcMaxPrice: vm.envOr("BASE_SEPOLIA_CADC_MAX_PRICE", DEFAULT_CADC_MAX_PRICE),
+            feeRecipient: vm.envOr("BASE_SEPOLIA_FEE_RECIPIENT", deployer),
+            feeBps: vm.envOr("BASE_SEPOLIA_FEE_BPS", uint256(250))
+        });
     }
 
     /**

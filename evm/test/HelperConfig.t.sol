@@ -33,4 +33,21 @@ contract HelperConfigTest is Test {
         assertEq(networkConfig.cadcDecimals, config.DEFAULT_CADC_DECIMALS());
         assertEq(networkConfig.cadcMaxPrice, config.DEFAULT_CADC_MAX_PRICE());
     }
+
+    function test_base_sepolia_config_allows_zero_addresses_for_mock_deployments() public {
+        vm.chainId(84532);
+        vm.setEnv("BASE_SEPOLIA_PRIVATE_KEY", vm.toString(uint256(1)));
+        vm.setEnv("BASE_SEPOLIA_USDC_ADDRESS", "0x0000000000000000000000000000000000000000");
+        vm.setEnv("BASE_SEPOLIA_CADC_ADDRESS", "0x0000000000000000000000000000000000000000");
+
+        HelperConfig config = new HelperConfig();
+        HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
+
+        assertEq(networkConfig.usdcToken, address(0));
+        assertEq(networkConfig.usdcDecimals, config.DEFAULT_USDC_DECIMALS());
+        assertEq(networkConfig.cadcMaxPrice, config.DEFAULT_CADC_MAX_PRICE());
+        assertEq(networkConfig.cadcToken, address(0));
+        assertEq(networkConfig.cadcDecimals, config.DEFAULT_CADC_DECIMALS());
+        assertEq(networkConfig.feeBps, uint256(250));
+    }
 }
