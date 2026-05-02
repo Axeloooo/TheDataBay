@@ -64,8 +64,8 @@ class OllamaLLMService(LLMService):
             embeddings_client=OllamaEmbeddings(
                 model=embedding_model,
                 base_url=embedding_base_url,
-                client_kwargs={},
-                async_client_kwargs={},
+                client_kwargs=client_kwargs,
+                async_client_kwargs=client_kwargs,
             ),
             summary_model=summary_model,
             embedding_model=embedding_model,

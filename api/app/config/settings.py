@@ -4,7 +4,7 @@ Configuration management using pydantic-settings for environment-based configura
 
 from functools import lru_cache
 from pathlib import Path
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]   # api/
@@ -28,11 +28,24 @@ class Settings(BaseSettings):
 
     # LLM settings
     llm_provider: str = Field(default="ollama", alias="LLM_PROVIDER")
-    llm_base_url: str = Field(default="http://localhost:11434", alias="LLM_BASE_URL")
+    # OLLAMA_HOST is a legacy alias kept for backward compatibility
+    llm_base_url: str = Field(
+        default="http://localhost:11434",
+        validation_alias=AliasChoices("LLM_BASE_URL", "OLLAMA_HOST"),
+    )
     llm_embedding_base_url: str = Field(default="http://localhost:11434", alias="LLM_EMBEDDING_BASE_URL")
-    llm_chat_model: str = Field(default="gpt-4o-mini", alias="LLM_CHAT_MODEL")
-    llm_embedding_model: str = Field(default="text-embedding-3-small", alias="LLM_EMBEDDING_MODEL")
-    llm_embedding_dimension: int = Field(default=1536, alias="LLM_EMBEDDING_DIMENSION")
+    # Defaults match the Ollama provider (LLM_PROVIDER default is "ollama")
+    llm_chat_model: str = Field(default="deepseek-v4-flash:cloud", alias="LLM_CHAT_MODEL")
+    # EMBEDDING_MODEL is a legacy alias kept for backward compatibility
+    llm_embedding_model: str = Field(
+        default="nomic-embed-text",
+        validation_alias=AliasChoices("LLM_EMBEDDING_MODEL", "EMBEDDING_MODEL"),
+    )
+    # EMBEDDING_DIMENSION is a legacy alias kept for backward compatibility
+    llm_embedding_dimension: int = Field(
+        default=768,
+        validation_alias=AliasChoices("LLM_EMBEDDING_DIMENSION", "EMBEDDING_DIMENSION"),
+    )
     llm_think: bool = Field(default=False, alias="LLM_THINK")
     ollama_api_key: SecretStr | None = Field(default=None, alias="OLLAMA_API_KEY")
     openai_api_key: SecretStr | None = Field(default=None, alias="OPENAI_API_KEY")
