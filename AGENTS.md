@@ -8,7 +8,7 @@ Ulenor is a decentralized dataset marketplace monorepo with four main components
 
 - `client/` — React + Vite web frontend
 - `mobile/` — Expo React Native mobile app
-- `server/` — FastAPI Python backend
+- `api/` — FastAPI Python backend
 - `evm/` — Solidity smart contracts (Foundry)
 
 The core flow: sellers upload AES-encrypted datasets to IPFS and create on-chain listings; buyers purchase via smart contract; the backend verifies on-chain access and releases the decryption key.
@@ -35,10 +35,10 @@ npm run lint       # ESLint
 npm run test       # Jest tests
 ```
 
-### Server (`server/`)
+### API (`api/`)
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
+cd api && python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
@@ -51,19 +51,21 @@ pytest -k "test_name" -q                                  # Single test by name
 ### Smart Contracts (`evm/`)
 
 ```bash
-make anvil           # Start local Anvil node (port 8545, chain ID 31337)
-make deploy-anvil    # Deploy Marketplace contract
-make seed-anvil      # Seed test data
-make build           # Compile contracts + export ABI to server/app/contracts/
-forge test           # Run Solidity tests
-forge fmt            # Format Solidity files
+make anvil                        # Start local Anvil node (port 8545, chain ID 31337)
+make deploy-anvil                 # Deploy Marketplace contract
+make seed-anvil                   # Seed test data
+make evm-build                    # Compile contracts + export ABI to api/app/contracts/
+make evm-test                     # Run Solidity tests
+make evm-fmt                      # Format Solidity files
+make mint-tokens-anvil            # Mint mock tokens on Anvil
+make mint-tokens-base-sepolia     # Mint mock tokens on Base Sepolia
 ```
 
 ### Dev Environment
 
 ```bash
-tilt up     # Start full stack (requires Minikube + Docker)
-tilt down   # Stop all services
+make dev-up     # Start full stack (requires Minikube + Docker)
+make dev-down   # Stop all services
 ```
 
 ## Architecture
@@ -76,7 +78,7 @@ tilt down   # Stop all services
 - **Bootstrap**: `src/bootstrap/app-bootstrap.tsx` handles app initialization
 - **Path alias**: `@/*` maps to `src/*`
 
-### Server
+### API
 
 Layered FastAPI architecture: **Routers → Services → Models/Schemas**
 
@@ -84,7 +86,7 @@ Layered FastAPI architecture: **Routers → Services → Models/Schemas**
 - `app/services/` — Business logic (AI ranking, LLM embedding, contract reads, encryption, IPFS)
 - `app/schemas/` — Pydantic request/response models
 - `app/models/` — SQLModel database models (PostgreSQL)
-- `app/config/settings.py` — All config via Pydantic `BaseSettings` with env var aliases; copy `server/.env.example` → `server/.env`
+- `app/config/settings.py` — All config via Pydantic `BaseSettings` with env var aliases; copy `.env.example` → `.env`
 
 Key API endpoints (base: `http://localhost:8080`):
 
@@ -100,7 +102,7 @@ Single contract (`evm/src/Marketplace.sol`) handles all marketplace logic:
 - OpenZeppelin `Ownable` + `ReentrancyGuard`
 - Fee model: basis points (bps) with configurable recipient
 - Metadata freezes after first purchase to preserve integrity
-- After `make build`, ABI is exported to `server/app/contracts/`
+- After `make evm-build`, ABI is exported to `api/app/contracts/`
 
 ### Mobile
 
@@ -115,8 +117,8 @@ Expo Router with file-based routing under `mobile/src/app/`.
 ## Environment Setup
 
 - **Client/Mobile**: Node.js 20.x
-- **Server**: Python 3.11+; requires `.env` from `.env.example`
-- **EVM**: Foundry toolchain; requires `.env` from `.env.example` (Anvil RPC URL, private keys, fee config)
+- **API**: Python 3.11+; requires `.env` from `.env.example` (root level)
+- **EVM**: Foundry toolchain; reads from root `.env`
 - **Full stack**: Docker + Minikube for Tilt-based orchestration
 
 ## Agent Skills
@@ -126,7 +128,7 @@ Agents **must read the selected skill's `SKILL.md` before implementation** and f
 
 ### Skill Loading Protocol (Required)
 
-1. **Classify the request** by domain (`client/`, `mobile/`, `server/`, `evm/`, docs/copy, debugging, or orchestration).
+1. **Classify the request** by domain (`client/`, `mobile/`, `api/`, `evm/`, docs/copy, debugging, or orchestration).
 2. **Load mandatory foundation skills first**:
    - `brainstorming` before creative feature work, behavior changes, or significant refactors.
    - `systematic-debugging` before attempting fixes for bugs, flaky tests, or unknown failures.

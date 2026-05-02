@@ -29,7 +29,7 @@ Ulenor includes:
 
 - `client/`: React + Vite frontend
 - `mobile/`: Expo React Native app (wallet, search, upload, purchases)
-- `server/`: FastAPI backend (LLM jobs, key release, contract reads)
+- `api/`: FastAPI backend (LLM jobs, key release, contract reads)
 - `evm/`: Foundry smart contracts/scripts/tests
 - `infra/development/`: Kubernetes manifests and Dockerfiles used in local dev
 
@@ -39,7 +39,7 @@ Ulenor includes:
 | --------------- | ----------------------------------------------------------------- | -------------------------------- |
 | Web app         | React, TypeScript, Vite, Zustand, Ethers.js                       | `client/`                        |
 | Mobile app      | Expo, React Native, Expo Router, Zustand, Reown AppKit, Ethers.js | `mobile/`                        |
-| Backend API     | FastAPI, SQLModel, Pydantic, pytest                               | `server/`                        |
+| Backend API     | FastAPI, SQLModel, Pydantic, pytest                               | `api/`                           |
 | Smart contracts | Solidity, Foundry (forge/anvil/cast), OpenZeppelin                | `evm/`                           |
 | Dev infra       | Docker, Kubernetes (Minikube), Tilt                               | `infra/development/`, `tiltfile` |
 
@@ -65,7 +65,6 @@ Ulenor includes:
 ### 1) Start local chain and deploy contract
 
 ```bash
-cd evm
 make anvil
 # in another terminal
 make deploy-anvil
@@ -77,11 +76,11 @@ make seed-anvil
 ### 2) Run backend
 
 ```bash
-cd server
+cd api
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 ### 3) Run frontend
@@ -92,14 +91,7 @@ npm install
 npm run dev
 ```
 
-Set frontend env values:
-
-```bash
-VITE_API_URL=http://localhost:8000
-VITE_CONTRACT_ADDRESS=<deployed_marketplace_address>
-VITE_PAYMENT_TOKEN_ADDRESS=<accepted_usdc_token_address>
-VITE_PINATA_GATEWAY_URL=https://gateway.pinata.cloud
-```
+Copy `.env.example` → `.env` at the repo root and fill in the values before starting the dev server.
 
 ### 4) Run mobile app
 
@@ -120,7 +112,7 @@ npm run start
 | `npm run lint`    | Run ESLint                      |
 | `npm run preview` | Serve built app locally         |
 
-### ⚙️ Backend (`server/`)
+### ⚙️ Backend (`api/`)
 
 | Command                    | What it does                               |
 | -------------------------- | ------------------------------------------ |
@@ -143,15 +135,15 @@ npm run start
 
 ### ⛓️ EVM / Foundry (`evm/`)
 
-| Command                                           | What it does                              |
-| ------------------------------------------------- | ----------------------------------------- |
-| `forge build`                                     | Compile contracts                         |
-| `forge test`                                      | Run solidity test suite                   |
-| `make anvil`                                      | Start local anvil node on `0.0.0.0:8545`  |
-| `make deploy-anvil`                               | Deploy `Marketplace` to local anvil       |
-| `make seed-anvil`                                 | Seed deterministic demo listings on-chain |
-| `make getall`                                     | Read all on-chain items with `cast`       |
-| `make buy-item ITEM_ID=<bytes32> PRICE_WEI=<wei>` | Buy seeded item from CLI                  |
+| Command                          | What it does                                          |
+| -------------------------------- | ----------------------------------------------------- |
+| `make evm-build`                 | Compile contracts, export ABI to `api/app/contracts/` |
+| `make evm-test`                  | Run Solidity test suite                               |
+| `make anvil`                     | Start local Anvil node on `0.0.0.0:8545`              |
+| `make deploy-anvil`              | Deploy `Marketplace` to local Anvil                   |
+| `make seed-anvil`                | Seed deterministic demo listings on-chain             |
+| `make mint-tokens-anvil`         | Mint MockUSDC + MockCADC on Anvil                     |
+| `make mint-tokens-base-sepolia`  | Mint MockUSDC + MockCADC on Base Sepolia               |
 
 ### 🐳 Docker
 
@@ -171,10 +163,10 @@ npm run start
 | `tilt down`                                     | Stop Tilt session                        |
 | `kubectl get pods -A`                           | Inspect all pods                         |
 | `kubectl get svc -A`                            | Inspect services                         |
-| `kubectl logs deployment/server -n default`     | View server logs                         |
+| `kubectl logs deployment/api -n default`        | View server logs                         |
 | `kubectl logs deployment/client -n default`     | View client logs                         |
 | `kubectl logs statefulset/postgres -n default`  | View postgres logs                       |
-| `kubectl port-forward svc/server-svc 8080:8080` | Expose backend locally                   |
+| `kubectl port-forward svc/api-svc 8080:8080`    | Expose backend locally                   |
 | `kubectl port-forward svc/client-svc 5173:5173` | Expose frontend locally                  |
 
 ## 🔌 API Endpoints
@@ -231,17 +223,15 @@ npm run start
 Use this flow to populate Home/Detail pages with real on-chain listings.
 
 ```bash
-cd evm
 make anvil
 # new terminal
 make deploy-anvil
 make seed-anvil
-make getall
 ```
 
 `make seed-anvil` uses `evm/script/SeedMarketplace.s.sol` and creates deterministic UUID-compatible `bytes32` item IDs so frontend route + backend UUID conversion remain consistent.
 
-`make deploy-anvil` also syncs the deployed marketplace address into local app config files used by the server and Tilt-based client/server deployments.
+`make deploy-anvil` also syncs the deployed marketplace address into `infra/k8s/development/secrets.yaml` and the root `.env`.
 
 For Tilt/Kubernetes, set `infra/k8s/development/secrets.yaml` `RPC_URL` to a host-reachable URL such as `http://host.docker.internal:8545`. Use `http://127.0.0.1:8545` only when the backend process itself runs directly on the host.
 
@@ -262,12 +252,12 @@ For Tilt/Kubernetes, set `infra/k8s/development/secrets.yaml` `RPC_URL` to a hos
 ### `getAllItems()` reverts in the backend but `make getall` works
 
 - Check that the backend is calling the same deployed address saved in `evm/deployments/anvil_marketplace.addr`.
-- If you redeployed Anvil, re-run `make deploy-anvil` to sync `infra/k8s/development/secrets.yaml` and `server/.env`.
+- If you redeployed Anvil, re-run `make deploy-anvil` to sync `infra/k8s/development/secrets.yaml` and the root `.env`.
 - Restart the server resource after the config update so the new `CONTRACT_ADDRESS` is loaded.
 
 ### Error: RPC node unreachable
 
-- Verify Anvil is running with `cd evm && make anvil`. The default target binds to `0.0.0.0:8545` so containers can reach it.
+- Verify Anvil is running with `make anvil`. The default target binds to `0.0.0.0:8545` so containers can reach it.
 - If the backend runs in Tilt/Kubernetes, set `infra/k8s/development/secrets.yaml` `RPC_URL` to `http://host.docker.internal:8545`, then restart the server resource so the secret is reloaded.
 - If the backend runs directly on your host with `uvicorn`, `RPC_URL=http://127.0.0.1:8545` is correct.
 
