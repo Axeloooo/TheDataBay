@@ -1,6 +1,6 @@
 from app.config.settings import Settings
 from app.llm.dependencies import get_llm_service
-from app.llm.services.ollama_provider import OllamaLLMService
+from app.llm.providers.ollama import OllamaLLMService
 
 
 def make_settings(**overrides: object) -> Settings:

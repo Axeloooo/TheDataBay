@@ -3,7 +3,7 @@ from pydantic import SecretStr
 
 from app.config.settings import Settings
 from app.llm.errors import LLMProviderError, LLMSummaryValidationError
-from app.llm.services.ollama_provider import OllamaLLMService
+from app.llm.providers.ollama import OllamaLLMService
 
 
 class FakeMessage:
@@ -83,9 +83,9 @@ def test_ollama_provider_uses_configured_model_defaults(monkeypatch):
         def __init__(self, **kwargs) -> None:
             constructed["embeddings"] = kwargs
 
-    monkeypatch.setattr("app.llm.services.ollama_provider.ChatOllama", FakeChat)
+    monkeypatch.setattr("app.llm.providers.ollama.ChatOllama", FakeChat)
     monkeypatch.setattr(
-        "app.llm.services.ollama_provider.OllamaEmbeddings", FakeEmbeddings
+        "app.llm.providers.ollama.OllamaEmbeddings", FakeEmbeddings
     )
 
     service = OllamaLLMService.from_settings(make_settings())
@@ -121,9 +121,9 @@ def test_ollama_provider_passes_optional_api_key_as_bearer_header(monkeypatch):
         def __init__(self, **kwargs) -> None:
             constructed["embeddings"] = kwargs
 
-    monkeypatch.setattr("app.llm.services.ollama_provider.ChatOllama", FakeChat)
+    monkeypatch.setattr("app.llm.providers.ollama.ChatOllama", FakeChat)
     monkeypatch.setattr(
-        "app.llm.services.ollama_provider.OllamaEmbeddings", FakeEmbeddings
+        "app.llm.providers.ollama.OllamaEmbeddings", FakeEmbeddings
     )
 
     OllamaLLMService.from_settings(make_settings(OLLAMA_API_KEY="secret-token"))
@@ -156,9 +156,9 @@ def test_ollama_provider_allows_hosted_endpoint_with_api_key(monkeypatch):
         def __init__(self, **kwargs) -> None:
             constructed["embeddings"] = kwargs
 
-    monkeypatch.setattr("app.llm.services.ollama_provider.ChatOllama", FakeChat)
+    monkeypatch.setattr("app.llm.providers.ollama.ChatOllama", FakeChat)
     monkeypatch.setattr(
-        "app.llm.services.ollama_provider.OllamaEmbeddings", FakeEmbeddings
+        "app.llm.providers.ollama.OllamaEmbeddings", FakeEmbeddings
     )
 
     settings = make_settings(

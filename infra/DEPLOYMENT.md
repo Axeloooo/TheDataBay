@@ -368,7 +368,7 @@ kubectl exec -n thedatabay deploy/backend -- python - <<'PY'
 import asyncio
 
 from app.config.settings import get_settings
-from app.llm.services.ollama_provider import OllamaLLMService
+from app.llm.providers.ollama import OllamaLLMService
 
 async def main() -> int:
     settings = get_settings()
