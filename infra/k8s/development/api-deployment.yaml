@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: server
+  name: api
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: server
+      app: api
   template:
     metadata:
       labels:
-        app: server
+        app: api
     spec:
       containers:
-        - name: server
-          image: ulenor/server
+        - name: api
+          image: ulenor/api
           env:
             # Database settings
             - name: POSTGRES_URL
@@ -59,14 +59,68 @@ spec:
                   name: ulenor-secrets
                   key: CORS_ORIGINS
 
-            # Ollama settings
-            - name: EMBEDDING_MODEL
+            # LLM settings
+            - name: LLM_PROVIDER
               valueFrom:
                 secretKeyRef:
                   name: ulenor-secrets
-                  key: EMBEDDING_MODEL
-            - name: OLLAMA_HOST
-              value: "http://host.docker.internal:11434"
+                  key: LLM_PROVIDER
+            - name: LLM_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: LLM_BASE_URL
+                  optional: true
+            - name: LLM_EMBEDDING_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: LLM_EMBEDDING_BASE_URL
+                  optional: true
+            - name: LLM_CHAT_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: LLM_CHAT_MODEL
+            - name: LLM_EMBEDDING_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: LLM_EMBEDDING_MODEL
+            - name: LLM_EMBEDDING_DIMENSION
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: LLM_EMBEDDING_DIMENSION
+            - name: LLM_THINK
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: LLM_THINK
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: OPENAI_API_KEY
+                  optional: true
+            - name: OLLAMA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: OLLAMA_API_KEY
+                  optional: true
+
+            # Dataset summary settings
+            - name: DATASET_SUMMARY_COUNT
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: DATASET_SUMMARY_COUNT
+            - name: DATASET_SUMMARY_SAMPLE_ROWS
+              valueFrom:
+                secretKeyRef:
+                  name: ulenor-secrets
+                  key: DATASET_SUMMARY_SAMPLE_ROWS
 
             # Embedding job settings
             - name: MAX_FILE_SIZE_MB
@@ -79,11 +133,6 @@ spec:
                 secretKeyRef:
                   name: ulenor-secrets
                   key: MAX_DATASET_ROWS
-            - name: EMBEDDING_CHUNK_SIZE
-              valueFrom:
-                secretKeyRef:
-                  name: ulenor-secrets
-                  key: EMBEDDING_CHUNK_SIZE
 
             # Similarity search settings
             - name: TOP_K
@@ -91,11 +140,6 @@ spec:
                 secretKeyRef:
                   name: ulenor-secrets
                   key: TOP_K
-            - name: K_ROWS
-              valueFrom:
-                secretKeyRef:
-                  name: ulenor-secrets
-                  key: K_ROWS
             - name: SIMILARITY_THRESHOLD
               valueFrom:
                 secretKeyRef:
@@ -170,10 +214,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: server-svc
+  name: api-svc
 spec:
   selector:
-    app: server
+    app: api
   ports:
     - port: 8080
       targetPort: 8080

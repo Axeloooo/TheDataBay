@@ -2,13 +2,13 @@ FROM python:3.11.12-slim-bookworm
 
 WORKDIR /code
 
-COPY server/requirements.txt /code/requirements.txt
+COPY api/requirements.txt /code/requirements.txt
 
 RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
 
-COPY server/app /code/app
-COPY server/alembic /code/alembic
-COPY server/alembic.ini /code/alembic.ini
+COPY api/app /code/app
+COPY api/alembic /code/alembic
+COPY api/alembic.ini /code/alembic.ini
 COPY shared /code/shared
 
 EXPOSE 8080
