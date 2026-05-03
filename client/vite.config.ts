@@ -19,23 +19,27 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       // Remap canonical env var names → VITE_* so client source is unchanged.
+      // Fall back to VITE_* prefixed names so Docker build-arg ENV vars are
+      // picked up when there is no root .env file (e.g. production builds).
       "import.meta.env.VITE_API_URL": JSON.stringify(
-        env.API_URL || "http://localhost:8080"
+        env.API_URL || env.VITE_API_URL || "http://localhost:8080"
       ),
       "import.meta.env.VITE_CONTRACT_ADDRESS": JSON.stringify(
-        env.CONTRACT_ADDRESS || ""
+        env.CONTRACT_ADDRESS || env.VITE_CONTRACT_ADDRESS || ""
       ),
       "import.meta.env.VITE_USDC_TOKEN_ADDRESS": JSON.stringify(
-        env.USDC_TOKEN_ADDRESS || ""
+        env.USDC_TOKEN_ADDRESS || env.VITE_USDC_TOKEN_ADDRESS || ""
       ),
       "import.meta.env.VITE_CADC_TOKEN_ADDRESS": JSON.stringify(
-        env.CADC_TOKEN_ADDRESS || ""
+        env.CADC_TOKEN_ADDRESS || env.VITE_CADC_TOKEN_ADDRESS || ""
       ),
       "import.meta.env.VITE_PINATA_GATEWAY_URL": JSON.stringify(
-        env.PINATA_GATEWAY_URL || "https://gateway.pinata.cloud"
+        env.PINATA_GATEWAY_URL ||
+          env.VITE_PINATA_GATEWAY_URL ||
+          "https://gateway.pinata.cloud"
       ),
       "import.meta.env.VITE_WALLETCONNECT_PROJECT_ID": JSON.stringify(
-        env.WALLETCONNECT_PROJECT_ID || ""
+        env.WALLETCONNECT_PROJECT_ID || env.VITE_WALLETCONNECT_PROJECT_ID || ""
       ),
       // WalletConnect packages reference Node.js `global`
       global: "globalThis",

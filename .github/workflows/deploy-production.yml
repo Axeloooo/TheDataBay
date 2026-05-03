@@ -75,7 +75,7 @@ jobs:
         run: |
           set -euo pipefail
           docker build \
-            -f infra/docker/production/server.Dockerfile \
+            -f infra/docker/production/api.Dockerfile \
             -t "$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY/api:$IMAGE_TAG" \
             .
           docker push "$ACR_LOGIN_SERVER/$IMAGE_REPOSITORY/api:$IMAGE_TAG"
