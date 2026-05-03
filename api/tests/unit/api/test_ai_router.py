@@ -27,7 +27,7 @@ def make_ranked_dataset(listing_id: str, score: float = 0.85) -> RankedDataset:
         purchase_count=0,
         score=score,
         score_label="high",
-        best_summary="Best matching summary",
+        best_match="Best matching summary",
     )
 
 
@@ -73,7 +73,7 @@ def test_similarity_search_returns_ranked_results(client):
     assert result["dataset_id"] == "dataset-0101"
     assert result["score"] == 0.85
     assert result["score_label"] == "high"
-    assert result["best_summary"] == "Best matching summary"
+    assert result["best_match"] == "Best matching summary"
     assert result["price_atomic"] == 100
     assert result["payment_token"] == "0x0000000000000000000000000000000000000002"
     assert result["settlement_currency"] == "USDC"

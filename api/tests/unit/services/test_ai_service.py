@@ -35,21 +35,15 @@ def make_item(listing_id: str, title: str = "Test Dataset") -> SimpleNamespace:
 
 def make_doc(
     *,
-    dataset_id: str,
     listing_id: str,
     page_content: str,
-    dataset_filename: str = "dataset.csv",
-    summary_kind: str = "overview",
-    summary_index: int = 0,
+    row_index: int = 0,
 ) -> SimpleNamespace:
     return SimpleNamespace(
         page_content=page_content,
         metadata={
-            "dataset_id": dataset_id,
             "listing_id": listing_id,
-            "dataset_filename": dataset_filename,
-            "summary_kind": summary_kind,
-            "summary_index": summary_index,
+            "row_index": row_index,
         },
     )
 
@@ -58,7 +52,7 @@ def make_settings(**overrides) -> SimpleNamespace:
     data = {
         "top_k": 10,
         "llm_embedding_model": "nomic-embed-text",
-        "dataset_summary_count": 5,
+        "max_embed_rows": 2000,
         "similarity_threshold": None,
     }
     data.update(overrides)
@@ -67,7 +61,7 @@ def make_settings(**overrides) -> SimpleNamespace:
 
 def make_service(
     *,
-    summary_hits: list[tuple[object, float]],
+    row_hits: list[tuple[object, float]],
     contract_items: list,
     embedding_vector: list[float] | None = None,
     embedding_raises: Exception | None = None,
@@ -87,7 +81,7 @@ def make_service(
         )
 
     vector_repository = MagicMock()
-    vector_repository.similarity_search_by_vector = AsyncMock(return_value=summary_hits)
+    vector_repository.similarity_search_by_vector = AsyncMock(return_value=row_hits)
     contract_listing_fetcher = MagicMock(return_value=contract_items)
 
     service = AIService(
@@ -139,12 +133,11 @@ def test_score_label_uses_fixed_search_bands(score: float, label: str):
 def test_strong_match_embeds_query_searches_summaries_and_joins_listing():
     item = make_item("listing-1", title="Heart Cohort")
     service, llm_service, vector_repository, contract_fetcher = make_service(
-        summary_hits=[
+        row_hits=[
             (
                 make_doc(
-                    dataset_id="dataset-1",
                     listing_id="listing-1",
-                    page_content="Summary: heart patients with age and cholesterol fields.",
+                    page_content="age in years: 63\nserum cholesterol: 200",
                 ),
                 0.91,
             )
@@ -157,25 +150,24 @@ def test_strong_match_embeds_query_searches_summaries_and_joins_listing():
     llm_service.embed_text.assert_awaited_once_with("heart cholesterol")
     vector_repository.similarity_search_by_vector.assert_awaited_once_with(
         [0.1, 0.2, 0.3],
-        k=25,
+        k=200,
     )
     contract_fetcher.assert_called_once()
     assert len(results) == 1
     result = results[0]
-    assert result.dataset_id == "dataset-1"
+    assert result.dataset_id == "listing-1"
     assert result.listing_id == "listing-1"
     assert result.title == "Heart Cohort"
     assert result.score == 0.91
     assert result.score_label == "high"
-    assert result.best_summary == "Summary: heart patients with age and cholesterol fields."
+    assert result.best_match == "age in years: 63\nserum cholesterol: 200"
 
 
 def test_weak_match_is_returned_with_low_label():
     service, _, _, _ = make_service(
-        summary_hits=[
+        row_hits=[
             (
                 make_doc(
-                    dataset_id="dataset-weak",
                     listing_id="listing-weak",
                     page_content="Some faintly related tabular metadata.",
                 ),
@@ -194,10 +186,9 @@ def test_weak_match_is_returned_with_low_label():
 
 def test_off_domain_no_match_is_filtered():
     service, _, _, contract_fetcher = make_service(
-        summary_hits=[
+        row_hits=[
             (
                 make_doc(
-                    dataset_id="dataset-off",
                     listing_id="listing-off",
                     page_content="Retail inventory summary.",
                 ),
@@ -217,16 +208,15 @@ def test_top_k_is_final_dataset_limit_and_not_row_overfetch():
     hits = [
         (
             make_doc(
-                dataset_id=f"dataset-{index}",
                 listing_id=f"listing-{index}",
-                page_content=f"Useful summary {index}",
+                page_content=f"Useful row content {index}",
             ),
             0.9 - index * 0.01,
         )
         for index in range(5)
     ]
     service, _, vector_repository, _ = make_service(
-        summary_hits=hits,
+        row_hits=hits,
         contract_items=[make_item(f"listing-{index}") for index in range(5)],
         settings=make_settings(top_k=3),
     )
@@ -235,23 +225,22 @@ def test_top_k_is_final_dataset_limit_and_not_row_overfetch():
 
     vector_repository.similarity_search_by_vector.assert_awaited_once_with(
         [0.1, 0.2, 0.3],
-        k=15,
+        k=200,
     )
     assert [result.dataset_id for result in results] == [
-        "dataset-0",
-        "dataset-1",
-        "dataset-2",
+        "listing-0",
+        "listing-1",
+        "listing-2",
     ]
 
 
 def test_similarity_threshold_can_raise_minimum_score_above_low_band():
     service, _, _, _ = make_service(
-        summary_hits=[
+        row_hits=[
             (
                 make_doc(
-                    dataset_id="dataset-low",
                     listing_id="listing-low",
-                    page_content="Low but normally matchable summary.",
+                    page_content="Low but normally matchable content.",
                 ),
                 0.43,
             )
@@ -263,32 +252,29 @@ def test_similarity_threshold_can_raise_minimum_score_above_low_band():
     assert asyncio.run(service.rank_datasets("weak signal", limit=5)) == []
 
 
-def test_dedupes_summary_hits_by_dataset_id_and_keeps_best_summary():
+def test_dedupes_row_hits_by_listing_id_and_keeps_best_match():
     service, _, _, _ = make_service(
-        summary_hits=[
+        row_hits=[
             (
                 make_doc(
-                    dataset_id="dataset-1",
                     listing_id="listing-1",
-                    page_content="Weaker summary for the same dataset.",
-                    summary_index=0,
+                    page_content="age in years: 45\nserum cholesterol: 180",
+                    row_index=0,
                 ),
                 0.6,
             ),
             (
                 make_doc(
-                    dataset_id="dataset-1",
                     listing_id="listing-1",
-                    page_content="Best summary with age, sex, and cholesterol.",
-                    summary_index=1,
+                    page_content="age in years: 37\nserum cholesterol: 289",
+                    row_index=1,
                 ),
                 0.88,
             ),
             (
                 make_doc(
-                    dataset_id="dataset-2",
                     listing_id="listing-2",
-                    page_content="Another dataset summary.",
+                    page_content="make: Toyota\nmodel: Camry",
                 ),
                 0.7,
             ),
@@ -298,19 +284,18 @@ def test_dedupes_summary_hits_by_dataset_id_and_keeps_best_summary():
 
     results = asyncio.run(service.rank_datasets("heart columns", limit=5))
 
-    assert [result.dataset_id for result in results] == ["dataset-1", "dataset-2"]
+    assert [result.dataset_id for result in results] == ["listing-1", "listing-2"]
     assert results[0].score == 0.88
-    assert results[0].best_summary == "Best summary with age, sex, and cholesterol."
+    assert results[0].best_match == "age in years: 37\nserum cholesterol: 289"
 
 
-def test_response_schema_includes_dataset_and_summary_fields():
+def test_response_schema_includes_all_ranked_dataset_fields():
     service, _, _, _ = make_service(
-        summary_hits=[
+        row_hits=[
             (
                 make_doc(
-                    dataset_id="dataset-schema",
                     listing_id="listing-schema",
-                    page_content="Schema coverage summary.",
+                    page_content="biological sex: 1\nage in years: 45",
                 ),
                 0.75,
             )
@@ -322,7 +307,7 @@ def test_response_schema_includes_dataset_and_summary_fields():
     payload = result.model_dump()
 
     assert payload == {
-        "dataset_id": "dataset-schema",
+        "dataset_id": "listing-schema",
         "listing_id": "listing-schema",
         "title": "Test Dataset",
         "description": "A test dataset",
@@ -334,7 +319,7 @@ def test_response_schema_includes_dataset_and_summary_fields():
         "purchase_count": 0,
         "score": 0.75,
         "score_label": "high",
-        "best_summary": "Schema coverage summary.",
+        "best_match": "biological sex: 1\nage in years: 45",
     }
 
 
@@ -342,12 +327,11 @@ def test_bytes32_contract_listing_id_joins_to_uuid_metadata_listing_id():
     listing_uuid = "deadbeef-dead-beef-dead-beefdeadbeef"
     bytes32_hex = "0x" + (uuid.UUID(listing_uuid).bytes + b"\x00" * 16).hex()
     service, _, _, _ = make_service(
-        summary_hits=[
+        row_hits=[
             (
                 make_doc(
-                    dataset_id="dataset-uuid",
                     listing_id=listing_uuid,
-                    page_content="UUID listing summary.",
+                    page_content="age in years: 50\nblood pressure: 120",
                 ),
                 0.82,
             )
@@ -364,7 +348,7 @@ def test_bytes32_contract_listing_id_joins_to_uuid_metadata_listing_id():
 
 def test_embedding_failure_raises_embedding_error():
     service, _, _, _ = make_service(
-        summary_hits=[],
+        row_hits=[],
         contract_items=[],
         embedding_raises=RuntimeError("provider down"),
     )

@@ -28,7 +28,7 @@ class RankedDataset(BaseModel):
     purchase_count: int
     score: float = Field(..., ge=0.0, le=1.0, description="Cosine similarity (0.0–1.0)")
     score_label: Literal["high", "moderate", "low"]
-    best_summary: str
+    best_match: str
 
 
 class SimilaritySearchResponse(BaseModel):

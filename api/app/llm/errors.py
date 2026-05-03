@@ -13,5 +13,5 @@ class LLMProviderError(LLMError):
     """Raised when the underlying provider call fails."""
 
 
-class LLMSummaryValidationError(LLMError):
-    """Raised when a summary response cannot be validated as strict JSON."""
+class LLMResponseValidationError(LLMError):
+    """Raised when an LLM response cannot be validated as the expected format."""

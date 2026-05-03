@@ -1,23 +1,6 @@
 """Pydantic schemas for generic LLM operations."""
 
-from pydantic import BaseModel, ConfigDict, Field
-
-
-class TextSummary(BaseModel):
-    """Strict JSON schema expected from summary models."""
-
-    title: str = Field(min_length=1)
-    summary: str = Field(min_length=1)
-    keywords: list[str] = Field(min_length=1)
-
-    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True, strict=True)
-
-
-class SummaryResult(BaseModel):
-    """Validated summary plus model metadata."""
-
-    summary: TextSummary
-    model: str
+from pydantic import BaseModel, Field
 
 
 class EmbeddingResult(BaseModel):
@@ -33,3 +16,9 @@ class EmbeddingBatchResult(BaseModel):
 
     embeddings: list[EmbeddingResult]
     model: str
+
+
+class ColumnExpansionResult(BaseModel):
+    """Mapping of raw CSV column names to plain-English descriptions."""
+
+    columns: dict[str, str]

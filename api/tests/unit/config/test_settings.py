@@ -21,8 +21,7 @@ LLM_EMBEDDING_MODEL="nomic-embed-text"
 LLM_EMBEDDING_DIMENSION=768
 LLM_THINK=false
 OLLAMA_API_KEY="test-ollama-key"
-DATASET_SUMMARY_COUNT=5
-DATASET_SUMMARY_SAMPLE_ROWS=20
+MAX_EMBED_ROWS=2000
 MAX_FILE_SIZE_MB=50
 MAX_DATASET_ROWS=50000
 TOP_K=10
@@ -63,8 +62,7 @@ def clear_relevant_env(monkeypatch: pytest.MonkeyPatch) -> None:
         "LLM_EMBEDDING_DIMENSION",
         "LLM_THINK",
         "OLLAMA_API_KEY",
-        "DATASET_SUMMARY_COUNT",
-        "DATASET_SUMMARY_SAMPLE_ROWS",
+        "MAX_EMBED_ROWS",
         "OLLAMA_HOST",
         "EMBEDDING_MODEL",
         "EMBEDDING_DIMENSION",
@@ -111,8 +109,7 @@ def test_settings_loads_from_env_file(tmp_path, monkeypatch):
     assert s.llm_think is False
     assert isinstance(s.ollama_api_key, SecretStr)
     assert s.ollama_api_key.get_secret_value() == "test-ollama-key"
-    assert s.dataset_summary_count == 5
-    assert s.dataset_summary_sample_rows == 20
+    assert s.max_embed_rows == 2000
 
     assert s.max_file_size_mb == 50
     assert s.max_dataset_rows == 50000
@@ -156,8 +153,7 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
         LLM_EMBEDDING_MODEL="m"
         LLM_EMBEDDING_DIMENSION="1024"
         LLM_THINK="true"
-        DATASET_SUMMARY_COUNT="7"
-        DATASET_SUMMARY_SAMPLE_ROWS="25"
+        MAX_EMBED_ROWS="500"
         MAX_FILE_SIZE_MB="123"
         MAX_DATASET_ROWS="456"
         TOP_K="15"
@@ -185,11 +181,7 @@ def test_settings_type_coercion(tmp_path, monkeypatch):
         isinstance(s.llm_embedding_dimension, int) and s.llm_embedding_dimension == 1024
     )
     assert s.llm_think is True
-    assert isinstance(s.dataset_summary_count, int) and s.dataset_summary_count == 7
-    assert (
-        isinstance(s.dataset_summary_sample_rows, int)
-        and s.dataset_summary_sample_rows == 25
-    )
+    assert isinstance(s.max_embed_rows, int) and s.max_embed_rows == 500
     assert isinstance(s.max_file_size_mb, int) and s.max_file_size_mb == 123
     assert isinstance(s.max_dataset_rows, int) and s.max_dataset_rows == 456
     assert isinstance(s.top_k, int) and s.top_k == 15
@@ -371,6 +363,5 @@ def test_legacy_ollama_and_embedding_env_names_are_migrated(tmp_path, monkeypatc
     assert s.llm_embedding_dimension == 384
     assert s.llm_chat_model == "deepseek-v4-flash:cloud"
     assert s.llm_think is False
-    assert s.dataset_summary_count == 5
-    assert s.dataset_summary_sample_rows == 20
+    assert s.max_embed_rows == 2000
     assert s.ollama_api_key is None

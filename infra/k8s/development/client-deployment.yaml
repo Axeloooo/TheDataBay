@@ -46,6 +46,11 @@ spec:
                 secretKeyRef:
                   name: thedatabay-secrets
                   key: WALLETCONNECT_PROJECT_ID
+            - name: VITE_CHAIN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CHAIN_ID
           resources:
             requests:
               memory: "512Mi"

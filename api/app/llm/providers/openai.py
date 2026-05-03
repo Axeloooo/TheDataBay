@@ -3,36 +3,40 @@
 from typing import Any
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
-from pydantic import ValidationError
 
 from ...config.settings import Settings
-from ..errors import LLMInputError, LLMProviderError, LLMSummaryValidationError
-from ..schemas import EmbeddingBatchResult, EmbeddingResult, SummaryResult, TextSummary
+from ..errors import LLMInputError, LLMProviderError, LLMResponseValidationError
+from ..schemas import (
+    ColumnExpansionResult,
+    EmbeddingBatchResult,
+    EmbeddingResult,
+)
 from ..service import LLMService
 
-DEFAULT_SUMMARY_MODEL = "gpt-4o-mini"
+DEFAULT_CHAT_MODEL = "gpt-4o-mini"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 
-_SUMMARY_SYSTEM_PROMPT = (
-    "Summarize the provided text as strict JSON only. The JSON object must contain "
-    'exactly these keys: "title" (string), "summary" (string), and '
-    '"keywords" (array of strings). Do not include markdown or extra keys.'
+_COLUMN_EXPANSION_SYSTEM_PROMPT = (
+    "You are a data analyst. Given CSV column names and sample rows, return a strict JSON object "
+    "mapping each column name to a plain-English description of what that column represents. "
+    "Include units or value encodings where evident (e.g. '0=female, 1=male'). "
+    "Return only the JSON object with no markdown or extra keys."
 )
 
 class OpenAILLMService(LLMService):
-    """LLM service that delegates summaries and embeddings to OpenAI."""
+    """LLM service that delegates column expansion and embeddings to OpenAI."""
 
     def __init__(
         self,
         *,
         chat_client: Any,
         embeddings_client: Any,
-        summary_model: str,
+        chat_model: str,
         embedding_model: str,
     ) -> None:
         self._chat_client = chat_client
         self._embeddings_client = embeddings_client
-        self.summary_model = summary_model
+        self.chat_model = chat_model
         self.embedding_model = embedding_model
 
     @property
@@ -48,12 +52,12 @@ class OpenAILLMService(LLMService):
             raise LLMProviderError("OPENAI_API_KEY must be set when LLM_PROVIDER is openai")
         api_key = api_key_secret.get_secret_value()
 
-        summary_model = getattr(settings, "llm_chat_model", DEFAULT_SUMMARY_MODEL)
+        chat_model = getattr(settings, "llm_chat_model", DEFAULT_CHAT_MODEL)
         embedding_model = getattr(settings, "llm_embedding_model", DEFAULT_EMBEDDING_MODEL)
 
         return cls(
             chat_client=ChatOpenAI(
-                model=summary_model,
+                model=chat_model,
                 api_key=api_key,
                 model_kwargs={"response_format": {"type": "json_object"}},
             ),
@@ -61,26 +65,54 @@ class OpenAILLMService(LLMService):
                 model=embedding_model,
                 api_key=api_key,
             ),
-            summary_model=summary_model,
+            chat_model=chat_model,
             embedding_model=embedding_model,
         )
 
-    async def summarize_text(self, text: str) -> SummaryResult:
-        """Generate and validate a strict JSON summary, retrying malformed JSON once."""
-        clean_text = _require_text(text)
+    async def expand_column_names(
+        self,
+        column_names: list[str],
+        sample_rows: list[list[str]],
+    ) -> ColumnExpansionResult:
+        """Return plain-English descriptions for CSV column names using gpt-4o-mini."""
+        sample_lines = "\n".join(
+            ", ".join(f"{col}: {val}" for col, val in zip(column_names, row))
+            for row in sample_rows
+        )
+        human_prompt = (
+            f"Column names: {', '.join(column_names)}\n"
+            f"Sample rows:\n{sample_lines}"
+        )
         last_error: Exception | None = None
-
         for attempt in range(2):
-            raw_content = await self._invoke_summary(clean_text, retry=attempt > 0)
+            if attempt > 0:
+                human_prompt = (
+                    "Your previous response was not valid JSON. "
+                    "Return only the strict JSON object mapping column names to descriptions:\n\n"
+                    + human_prompt
+                )
             try:
-                summary = TextSummary.model_validate_json(raw_content)
-                return SummaryResult(summary=summary, model=self.summary_model)
-            except (ValidationError, ValueError) as exc:
+                response = await self._chat_client.ainvoke(
+                    [
+                        ("system", _COLUMN_EXPANSION_SYSTEM_PROMPT),
+                        ("human", human_prompt),
+                    ]
+                )
+                content = getattr(response, "content", response)
+                if not isinstance(content, str):
+                    raise LLMResponseValidationError("Column expansion response was not text")
+                import json
+                raw = json.loads(content)
+                if not isinstance(raw, dict):
+                    raise ValueError("Expected a JSON object")
+                return ColumnExpansionResult(
+                    columns={str(k): str(v) for k, v in raw.items()}
+                )
+            except Exception as exc:
                 last_error = exc
 
-        raise LLMSummaryValidationError(
-            "OpenAI returned malformed summary JSON after retry"
-        ) from last_error
+        # Fallback: return raw column names as their own descriptions
+        return ColumnExpansionResult(columns={col: col for col in column_names})
 
     async def embed_text(self, text: str) -> EmbeddingResult:
         """Embed a single text string."""
@@ -115,30 +147,6 @@ class OpenAILLMService(LLMService):
             ],
             model=self.embedding_model,
         )
-
-    async def _invoke_summary(self, text: str, *, retry: bool) -> str:
-        human_prompt = text
-        if retry:
-            human_prompt = (
-                "Your previous response was not valid for the required schema. "
-                "Return only the strict JSON object for this text:\n\n"
-                f"{text}"
-            )
-
-        try:
-            response = await self._chat_client.ainvoke(
-                [
-                    ("system", _SUMMARY_SYSTEM_PROMPT),
-                    ("human", human_prompt),
-                ]
-            )
-        except Exception as exc:
-            raise LLMProviderError("OpenAI summary request failed") from exc
-
-        content = getattr(response, "content", response)
-        if not isinstance(content, str):
-            raise LLMSummaryValidationError("OpenAI summary response was not text")
-        return content
 
 
 def _require_text(text: str) -> str:

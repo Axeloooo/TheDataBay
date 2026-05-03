@@ -52,16 +52,10 @@ class Settings(BaseSettings):
     ollama_api_key: SecretStr | None = Field(default=None, alias="OLLAMA_API_KEY")
     openai_api_key: SecretStr | None = Field(default=None, alias="OPENAI_API_KEY")
 
-    # Dataset summary settings
-    dataset_summary_count: int = Field(default=5, alias="DATASET_SUMMARY_COUNT")
-    dataset_summary_sample_rows: int = Field(
-        default=20,
-        alias="DATASET_SUMMARY_SAMPLE_ROWS",
-    )
-
     # Embedding job settings
     max_file_size_mb: int = Field(alias="MAX_FILE_SIZE_MB")
     max_dataset_rows: int = Field(alias="MAX_DATASET_ROWS")
+    max_embed_rows: int = Field(default=2000, alias="MAX_EMBED_ROWS")
 
     # Similarity search settings
     top_k: int = Field(alias="TOP_K")
@@ -86,8 +80,8 @@ class Settings(BaseSettings):
     database_url: SecretStr = Field(alias="POSTGRES_URL")
 
     @property
-    def summary_model(self) -> str:
-        """Return the configured summary/chat model."""
+    def chat_model(self) -> str:
+        """Return the configured chat model."""
         return self.llm_chat_model
 
     @property

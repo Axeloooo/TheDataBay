@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 _SCORE_HIGH = 0.72
 _SCORE_MODERATE = 0.58
 _SCORE_LOW = 0.42
-_MAX_SUMMARY_FETCH = 200
+_MAX_ROW_FETCH = 200
 
 
 def _clamp(score: float) -> float:
@@ -66,7 +66,7 @@ class _DatasetHit:
     listing_id: str
     score: float
     score_label: Literal["high", "moderate", "low"]
-    best_summary: str
+    best_match: str
 
 
 class _LLMEmbeddingsAdapter:
@@ -107,18 +107,18 @@ class AIService:
         self._settings = settings
 
     async def rank_datasets(self, query: str, limit: int = 20) -> list[RankedDataset]:
-        """Rank whole datasets by their strongest matching summary."""
+        """Rank datasets by their strongest matching row."""
         final_limit = max(0, min(limit, int(getattr(self._settings, "top_k", limit))))
         if final_limit == 0:
             return []
-        summary_fetch_k = _summary_fetch_limit(self._settings, final_limit)
+        row_fetch_k = _row_fetch_limit(self._settings, final_limit)
 
         logger.info(
-            "ai_service.rank_datasets start query_len=%s limit=%s final_limit=%s summary_k=%s",
+            "ai_service.rank_datasets start query_len=%s limit=%s final_limit=%s row_fetch_k=%s",
             len(query),
             limit,
             final_limit,
-            summary_fetch_k,
+            row_fetch_k,
         )
 
         try:
@@ -128,9 +128,9 @@ class AIService:
             raise EmbeddingError(str(exc)) from exc
 
         try:
-            summary_hits = await self._vector_repository.similarity_search_by_vector(
+            row_hits = await self._vector_repository.similarity_search_by_vector(
                 embedding.vector,
-                k=summary_fetch_k,
+                k=row_fetch_k,
             )
         except ValueError as exc:
             if "Collection not found" in str(exc):
@@ -143,11 +143,11 @@ class AIService:
             raise EmbeddingError(str(exc)) from exc
 
         dataset_hits = _aggregate_dataset_hits(
-            summary_hits,
+            row_hits,
             min_score=_minimum_match_score(self._settings),
         )
         if not dataset_hits:
-            logger.info("ai_service.rank_datasets no matching summary hits")
+            logger.info("ai_service.rank_datasets no matching row hits")
             return []
 
         loop = asyncio.get_running_loop()
@@ -183,7 +183,7 @@ class AIService:
                     purchase_count=int(item.purchase_count),
                     score=hit.score,
                     score_label=hit.score_label,
-                    best_summary=hit.best_summary,
+                    best_match=hit.best_match,
                 )
             )
             if len(results) >= final_limit:
@@ -198,12 +198,11 @@ def _aggregate_dataset_hits(
     *,
     min_score: float = _SCORE_LOW,
 ) -> list[_DatasetHit]:
-    best_by_dataset: dict[str, _DatasetHit] = {}
+    best_by_listing: dict[str, _DatasetHit] = {}
     for doc, raw_similarity in row_hits:
         metadata = getattr(doc, "metadata", {}) or {}
-        dataset_id = metadata.get("dataset_id")
         listing_id = metadata.get("listing_id")
-        if not dataset_id or not listing_id:
+        if not listing_id:
             continue
 
         score = _clamp(float(raw_similarity))
@@ -213,22 +212,22 @@ def _aggregate_dataset_hits(
 
         normalized_listing_id = _bytes32_hex_to_uuid(str(listing_id))
         hit = _DatasetHit(
-            dataset_id=str(dataset_id),
+            dataset_id=normalized_listing_id,
             listing_id=normalized_listing_id,
             score=score,
             score_label=label,
-            best_summary=str(getattr(doc, "page_content", "") or ""),
+            best_match=str(getattr(doc, "page_content", "") or ""),
         )
-        current = best_by_dataset.get(hit.dataset_id)
+        current = best_by_listing.get(normalized_listing_id)
         if current is None or hit.score > current.score:
-            best_by_dataset[hit.dataset_id] = hit
+            best_by_listing[normalized_listing_id] = hit
 
-    return sorted(best_by_dataset.values(), key=lambda hit: hit.score, reverse=True)
+    return sorted(best_by_listing.values(), key=lambda hit: hit.score, reverse=True)
 
 
-def _summary_fetch_limit(settings: Settings, final_limit: int) -> int:
-    summary_count = max(1, int(getattr(settings, "dataset_summary_count", 1)))
-    return min(_MAX_SUMMARY_FETCH, max(final_limit, final_limit * summary_count))
+def _row_fetch_limit(settings: Settings, final_limit: int) -> int:
+    max_embed_rows = max(1, int(getattr(settings, "max_embed_rows", 2000)))
+    return min(_MAX_ROW_FETCH, max(500, final_limit * max_embed_rows))
 
 
 def _minimum_match_score(settings: Settings) -> float:

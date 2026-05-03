@@ -18,6 +18,7 @@ import {
   saveUploadSession,
   type PersistedUploadSession,
 } from "@/lib/upload-session";
+import { walletRuntime } from "@/lib/wallet/runtime";
 
 type UploadStore = {
   title: string;
@@ -312,6 +313,7 @@ export const useUploadStore = create<UploadStore>()(
         set({ isCreating: true, error: null });
 
         try {
+          await walletRuntime.switchToConfiguredChain();
           const settlementCurrency =
             state.persistedSession?.settlementCurrency ??
             state.settlementCurrency;

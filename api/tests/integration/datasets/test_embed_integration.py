@@ -10,7 +10,7 @@ from sqlalchemy.pool import NullPool
 
 from app.config.settings import Settings
 from app.datasets.service import DatasetEmbedService
-from app.llm.schemas import SummaryResult, TextSummary
+from app.llm.schemas import ColumnExpansionResult
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.integration]
 
@@ -54,17 +54,14 @@ class FakeLLMService:
     embeddings_client = object()
 
     def __init__(self) -> None:
-        self.prompts: list[str] = []
+        self.expand_calls: list[tuple[list[str], list[list[str]]]] = []
 
-    async def summarize_text(self, text: str) -> SummaryResult:
-        self.prompts.append(text)
-        return SummaryResult(
-            summary=TextSummary(
-                title="Dataset profile",
-                summary="A grounded dataset summary.",
-                keywords=["dataset", "summary"],
-            ),
-            model="fake-summary-model",
+    async def expand_column_names(
+        self, column_names: list[str], sample_rows: list[list[str]]
+    ) -> ColumnExpansionResult:
+        self.expand_calls.append((column_names, sample_rows))
+        return ColumnExpansionResult(
+            columns={col: f"{col} (expanded)" for col in column_names}
         )
 
     async def embed_text(self, text: str):
@@ -74,7 +71,7 @@ class FakeLLMService:
         raise AssertionError("DatasetEmbedService must not embed rows directly")
 
 
-class FakeSummaryRepository:
+class FakeVectorRepository:
     def __init__(self) -> None:
         self.created = False
         self.docs = []
@@ -131,7 +128,7 @@ async def _delete_dataset_records(factory, listing_id: str) -> None:
             )
 
 
-async def test_embed_persists_summary_metadata_and_dataset_key(
+async def test_embed_persists_row_documents_and_dataset_key(
     pg_container,
     run_alembic,
     committing_factory,
@@ -139,7 +136,7 @@ async def test_embed_persists_summary_metadata_and_dataset_key(
 ) -> None:
     csv_file = SAMPLE_CSV_PATH.open("rb")
     llm_service = FakeLLMService()
-    summary_repository = FakeSummaryRepository()
+    vector_repository = FakeVectorRepository()
 
     async def fake_upload(payload, filename, settings):
         return "ipfs://QmFakeData", "0xfakedata"
@@ -147,7 +144,7 @@ async def test_embed_persists_summary_metadata_and_dataset_key(
     service = DatasetEmbedService(
         settings,
         llm_service=llm_service,
-        summary_repository=summary_repository,
+        vector_repository=vector_repository,
         session_factory=committing_factory,
         key_generator=lambda: b"\xab" * 32,
         encryptor=lambda content, key, aad: (b"ciphertext", b"\x00" * 12),
@@ -169,18 +166,16 @@ async def test_embed_persists_summary_metadata_and_dataset_key(
         assert response.dataset_url == "ipfs://QmFakeData"
         assert response.dataset_hash == "0xfakedata"
         assert response.stats.total_rows == 5
-        assert summary_repository.created is True
-        assert len(summary_repository.docs) == settings.dataset_summary_count
-        assert len(llm_service.prompts) == settings.dataset_summary_count
-        assert summary_repository.deleted_listing_id == response.listing_id
-        assert summary_repository.deleted_ids == summary_repository.ids
-        assert summary_repository.docs[0].metadata == {
-            "dataset_id": response.listing_id,
+        assert vector_repository.created is True
+        assert len(vector_repository.docs) == 5
+        assert len(llm_service.expand_calls) == 1
+        assert vector_repository.deleted_listing_id == response.listing_id
+        assert vector_repository.deleted_ids == vector_repository.ids
+        assert vector_repository.docs[0].metadata == {
             "listing_id": response.listing_id,
-            "dataset_filename": "sample.csv",
-            "summary_kind": "technical_profile",
-            "summary_index": 0,
+            "row_index": 0,
         }
+        assert "(expanded)" in vector_repository.docs[0].page_content
 
         async with committing_factory() as verify_session:
             key_result = await verify_session.execute(

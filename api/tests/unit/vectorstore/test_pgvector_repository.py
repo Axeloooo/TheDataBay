@@ -5,7 +5,7 @@ import pytest
 from langchain_core.documents import Document
 
 from app.vectorstore.repositories.pgvector_repository import (
-    DATASET_SUMMARIES_COLLECTION,
+    DATASET_ROWS_COLLECTION,
     PGVectorRepository,
     pgvector_repository_for_settings,
 )
@@ -85,9 +85,8 @@ def test_repository_can_be_created_from_settings():
     assert isinstance(repository, PGVectorRepository)
 
 
-def test_collection_targets_dataset_summaries_not_legacy_rows():
-    assert DATASET_SUMMARIES_COLLECTION == "dataset_summaries"
-    assert DATASET_SUMMARIES_COLLECTION != "dataset_rows"
+def test_collection_targets_dataset_rows():
+    assert DATASET_ROWS_COLLECTION == "dataset_rows"
 
 
 @pytest.mark.asyncio
@@ -105,7 +104,7 @@ async def test_create_collection_and_add_documents_use_dataset_summaries_collect
     assert isinstance(vectorstore.kwargs["embeddings"], FakeEmbeddings)
     assert vectorstore.kwargs == {
         "embeddings": vectorstore.kwargs["embeddings"],
-        "collection_name": DATASET_SUMMARIES_COLLECTION,
+        "collection_name": DATASET_ROWS_COLLECTION,
         "connection": "postgresql+psycopg://user:pass@localhost:5432/db",
         "embedding_length": 768,
         "use_jsonb": True,
@@ -157,7 +156,7 @@ async def test_delete_stale_documents_removes_listing_docs_outside_current_ids()
     assert "e.cmetadata->>'listing_id' = :listing_id" in statement
     assert "e.id != ALL(:current_ids)" in statement
     assert params == {
-        "collection_name": DATASET_SUMMARIES_COLLECTION,
+        "collection_name": DATASET_ROWS_COLLECTION,
         "listing_id": "listing-1",
         "current_ids": ["listing-1:summary"],
     }

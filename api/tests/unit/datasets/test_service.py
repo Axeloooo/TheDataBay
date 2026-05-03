@@ -7,7 +7,7 @@ from langchain_core.documents import Document
 
 from app.datasets.service import DatasetEmbedService
 from app.llm.errors import LLMProviderError
-from app.llm.schemas import SummaryResult, TextSummary
+from app.llm.schemas import ColumnExpansionResult
 from app.shared.errors import ApiError
 
 
@@ -15,7 +15,7 @@ def make_upload_file(name: str, content: bytes) -> UploadFile:
     return UploadFile(filename=name, file=io.BytesIO(content))
 
 
-class FakeSummaryRepository:
+class FakeVectorRepository:
     def __init__(self) -> None:
         self.create_called = False
         self.added_docs: list[Document] = []
@@ -37,34 +37,23 @@ class FakeSummaryRepository:
 
 class FakeLLMService:
     def __init__(self) -> None:
-        self.prompts: list[str] = []
-        self.embedded_texts: list[str] = []
+        self.expand_calls: list[tuple[list[str], list[list[str]]]] = []
         self.embedding_model = "llm-embedding-model"
         self.embedding_dimension = 384
         self.embeddings_client = object()
 
-    async def summarize_text(self, text: str) -> SummaryResult:
-        self.prompts.append(text)
-        kind = next(
-            marker.removeprefix("summary_kind=")
-            for marker in text.splitlines()
-            if marker.startswith("summary_kind=")
-        )
-        return SummaryResult(
-            summary=TextSummary(
-                title=f"{kind} title",
-                summary=f"{kind} summary grounded in sample",
-                keywords=[kind, "dataset"],
-            ),
-            model="fake-summary-model",
+    async def expand_column_names(
+        self, column_names: list[str], sample_rows: list[list[str]]
+    ) -> ColumnExpansionResult:
+        self.expand_calls.append((column_names, sample_rows))
+        return ColumnExpansionResult(
+            columns={col: f"{col} (expanded)" for col in column_names}
         )
 
     async def embed_text(self, text: str):
-        self.embedded_texts.append(text)
         raise AssertionError("DatasetEmbedService must not embed directly")
 
     async def embed_texts(self, texts: list[str]):
-        self.embedded_texts.extend(texts)
         raise AssertionError("DatasetEmbedService must not embed rows directly")
 
 
@@ -113,7 +102,7 @@ def fake_session_factory():
 
 
 def make_service(settings, **overrides):
-    summary_repository = overrides.pop("summary_repository", FakeSummaryRepository())
+    vector_repository = overrides.pop("vector_repository", FakeVectorRepository())
     llm_service = overrides.pop("llm_service", FakeLLMService())
     repo = overrides.pop("repo", FakeKeyRepository())
 
@@ -123,7 +112,7 @@ def make_service(settings, **overrides):
     service = DatasetEmbedService(
         settings,
         llm_service=llm_service,
-        summary_repository=summary_repository,
+        vector_repository=vector_repository,
         session_factory=fake_session_factory,
         key_repository=repo,
         csv_loader_cls=overrides.pop("csv_loader_cls", FakeCSVLoader),
@@ -133,14 +122,14 @@ def make_service(settings, **overrides):
     )
     return SimpleNamespace(
         service=service,
-        summary_repository=summary_repository,
+        vector_repository=vector_repository,
         llm_service=llm_service,
         repo=repo,
     )
 
 
 @pytest.mark.asyncio
-async def test_embed_persists_configured_summary_documents(settings):
+async def test_embed_persists_row_documents(settings):
     harness = make_service(settings)
 
     response = await harness.service.embed(
@@ -153,13 +142,6 @@ async def test_embed_persists_configured_summary_documents(settings):
         settlement_decimals=6,
     )
 
-    expected_kinds = [
-        "technical_profile",
-        "plain_language_profile",
-        "question_answer_profile",
-        "use_case_profile",
-        "column_glossary_profile",
-    ]
     assert response.dataset_url == "ipfs://QmData"
     assert response.dataset_hash == "0xdata"
     assert response.preview.column_names == ["age", "cp"]
@@ -169,36 +151,26 @@ async def test_embed_persists_configured_summary_documents(settings):
     assert response.vector_spec.model == settings.llm_embedding_model
     assert response.vector_spec.dimension == settings.llm_embedding_dimension
 
-    repository = harness.summary_repository
+    repository = harness.vector_repository
     assert repository.create_called is True
-    assert len(repository.added_docs) == settings.dataset_summary_count
-    assert len(harness.llm_service.prompts) == settings.dataset_summary_count
-    assert harness.llm_service.embedded_texts == []
+    # One document per CSV data row (2 rows)
+    assert len(repository.added_docs) == 2
     assert repository.added_ids == [
-        f"{response.listing_id}:summary:{index}:{kind}"
-        for index, kind in enumerate(expected_kinds)
+        f"{response.listing_id}:row:0",
+        f"{response.listing_id}:row:1",
     ]
     assert repository.deleted_listing_id == response.listing_id
     assert repository.deleted_ids == repository.added_ids
 
-    for index, (kind, document) in enumerate(
-        zip(expected_kinds, repository.added_docs, strict=True)
-    ):
-        assert document.metadata == {
-            "dataset_id": response.listing_id,
-            "listing_id": response.listing_id,
-            "dataset_filename": "heart.csv",
-            "summary_kind": kind,
-            "summary_index": index,
-        }
-        assert document.page_content.startswith(f"{kind}\nTitle: {kind} title")
-        assert "age: 63\ncp: 3" not in document.page_content
+    # Documents use LLM-expanded column names in page_content
+    assert len(harness.llm_service.expand_calls) == 1
+    expanded_cols, sample = harness.llm_service.expand_calls[0]
+    assert expanded_cols == ["age", "cp"]
 
-    for kind, prompt in zip(expected_kinds, harness.llm_service.prompts, strict=True):
-        assert f"summary_kind={kind}" in prompt
-        assert "Dataset title: Heart" in prompt
-        assert "Dataset description: Cardio rows" in prompt
-        assert "age: 63\ncp: 3" in prompt
+    for i, doc in enumerate(repository.added_docs):
+        assert doc.metadata == {"listing_id": response.listing_id, "row_index": i}
+        assert "age (expanded):" in doc.page_content
+        assert "cp (expanded):" in doc.page_content
 
     assert harness.repo.calls[0]["listing_id"] == response.listing_id
     assert harness.repo.calls[0]["dataset_url"] == "ipfs://QmData"
@@ -219,9 +191,9 @@ async def test_embed_persists_configured_summary_documents(settings):
 
 
 @pytest.mark.asyncio
-async def test_embed_respects_dataset_summary_count(settings):
-    two_summary_settings = settings.model_copy(update={"dataset_summary_count": 2})
-    harness = make_service(two_summary_settings)
+async def test_embed_respects_max_embed_rows(settings):
+    one_row_settings = settings.model_copy(update={"max_embed_rows": 1})
+    harness = make_service(one_row_settings)
 
     response = await harness.service.embed(
         file=make_upload_file("heart.csv", b"age,cp\n63,3\n37,2\n"),
@@ -231,17 +203,10 @@ async def test_embed_respects_dataset_summary_count(settings):
         price_atomic=100,
     )
 
-    summary_kinds = [
-        doc.metadata["summary_kind"]
-        for doc in harness.summary_repository.added_docs
-    ]
-    assert summary_kinds == [
-        "technical_profile",
-        "plain_language_profile",
-    ]
-    assert harness.summary_repository.added_ids == [
-        f"{response.listing_id}:summary:0:technical_profile",
-        f"{response.listing_id}:summary:1:plain_language_profile",
+    # Only 1 row document despite 2 CSV rows
+    assert len(harness.vector_repository.added_docs) == 1
+    assert harness.vector_repository.added_ids == [
+        f"{response.listing_id}:row:0",
     ]
 
 
@@ -341,14 +306,14 @@ async def test_embed_rejects_invalid_metadata(settings, kwargs, error):
 
 
 @pytest.mark.asyncio
-async def test_embed_does_not_write_key_when_summary_repository_fails(settings):
-    summary_repository = FakeSummaryRepository()
+async def test_embed_does_not_write_key_when_vector_repository_fails(settings):
+    vector_repository = FakeVectorRepository()
 
     async def fail_add(documents, ids):
         raise RuntimeError("vector repository down")
 
-    summary_repository.add_documents = fail_add
-    harness = make_service(settings, summary_repository=summary_repository)
+    vector_repository.add_documents = fail_add
+    harness = make_service(settings, vector_repository=vector_repository)
 
     with pytest.raises(ApiError) as exc_info:
         await harness.service.embed(
@@ -364,26 +329,29 @@ async def test_embed_does_not_write_key_when_summary_repository_fails(settings):
 
 
 @pytest.mark.asyncio
-async def test_embed_maps_llm_failure_and_does_not_write_key(settings):
-    class FailingLLMService(FakeLLMService):
-        async def summarize_text(self, text: str) -> SummaryResult:
-            raise LLMProviderError("Ollama summary request was unauthorized")
+async def test_embed_falls_back_to_raw_column_names_when_expand_fails(settings):
+    class FailingExpandService(FakeLLMService):
+        async def expand_column_names(self, column_names, sample_rows):
+            raise LLMProviderError("OpenAI column expansion request failed")
 
-    harness = make_service(settings, llm_service=FailingLLMService())
+    harness = make_service(settings, llm_service=FailingExpandService())
 
-    with pytest.raises(ApiError) as exc_info:
-        await harness.service.embed(
-            file=make_upload_file("data.csv", b"a,b\n1,2\n"),
-            title="Dataset",
-            description="Desc",
-            seller="0x0000000000000000000000000000000000000001",
-            price_atomic=100,
-        )
+    # embed should still succeed — column expansion failure is a graceful fallback
+    response = await harness.service.embed(
+        file=make_upload_file("data.csv", b"age,cp\n63,3\n37,2\n"),
+        title="Dataset",
+        description="Desc",
+        seller="0x0000000000000000000000000000000000000001",
+        price_atomic=100,
+    )
 
-    assert exc_info.value.error == "llm_error"
-    assert exc_info.value.status_code == 502
-    assert "unauthorized" in exc_info.value.details["cause"]
-    assert harness.repo.calls == []
+    assert response.dataset_url == "ipfs://QmData"
+    # Raw column names used as fallback — page_content keeps original CSVLoader format
+    docs = harness.vector_repository.added_docs
+    assert len(docs) == 2
+    assert "age:" in docs[0].page_content
+    assert "cp:" in docs[0].page_content
+    assert harness.repo.calls[0]["listing_id"] == response.listing_id
 
 
 @pytest.mark.asyncio

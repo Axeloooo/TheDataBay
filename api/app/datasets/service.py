@@ -23,7 +23,6 @@ from ..contracts.marketplace_schemas import TOKEN_DECIMALS
 from ..database.async_engine import get_async_session_factory
 from ..llm.dependencies import get_llm_service
 from ..llm.errors import LLMError
-from ..llm.schemas import SummaryResult
 from ..llm.service import LLMService
 from ..shared.encryption import encrypt_bytes, generate_key
 from ..shared.errors import ApiError
@@ -42,13 +41,6 @@ from .schemas import (
 
 logger = logging.getLogger(__name__)
 
-SUMMARY_KINDS = [
-    "technical_profile",
-    "plain_language_profile",
-    "question_answer_profile",
-    "use_case_profile",
-    "column_glossary_profile",
-]
 
 
 def _api_error(
@@ -63,6 +55,18 @@ def _api_error(
         message=message,
         details=details or {},
     )
+
+
+def _apply_column_expansion(page_content: str, col_map: dict[str, str]) -> str:
+    """Replace raw column names in CSVLoader page_content with expanded descriptions."""
+    lines = []
+    for line in page_content.splitlines():
+        for col, expanded in col_map.items():
+            if line.startswith(f"{col}: "):
+                line = f"{expanded}: {line[len(col) + 2:]}"
+                break
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def _looks_numeric(value: str) -> bool:
@@ -111,7 +115,7 @@ class DatasetEmbedService:
         settings: Settings,
         *,
         llm_service: LLMService,
-        summary_repository: PGVectorRepository,
+        vector_repository: PGVectorRepository,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
         key_repository: DatasetKeyRepository | None = None,
         csv_loader_cls: type[CSVLoader] = CSVLoader,
@@ -121,7 +125,7 @@ class DatasetEmbedService:
     ) -> None:
         self._settings = settings
         self._llm_service = llm_service
-        self._summary_repository = summary_repository
+        self._vector_repository = vector_repository
         self._session_factory = session_factory or get_async_session_factory()
         self._key_repository = key_repository or DatasetKeyRepository()
         self._csv_loader_cls = csv_loader_cls
@@ -217,22 +221,20 @@ class DatasetEmbedService:
                 tmp_path = tmp.name
 
             loaded_docs = self._csv_loader_cls(file_path=tmp_path).load()
-            summary_docs = await self._build_summary_documents(
+            row_docs = await self._build_row_documents(
                 loaded_docs=loaded_docs,
                 listing_id=listing_id,
-                filename=filename,
-                title=title,
-                description=description,
-                stats=stats,
+                column_names=column_names,
+                data_rows=data_rows,
             )
             document_ids = [
-                f"{listing_id}:summary:{index}:{document.metadata['summary_kind']}"
-                for index, document in enumerate(summary_docs)
+                f"{listing_id}:row:{i}"
+                for i in range(len(row_docs))
             ]
 
-            await self._summary_repository.create_collection()
-            await self._summary_repository.add_documents(summary_docs, ids=document_ids)
-            await self._summary_repository.delete_stale_documents(
+            await self._vector_repository.create_collection()
+            await self._vector_repository.add_documents(row_docs, ids=document_ids)
+            await self._vector_repository.delete_stale_documents(
                 listing_id,
                 document_ids,
             )
@@ -263,7 +265,7 @@ class DatasetEmbedService:
             raise _api_error(
                 502,
                 "llm_error",
-                "Dataset summary generation failed.",
+                "LLM column expansion failed.",
                 {"cause": str(exc)},
             ) from exc
         except Exception as exc:
@@ -305,81 +307,33 @@ class DatasetEmbedService:
             vector_spec=vector_spec,
         )
 
-    async def _build_summary_documents(
+    async def _build_row_documents(
         self,
         *,
         loaded_docs: list[Document],
         listing_id: str,
-        filename: str,
-        title: str,
-        description: str,
-        stats: DatasetStats,
+        column_names: list[str],
+        data_rows: list[list[str]],
     ) -> list[Document]:
-        summary_count = max(0, self._settings.dataset_summary_count)
-        context = self._summary_context(loaded_docs)
-        documents: list[Document] = []
-        for index in range(summary_count):
-            kind = SUMMARY_KINDS[index % len(SUMMARY_KINDS)]
-            result = await self._llm_service.summarize_text(
-                self._summary_prompt(
-                    kind=kind,
-                    title=title,
-                    description=description,
-                    filename=filename,
-                    stats=stats,
-                    context=context,
-                )
+        """Enrich CSVLoader documents with LLM-expanded column descriptions."""
+        try:
+            expansion = await self._llm_service.expand_column_names(
+                column_names, data_rows[:5]
             )
+            col_map = expansion.columns
+        except Exception:
+            col_map = {col: col for col in column_names}
+
+        cap = max(0, self._settings.max_embed_rows)
+        documents: list[Document] = []
+        for i, doc in enumerate(loaded_docs[:cap]):
             documents.append(
                 Document(
-                    page_content=self._summary_page_content(kind, result),
-                    metadata={
-                        "dataset_id": listing_id,
-                        "listing_id": listing_id,
-                        "dataset_filename": filename,
-                        "summary_kind": kind,
-                        "summary_index": index,
-                    },
+                    page_content=_apply_column_expansion(doc.page_content, col_map),
+                    metadata={"listing_id": listing_id, "row_index": i},
                 )
             )
         return documents
-
-    def _summary_context(self, loaded_docs: list[Document]) -> str:
-        sample_size = max(0, self._settings.dataset_summary_sample_rows)
-        sample_docs = loaded_docs[:sample_size]
-        return "\n\n".join(document.page_content for document in sample_docs)
-
-    def _summary_prompt(
-        self,
-        *,
-        kind: str,
-        title: str,
-        description: str,
-        filename: str,
-        stats: DatasetStats,
-        context: str,
-    ) -> str:
-        return (
-            f"summary_kind={kind}\n"
-            f"Dataset title: {title}\n"
-            f"Dataset description: {description}\n"
-            f"Dataset filename: {filename}\n"
-            f"Rows: {stats.total_rows}\n"
-            f"Columns: {stats.total_columns}\n"
-            "Use only the grounded CSV sample below. Do not invent columns, row "
-            "values, sources, or purchase details.\n"
-            "CSV sample:\n"
-            f"{context}"
-        )
-
-    def _summary_page_content(self, kind: str, result: SummaryResult) -> str:
-        keywords = ", ".join(result.summary.keywords)
-        return (
-            f"{kind}\n"
-            f"Title: {result.summary.title}\n"
-            f"Summary: {result.summary.summary}\n"
-            f"Keywords: {keywords}"
-        )
 
     def _validate_static_inputs(
         self,
@@ -450,7 +404,7 @@ def get_dataset_embed_service(
     embeddings = getattr(llm_service, "embeddings_client", None)
     if embeddings is None:
         raise RuntimeError("Configured LLM service does not expose an embeddings client")
-    summary_repository = pgvector_repository_for_settings(
+    vector_repository = pgvector_repository_for_settings(
         settings,
         session_factory=get_async_session_factory(),
         embeddings=embeddings,
@@ -458,5 +412,5 @@ def get_dataset_embed_service(
     return DatasetEmbedService(
         settings,
         llm_service=llm_service,
-        summary_repository=summary_repository,
+        vector_repository=vector_repository,
     )

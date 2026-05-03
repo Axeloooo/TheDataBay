@@ -43,6 +43,11 @@ def make_settings(**overrides: object) -> Settings:
         "HOST": "localhost",
         "PORT": 8080,
         "CORS_ORIGINS": ["http://localhost:5173"],
+        "LLM_PROVIDER": "ollama",
+        "LLM_BASE_URL": "http://localhost:11434",
+        "LLM_CHAT_MODEL": "deepseek-v4-flash:cloud",
+        "LLM_EMBEDDING_MODEL": "nomic-embed-text",
+        "LLM_EMBEDDING_DIMENSION": 768,
         "MAX_FILE_SIZE_MB": 50,
         "MAX_DATASET_ROWS": 50000,
         "TOP_K": 10,
@@ -90,7 +95,7 @@ def test_ollama_provider_uses_configured_model_defaults(monkeypatch):
 
     service = OllamaLLMService.from_settings(make_settings())
 
-    assert service.summary_model == "deepseek-v4-flash:cloud"
+    assert service.chat_model == "deepseek-v4-flash:cloud"
     assert service.embedding_model == "nomic-embed-text"
     assert constructed == {
         "chat": {
@@ -176,7 +181,7 @@ async def test_embed_text_returns_vector_with_model_metadata():
     service = OllamaLLMService(
         chat_client=FakeChatClient([]),
         embeddings_client=embeddings,
-        summary_model="summary-model",
+        chat_model="chat-model",
         embedding_model="embedding-model",
     )
 
@@ -193,7 +198,7 @@ async def test_embed_texts_returns_batch_vectors():
     service = OllamaLLMService(
         chat_client=FakeChatClient([]),
         embeddings_client=embeddings,
-        summary_model="summary-model",
+        chat_model="chat-model",
         embedding_model="embedding-model",
     )
 
@@ -203,67 +208,3 @@ async def test_embed_texts_returns_batch_vectors():
     assert result.model == "embedding-model"
     assert result.embeddings[0].vector == [0.0]
     assert result.embeddings[1].vector == [1.0]
-
-
-async def test_summarize_text_accepts_strict_json():
-    chat = FakeChatClient(
-        [
-            (
-                '{"title":"Weather data","summary":"Daily climate rows",'
-                '"keywords":["climate","temperature"]}'
-            )
-        ]
-    )
-    service = OllamaLLMService(
-        chat_client=chat,
-        embeddings_client=FakeEmbeddingsClient(),
-        summary_model="summary-model",
-        embedding_model="embedding-model",
-    )
-
-    result = await service.summarize_text("csv sample")
-
-    assert result.model == "summary-model"
-    assert result.summary.title == "Weather data"
-    assert result.summary.keywords == ["climate", "temperature"]
-    assert len(chat.messages) == 1
-
-
-async def test_summarize_text_retries_malformed_json_once():
-    chat = FakeChatClient(
-        [
-            "not json",
-            '{"title":"Clean","summary":"Validated","keywords":["ok"]}',
-        ]
-    )
-    service = OllamaLLMService(
-        chat_client=chat,
-        embeddings_client=FakeEmbeddingsClient(),
-        summary_model="summary-model",
-        embedding_model="embedding-model",
-    )
-
-    result = await service.summarize_text("csv sample")
-
-    assert result.summary.title == "Clean"
-    assert len(chat.messages) == 2
-
-
-async def test_summarize_text_raises_after_one_retry_for_invalid_summary():
-    chat = FakeChatClient(
-        [
-            '{"title":"Bad","summary":"Missing keywords"}',
-            '{"title":"Bad","summary":"Still missing keywords"}',
-        ]
-    )
-    service = OllamaLLMService(
-        chat_client=chat,
-        embeddings_client=FakeEmbeddingsClient(),
-        summary_model="summary-model",
-        embedding_model="embedding-model",
-    )
-
-    with pytest.raises(LLMSummaryValidationError):
-        await service.summarize_text("csv sample")
-
-    assert len(chat.messages) == 2

@@ -1,4 +1,4 @@
-"""PGVector repository for dataset summary embeddings."""
+"""PGVector repository for dataset row embeddings."""
 
 from __future__ import annotations
 
@@ -10,11 +10,11 @@ from langchain_postgres import PGVector
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-DATASET_SUMMARIES_COLLECTION = "dataset_summaries"
+DATASET_ROWS_COLLECTION = "dataset_rows"
 
 
 class PGVectorRepository:
-    """Data-access boundary for LangChain PGVector dataset summaries."""
+    """Data-access boundary for LangChain PGVector dataset row embeddings."""
 
     def __init__(
         self,
@@ -23,7 +23,7 @@ class PGVectorRepository:
         embeddings: Any,
         embedding_dimension: int,
         session_factory: async_sessionmaker[AsyncSession] | None = None,
-        collection_name: str = DATASET_SUMMARIES_COLLECTION,
+        collection_name: str = DATASET_ROWS_COLLECTION,
         pgvector_cls: type[PGVector] | None = None,
     ) -> None:
         self._connection = connection
@@ -39,7 +39,7 @@ class PGVectorRepository:
         await self._get_vectorstore().acreate_collection()
 
     async def add_documents(self, docs: Sequence[Document], ids: list[str]) -> None:
-        """Persist dataset summary documents with stable caller-provided IDs."""
+        """Persist dataset row documents with stable caller-provided IDs."""
         await self._get_vectorstore().aadd_documents(docs, ids=ids)
 
     async def similarity_search_by_vector(
@@ -47,7 +47,7 @@ class PGVectorRepository:
         vector: list[float],
         k: int,
     ) -> list[tuple[Document, float]]:
-        """Return summary hits with cosine similarity scores."""
+        """Return row hits with cosine similarity scores."""
         hits = await self._get_vectorstore().asimilarity_search_with_score_by_vector(
             vector,
             k=k,
@@ -62,7 +62,7 @@ class PGVectorRepository:
         listing_id: str,
         current_ids: list[str],
     ) -> None:
-        """Delete summary documents for a listing that are no longer current."""
+        """Delete row documents for a listing that are no longer current."""
         if self._session_factory is None:
             raise RuntimeError("session_factory is required to delete stale documents")
 

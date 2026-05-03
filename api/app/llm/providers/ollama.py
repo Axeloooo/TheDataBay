@@ -5,38 +5,42 @@ from urllib.parse import urlparse
 
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from ollama import ResponseError
-from pydantic import ValidationError
 
 from ...config.settings import Settings
-from ..errors import LLMInputError, LLMProviderError, LLMSummaryValidationError
-from ..schemas import EmbeddingBatchResult, EmbeddingResult, SummaryResult, TextSummary
+from ..errors import LLMInputError, LLMProviderError, LLMResponseValidationError
+from ..schemas import (
+    ColumnExpansionResult,
+    EmbeddingBatchResult,
+    EmbeddingResult,
+)
 from ..service import LLMService
 
-DEFAULT_SUMMARY_MODEL = "deepseek-v4-flash"
+DEFAULT_CHAT_MODEL = "deepseek-v4-flash"
 DEFAULT_EMBEDDING_MODEL = "nomic-embed-text"
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 
-_SUMMARY_SYSTEM_PROMPT = (
-    "Summarize the provided text as strict JSON only. The JSON object must contain "
-    'exactly these keys: "title" (string), "summary" (string), and '
-    '"keywords" (array of strings). Do not include markdown or extra keys.'
+_COLUMN_EXPANSION_SYSTEM_PROMPT = (
+    "You are a data analyst. Given CSV column names and sample rows, return a strict JSON object "
+    "mapping each column name to a plain-English description of what that column represents. "
+    "Include units or value encodings where evident (e.g. '0=female, 1=male'). "
+    "Return only the JSON object with no markdown or extra keys."
 )
 
 
 class OllamaLLMService(LLMService):
-    """LLM service that delegates summaries and embeddings to Ollama."""
+    """LLM service that delegates column expansion and embeddings to Ollama."""
 
     def __init__(
         self,
         *,
         chat_client: Any,
         embeddings_client: Any,
-        summary_model: str,
+        chat_model: str,
         embedding_model: str,
     ) -> None:
         self._chat_client = chat_client
         self._embeddings_client = embeddings_client
-        self.summary_model = summary_model
+        self.chat_model = chat_model
         self.embedding_model = embedding_model
 
     @property
@@ -48,18 +52,14 @@ class OllamaLLMService(LLMService):
     def from_settings(cls, settings: Settings) -> "OllamaLLMService":
         """Build the Ollama clients from application settings."""
         base_url = getattr(settings, "llm_base_url", DEFAULT_OLLAMA_BASE_URL)
-        # Fall back to the chat base URL so a single LLM_BASE_URL suffices in
-        # environments (e.g. Kubernetes) where Ollama serves both workloads.
-        embedding_base_url = (
-            getattr(settings, "llm_embedding_base_url", None) or base_url
-        )
+        embedding_base_url = getattr(settings, "llm_embedding_base_url", DEFAULT_OLLAMA_BASE_URL)
         summary_model = getattr(settings, "llm_chat_model", DEFAULT_SUMMARY_MODEL)
         embedding_model = getattr(settings, "llm_embedding_model", DEFAULT_EMBEDDING_MODEL)
         client_kwargs = _client_kwargs(settings)
         _validate_auth_configuration(base_url, client_kwargs)
         return cls(
             chat_client=ChatOllama(
-                model=summary_model,
+                model=chat_model,
                 base_url=base_url,
                 format="json",
                 client_kwargs=client_kwargs,
@@ -71,26 +71,56 @@ class OllamaLLMService(LLMService):
                 client_kwargs=client_kwargs,
                 async_client_kwargs=client_kwargs,
             ),
-            summary_model=summary_model,
+            chat_model=chat_model,
             embedding_model=embedding_model,
         )
 
-    async def summarize_text(self, text: str) -> SummaryResult:
-        """Generate and validate a strict JSON summary, retrying malformed JSON once."""
-        clean_text = _require_text(text)
+    async def expand_column_names(
+        self,
+        column_names: list[str],
+        sample_rows: list[list[str]],
+    ) -> ColumnExpansionResult:
+        """Return plain-English descriptions for CSV column names."""
+        sample_lines = "\n".join(
+            ", ".join(f"{col}: {val}" for col, val in zip(column_names, row))
+            for row in sample_rows
+        )
+        human_prompt = (
+            f"Column names: {', '.join(column_names)}\n"
+            f"Sample rows:\n{sample_lines}"
+        )
         last_error: Exception | None = None
-
         for attempt in range(2):
-            raw_content = await self._invoke_summary(clean_text, retry=attempt > 0)
+            if attempt > 0:
+                human_prompt = (
+                    "Your previous response was not valid JSON. "
+                    "Return only the strict JSON object mapping column names to descriptions:\n\n"
+                    + human_prompt
+                )
             try:
-                summary = TextSummary.model_validate_json(raw_content)
-                return SummaryResult(summary=summary, model=self.summary_model)
-            except (ValidationError, ValueError) as exc:
+                response = await self._chat_client.ainvoke(
+                    [
+                        ("system", _COLUMN_EXPANSION_SYSTEM_PROMPT),
+                        ("human", human_prompt),
+                    ]
+                )
+                content = getattr(response, "content", response)
+                if not isinstance(content, str):
+                    raise LLMResponseValidationError("Column expansion response was not text")
+                import json
+                raw = json.loads(content)
+                if not isinstance(raw, dict):
+                    raise ValueError("Expected a JSON object")
+                return ColumnExpansionResult(
+                    columns={str(k): str(v) for k, v in raw.items()}
+                )
+            except ResponseError as exc:
+                last_error = _provider_error_from_response(exc, "column expansion")
+            except Exception as exc:
                 last_error = exc
 
-        raise LLMSummaryValidationError(
-            "Ollama returned malformed summary JSON after retry"
-        ) from last_error
+        # Fallback: return raw column names as their own descriptions
+        return ColumnExpansionResult(columns={col: col for col in column_names})
 
     async def embed_text(self, text: str) -> EmbeddingResult:
         """Embed a single text string."""
@@ -129,32 +159,6 @@ class OllamaLLMService(LLMService):
             ],
             model=self.embedding_model,
         )
-
-    async def _invoke_summary(self, text: str, *, retry: bool) -> str:
-        human_prompt = text
-        if retry:
-            human_prompt = (
-                "Your previous response was not valid for the required schema. "
-                "Return only the strict JSON object for this text:\n\n"
-                f"{text}"
-            )
-
-        try:
-            response = await self._chat_client.ainvoke(
-                [
-                    ("system", _SUMMARY_SYSTEM_PROMPT),
-                    ("human", human_prompt),
-                ]
-            )
-        except ResponseError as exc:
-            raise _provider_error_from_response(exc, "summary") from exc
-        except Exception as exc:
-            raise LLMProviderError("Ollama summary request failed") from exc
-
-        content = getattr(response, "content", response)
-        if not isinstance(content, str):
-            raise LLMSummaryValidationError("Ollama summary response was not text")
-        return content
 
 
 def _require_text(text: str) -> str:
@@ -206,4 +210,4 @@ def _provider_error_from_response(exc: ResponseError, operation: str) -> LLMProv
             f"Ollama {operation} request was unauthorized; verify OLLAMA_API_KEY is set "
             "in the backend pod and valid for LLM_BASE_URL"
         )
-    return LLMProviderError(f"Ollama {operation} request failed")
+    return LLMProviderError(f"Ollama {operation} request failed (status {status_code})")
