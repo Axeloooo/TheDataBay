@@ -2,7 +2,7 @@ import pytest
 from pydantic import SecretStr
 
 from app.config.settings import Settings
-from app.llm.errors import LLMProviderError, LLMSummaryValidationError
+from app.llm.errors import LLMProviderError
 from app.llm.providers.ollama import OllamaLLMService
 
 
