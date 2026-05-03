@@ -33,7 +33,9 @@ class Settings(BaseSettings):
         default="http://localhost:11434",
         validation_alias=AliasChoices("LLM_BASE_URL", "OLLAMA_HOST"),
     )
-    llm_embedding_base_url: str = Field(default="http://localhost:11434", alias="LLM_EMBEDDING_BASE_URL")
+    # When absent, OllamaLLMService falls back to llm_base_url so a single
+    # LLM_BASE_URL setting covers both chat and embeddings in Kubernetes.
+    llm_embedding_base_url: str | None = Field(default=None, alias="LLM_EMBEDDING_BASE_URL")
     # Defaults match the Ollama provider (LLM_PROVIDER default is "ollama")
     llm_chat_model: str = Field(default="deepseek-v4-flash:cloud", alias="LLM_CHAT_MODEL")
     # EMBEDDING_MODEL is a legacy alias kept for backward compatibility
