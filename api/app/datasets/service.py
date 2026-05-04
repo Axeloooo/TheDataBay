@@ -137,16 +137,12 @@ class DatasetEmbedService:
         self,
         *,
         file: UploadFile,
-        title: str,
-        description: str,
         seller: str,
-        price_atomic: int,
         settlement_currency: str = "USDC",
         settlement_decimals: int | None = None,
         seller_wallet_type: str = "evm",
     ) -> DatasetEmbedResponse:
         """Embed a CSV dataset and return completed upload metadata."""
-        del price_atomic
         started = time.perf_counter()
         filename = file.filename or ""
         self._validate_static_inputs(

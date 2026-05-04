@@ -92,10 +92,7 @@ def test_embed_dataset_returns_completed_payload():
         response = client.post(
             "/api/v1/datasets/embed",
             data={
-                "title": "Retail Data",
-                "description": "Point of sale records",
                 "seller": "0x0000000000000000000000000000000000000001",
-                "price_atomic": "250",
             },
             files={"file": ("retail.csv", b"age,cp\n63,3\n", "text/csv")},
         )
@@ -115,7 +112,6 @@ def test_embed_dataset_returns_completed_payload():
         "vector_spec": {"model": "nomic-embed-text", "dimension": 768},
     }
     assert fake_service.calls[0]["file"].filename == "retail.csv"
-    assert fake_service.calls[0]["price_atomic"] == 250
     assert fake_service.calls[0]["settlement_currency"] == "USDC"
     assert fake_service.calls[0]["seller_wallet_type"] == "evm"
 

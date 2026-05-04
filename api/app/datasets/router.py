@@ -27,10 +27,7 @@ logger = logging.getLogger(__name__)
 @router.post("/embed", response_model=DatasetEmbedResponse)
 async def embed_dataset(
     file: UploadFile = File(...),
-    title: str = Form(...),
-    description: str = Form(...),
     seller: str = Form(...),
-    price_atomic: int = Form(...),
     settlement_currency: str = Form("USDC"),
     settlement_decimals: int | None = Form(None),
     seller_wallet_type: str = Form("evm"),
@@ -45,10 +42,7 @@ async def embed_dataset(
     )
     return await service.embed(
         file=file,
-        title=title,
-        description=description,
         seller=seller,
-        price_atomic=price_atomic,
         settlement_currency=settlement_currency,
         settlement_decimals=settlement_decimals,
         seller_wallet_type=seller_wallet_type,

@@ -134,10 +134,7 @@ async def test_embed_persists_row_documents(settings):
 
     response = await harness.service.embed(
         file=make_upload_file("heart.csv", b"age,cp\n63,3\n37,2\n"),
-        title="Heart",
-        description="Cardio rows",
         seller="0x0000000000000000000000000000000000000001",
-        price_atomic=100,
         settlement_currency="USDC",
         settlement_decimals=6,
     )
@@ -205,10 +202,7 @@ async def test_embed_validation_errors(settings, filename, content, error, statu
     with pytest.raises(ApiError) as exc_info:
         await harness.service.embed(
             file=make_upload_file(filename, content),
-            title="Dataset",
-            description="Desc",
             seller="0x0000000000000000000000000000000000000001",
-            price_atomic=100,
         )
 
     assert exc_info.value.error == error
@@ -224,10 +218,7 @@ async def test_embed_rejects_too_large_file(settings):
     with pytest.raises(ApiError) as exc_info:
         await harness.service.embed(
             file=make_upload_file("data.csv", b"a,b\n1,2\n"),
-            title="Dataset",
-            description="Desc",
             seller="0x0000000000000000000000000000000000000001",
-            price_atomic=100,
         )
 
     assert exc_info.value.error == "file_too_large"
@@ -243,10 +234,7 @@ async def test_embed_rejects_too_many_rows(settings):
     with pytest.raises(ApiError) as exc_info:
         await harness.service.embed(
             file=make_upload_file("data.csv", b"a,b\n1,2\n"),
-            title="Dataset",
-            description="Desc",
             seller="0x0000000000000000000000000000000000000001",
-            price_atomic=100,
         )
 
     assert exc_info.value.error == "too_many_rows"
@@ -271,10 +259,7 @@ async def test_embed_rejects_invalid_metadata(settings, kwargs, error):
     harness = make_service(settings)
     payload = {
         "file": make_upload_file("data.csv", b"a,b\n1,2\n"),
-        "title": "Dataset",
-        "description": "Desc",
         "seller": "0x0000000000000000000000000000000000000001",
-        "price_atomic": 100,
     }
     payload.update(kwargs)
 
@@ -299,10 +284,7 @@ async def test_embed_does_not_write_key_when_vector_repository_fails(settings):
     with pytest.raises(ApiError) as exc_info:
         await harness.service.embed(
             file=make_upload_file("data.csv", b"a,b\n1,2\n"),
-            title="Dataset",
-            description="Desc",
             seller="0x0000000000000000000000000000000000000001",
-            price_atomic=100,
         )
 
     assert exc_info.value.error == "vectorstore_error"
@@ -320,10 +302,7 @@ async def test_embed_falls_back_to_raw_column_names_when_expand_fails(settings):
     # embed should still succeed — column expansion failure is a graceful fallback
     response = await harness.service.embed(
         file=make_upload_file("data.csv", b"age,cp\n63,3\n37,2\n"),
-        title="Dataset",
-        description="Desc",
         seller="0x0000000000000000000000000000000000000001",
-        price_atomic=100,
     )
 
     assert response.dataset_url == "ipfs://QmData"
@@ -345,10 +324,7 @@ async def test_embed_maps_ipfs_failure_and_does_not_write_key(settings):
     with pytest.raises(ApiError) as exc_info:
         await harness.service.embed(
             file=make_upload_file("data.csv", b"a,b\n1,2\n"),
-            title="Dataset",
-            description="Desc",
             seller="0x0000000000000000000000000000000000000001",
-            price_atomic=100,
         )
 
     assert exc_info.value.error == "ipfs_error"
