@@ -94,7 +94,7 @@ class PGVectorRepository:
                 connection=self._connection,
                 embedding_length=self._embedding_dimension,
                 use_jsonb=True,
-                create_extension=True,
+                create_extension=False,
                 async_mode=True,
             )
         return self._vectorstore
