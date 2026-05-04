@@ -42,14 +42,13 @@ export default defineConfig(({ mode }) => {
         env.WALLETCONNECT_PROJECT_ID || env.VITE_WALLETCONNECT_PROJECT_ID || ""
       ),
       "import.meta.env.VITE_CHAIN_ID": JSON.stringify(
-        env.CHAIN_ID || env.VITE_CHAIN_ID || "84532"
+        env.CHAIN_ID || env.VITE_CHAIN_ID || "31337"
       ),
       // WalletConnect packages reference Node.js `global`
       global: "globalThis",
     },
     test: {
       environment: "jsdom",
-      setupFiles: ["./src/test/setup.ts"],
       globals: true,
       exclude: [...configDefaults.exclude, "tests/e2e/**"],
     },
