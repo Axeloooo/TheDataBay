@@ -23,9 +23,9 @@ from .schemas import RankedDataset
 
 logger = logging.getLogger(__name__)
 
-_SCORE_HIGH = 0.72
-_SCORE_MODERATE = 0.58
-_SCORE_LOW = 0.42
+_SCORE_HIGH = 0.5
+_SCORE_MODERATE = 0.4
+_SCORE_LOW = 0.2
 _MAX_ROW_FETCH = 200
 
 
@@ -142,6 +142,13 @@ class AIService:
             logger.error("ai_service.rank_datasets vector_search_failed: %s", exc)
             raise EmbeddingError(str(exc)) from exc
 
+        logger.info(
+            "ai_service.rank_datasets raw_hits=%s top_scores=%s min_score=%.3f",
+            len(row_hits),
+            [round(s, 3) for _, s in row_hits[:5]],
+            _minimum_match_score(self._settings),
+        )
+
         dataset_hits = _aggregate_dataset_hits(
             row_hits,
             min_score=_minimum_match_score(self._settings),
@@ -157,15 +164,20 @@ class AIService:
             self._settings,
         )
         item_map = {_bytes32_hex_to_uuid(str(item.id)): item for item in contract_items}
+        logger.info(
+            "ai_service.rank_datasets dataset_hits=%s contract_items=%s contract_ids=%s",
+            len(dataset_hits),
+            len(contract_items),
+            [_bytes32_hex_to_uuid(str(item.id)) for item in contract_items],
+        )
 
         results: list[RankedDataset] = []
         for hit in dataset_hits:
             item = item_map.get(hit.listing_id)
             if item is None:
-                logger.debug(
-                    "ai_service.rank_datasets stale_hit listing_id=%s dataset_id=%s",
+                logger.info(
+                    "ai_service.rank_datasets stale_hit listing_id=%s (not in contract)",
                     hit.listing_id,
-                    hit.dataset_id,
                 )
                 continue
 

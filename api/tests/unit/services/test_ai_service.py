@@ -118,10 +118,10 @@ class TestClamp:
 @pytest.mark.parametrize(
     ("score", "label"),
     [
-        (0.72, "high"),
-        (0.719, "moderate"),
-        (0.58, "moderate"),
-        (0.579, "low"),
+        (0.62, "high"),
+        (0.619, "moderate"),
+        (0.52, "moderate"),
+        (0.519, "low"),
         (0.42, "low"),
         (0.419, "no_match"),
     ],

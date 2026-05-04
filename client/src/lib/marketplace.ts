@@ -103,7 +103,7 @@ export function getCadcTokenAddress(): string {
   }
 }
 
-export function getUsdcTokenAddressForCurrency(
+export function getPaymentTokenAddressForCurrency(
   currency: SettlementCurrency,
 ): string {
   switch (currency) {

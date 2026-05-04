@@ -52,11 +52,7 @@ class OllamaLLMService(LLMService):
     def from_settings(cls, settings: Settings) -> "OllamaLLMService":
         """Build the Ollama clients from application settings."""
         base_url = getattr(settings, "llm_base_url", DEFAULT_OLLAMA_BASE_URL)
-        # Fall back to chat base URL so a single LLM_BASE_URL covers both
-        # workloads in Kubernetes (llm_embedding_base_url is optional / None).
-        embedding_base_url = (
-            getattr(settings, "llm_embedding_base_url", None) or base_url
-        )
+        embedding_base_url = getattr(settings, "llm_embedding_base_url", None) or base_url
         chat_model = getattr(settings, "llm_chat_model", DEFAULT_CHAT_MODEL)
         embedding_model = getattr(settings, "llm_embedding_model", DEFAULT_EMBEDDING_MODEL)
         client_kwargs = _client_kwargs(settings)
