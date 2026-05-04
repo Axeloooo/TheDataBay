@@ -41,6 +41,9 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_WALLETCONNECT_PROJECT_ID": JSON.stringify(
         env.WALLETCONNECT_PROJECT_ID || env.VITE_WALLETCONNECT_PROJECT_ID || ""
       ),
+      "import.meta.env.VITE_CHAIN_ID": JSON.stringify(
+        env.CHAIN_ID || env.VITE_CHAIN_ID || "84532"
+      ),
       // WalletConnect packages reference Node.js `global`
       global: "globalThis",
     },

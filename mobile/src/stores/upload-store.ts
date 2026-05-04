@@ -9,7 +9,7 @@ import {
   SETTLEMENT_CURRENCY,
   SETTLEMENT_DECIMALS,
   formatSettlementAmount,
-  getPaymentTokenAddress,
+  getUsdcTokenAddress,
   parseSettlementAmount,
   createItemTx,
 } from "@/src/lib/marketplace";
@@ -343,7 +343,7 @@ export const useUploadStore = create<UploadStore>()(
             description:
               state.persistedSession?.description ?? state.description,
             seller: address,
-            paymentToken: getPaymentTokenAddress(),
+            paymentToken: getUsdcTokenAddress(),
             priceAtomic: effectivePriceAtomic,
             datasetUrl: currentDatasetUrl,
             datasetHash: currentDatasetHash,
