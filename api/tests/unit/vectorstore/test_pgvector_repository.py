@@ -108,7 +108,7 @@ async def test_create_collection_and_add_documents_use_dataset_summaries_collect
         "connection": "postgresql+psycopg://user:pass@localhost:5432/db",
         "embedding_length": 768,
         "use_jsonb": True,
-        "create_extension": True,
+        "create_extension": False,
         "async_mode": True,
     }
     vectorstore.acreate_collection.assert_awaited_once_with()
