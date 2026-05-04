@@ -190,25 +190,6 @@ async def test_embed_persists_row_documents(settings):
     }
 
 
-@pytest.mark.asyncio
-async def test_embed_respects_max_embed_rows(settings):
-    one_row_settings = settings.model_copy(update={"max_embed_rows": 1})
-    harness = make_service(one_row_settings)
-
-    response = await harness.service.embed(
-        file=make_upload_file("heart.csv", b"age,cp\n63,3\n37,2\n"),
-        title="Heart",
-        description="Cardio rows",
-        seller="0x0000000000000000000000000000000000000001",
-        price_atomic=100,
-    )
-
-    # Only 1 row document despite 2 CSV rows
-    assert len(harness.vector_repository.added_docs) == 1
-    assert harness.vector_repository.added_ids == [
-        f"{response.listing_id}:row:0",
-    ]
-
 
 @pytest.mark.parametrize(
     "filename,content,error,status",

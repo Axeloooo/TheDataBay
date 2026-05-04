@@ -237,9 +237,8 @@ def _aggregate_dataset_hits(
     return sorted(best_by_listing.values(), key=lambda hit: hit.score, reverse=True)
 
 
-def _row_fetch_limit(settings: Settings, final_limit: int) -> int:
-    max_embed_rows = max(1, int(getattr(settings, "max_embed_rows", 2000)))
-    return min(_MAX_ROW_FETCH, max(500, final_limit * max_embed_rows))
+def _row_fetch_limit(_settings: Settings, _final_limit: int) -> int:
+    return _MAX_ROW_FETCH
 
 
 def _minimum_match_score(settings: Settings) -> float:

@@ -55,7 +55,6 @@ class Settings(BaseSettings):
     # Embedding job settings
     max_file_size_mb: int = Field(alias="MAX_FILE_SIZE_MB")
     max_dataset_rows: int = Field(alias="MAX_DATASET_ROWS")
-    max_embed_rows: int = Field(default=2000, alias="MAX_EMBED_ROWS")
 
     # Similarity search settings
     top_k: int = Field(alias="TOP_K")

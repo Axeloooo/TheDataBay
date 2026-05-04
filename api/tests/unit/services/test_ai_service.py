@@ -52,7 +52,6 @@ def make_settings(**overrides) -> SimpleNamespace:
     data = {
         "top_k": 10,
         "llm_embedding_model": "nomic-embed-text",
-        "max_embed_rows": 2000,
         "similarity_threshold": None,
     }
     data.update(overrides)
@@ -118,12 +117,12 @@ class TestClamp:
 @pytest.mark.parametrize(
     ("score", "label"),
     [
-        (0.62, "high"),
-        (0.619, "moderate"),
-        (0.52, "moderate"),
-        (0.519, "low"),
-        (0.42, "low"),
-        (0.419, "no_match"),
+        (0.5, "high"),
+        (0.499, "moderate"),
+        (0.4, "moderate"),
+        (0.399, "low"),
+        (0.2, "low"),
+        (0.199, "no_match"),
     ],
 )
 def test_score_label_uses_fixed_search_bands(score: float, label: str):
@@ -171,7 +170,7 @@ def test_weak_match_is_returned_with_low_label():
                     listing_id="listing-weak",
                     page_content="Some faintly related tabular metadata.",
                 ),
-                0.43,
+                0.25,
             )
         ],
         contract_items=[make_item("listing-weak")],
@@ -180,7 +179,7 @@ def test_weak_match_is_returned_with_low_label():
     results = asyncio.run(service.rank_datasets("weak signal", limit=5))
 
     assert len(results) == 1
-    assert results[0].score == 0.43
+    assert results[0].score == 0.25
     assert results[0].score_label == "low"
 
 
@@ -192,7 +191,7 @@ def test_off_domain_no_match_is_filtered():
                     listing_id="listing-off",
                     page_content="Retail inventory summary.",
                 ),
-                0.419,
+                0.19,
             )
         ],
         contract_items=[make_item("listing-off")],

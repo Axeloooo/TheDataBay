@@ -324,9 +324,8 @@ class DatasetEmbedService:
         except Exception:
             col_map = {col: col for col in column_names}
 
-        cap = max(0, self._settings.max_embed_rows)
         documents: list[Document] = []
-        for i, doc in enumerate(loaded_docs[:cap]):
+        for i, doc in enumerate(loaded_docs):
             documents.append(
                 Document(
                     page_content=_apply_column_expansion(doc.page_content, col_map),
