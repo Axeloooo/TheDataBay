@@ -19,17 +19,10 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
 ];
 
 function PurchaseRequests() {
-  const {
-    purchaseRequests,
-    loadingPurchaseRequests,
-    purchaseRequestError,
-    loadPurchaseRequests,
-  } = useAgentStore((state) => ({
-    purchaseRequests: state.purchaseRequests,
-    loadingPurchaseRequests: state.loadingPurchaseRequests,
-    purchaseRequestError: state.purchaseRequestError,
-    loadPurchaseRequests: state.loadPurchaseRequests,
-  }));
+  const purchaseRequests = useAgentStore((state) => state.purchaseRequests);
+  const loadingPurchaseRequests = useAgentStore((state) => state.loadingPurchaseRequests);
+  const purchaseRequestError = useAgentStore((state) => state.purchaseRequestError);
+  const loadPurchaseRequests = useAgentStore((state) => state.loadPurchaseRequests);
   const address = useWalletStore((state) => state.address);
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");

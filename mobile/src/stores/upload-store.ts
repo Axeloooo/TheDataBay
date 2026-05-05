@@ -9,7 +9,7 @@ import {
   SETTLEMENT_CURRENCY,
   SETTLEMENT_DECIMALS,
   formatSettlementAmount,
-  getPaymentTokenAddress,
+  getUsdcTokenAddress,
   parseSettlementAmount,
   createItemTx,
 } from "@/src/lib/marketplace";
@@ -53,7 +53,7 @@ type UploadStore = {
   createListingOnChain: (address: string | null) => Promise<string | null>;
 };
 
-const STORAGE_KEY = "bridgemart_upload_store_v1";
+const STORAGE_KEY = "thedatabay_upload_store_v1";
 const ZERO_BYTES32 = `0x${"0".repeat(64)}`;
 
 function statusToUploadStatus(status: string | null | undefined): UploadStatus {
@@ -343,7 +343,7 @@ export const useUploadStore = create<UploadStore>()(
             description:
               state.persistedSession?.description ?? state.description,
             seller: address,
-            paymentToken: getPaymentTokenAddress(),
+            paymentToken: getUsdcTokenAddress(),
             priceAtomic: effectivePriceAtomic,
             datasetUrl: currentDatasetUrl,
             datasetHash: currentDatasetHash,

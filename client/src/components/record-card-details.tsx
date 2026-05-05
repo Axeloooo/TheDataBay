@@ -8,13 +8,12 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   Copy,
-  FileText,
   User,
   Shield,
-  Link2,
   Users,
   CheckCircle2,
   AlertCircle,
+  TableIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { MarketplaceDataItem } from "@/types/contract";
@@ -29,6 +28,7 @@ interface RecordCardDetailsProps {
   isPurchased?: boolean;
   integrityStatus?: "verifying" | "verified" | "failed" | "unavailable";
   integrityDetail?: string;
+  preview?: { column_names: string[]; rows: string[][] } | null;
 }
 
 function RecordCardDetails({
@@ -36,13 +36,12 @@ function RecordCardDetails({
   isPurchased = false,
   integrityStatus = "unavailable",
   integrityDetail,
+  preview,
 }: RecordCardDetailsProps) {
   const copyToClipboard = async (text: string, label: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      toast(`${label} copied to clipboard`, {
-        description: text,
-      });
+      toast(`${label} copied to clipboard`, { description: text });
     } catch {
       toast.error("Failed to copy to clipboard");
     }
@@ -113,13 +112,11 @@ function RecordCardDetails({
         </div>
         <p className="text-muted-foreground">{dataset.description}</p>
         {integrityDetail && integrityStatus !== "verified" && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {integrityDetail}
-          </p>
+          <p className="mt-2 text-xs text-muted-foreground">{integrityDetail}</p>
         )}
       </div>
 
-      {/* Price & Actions */}
+      {/* Price */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-center justify-between">
@@ -148,149 +145,134 @@ function RecordCardDetails({
               </div>
             </div>
             <div className="text-sm text-muted-foreground">
-              {isPurchased ? "Access granted" : "Purchase to unlock"}
+              {isPurchased ? "Access granted" : "Purchase to unlock full dataset"}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Listing Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Listing Summary
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Listing ID</p>
-              <p className="font-mono text-xs break-all">{dataset.id}</p>
+      {/* Dataset Preview */}
+      {preview ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TableIcon className="h-5 w-5" />
+              Dataset Preview
+            </CardTitle>
+            <CardDescription>
+              First {preview.rows.length} row{preview.rows.length !== 1 ? "s" : ""} ·{" "}
+              {preview.column_names.length} column{preview.column_names.length !== 1 ? "s" : ""}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto rounded-md border">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    {preview.column_names.map((col) => (
+                      <th
+                        key={col}
+                        className="px-3 py-2 text-left font-semibold text-muted-foreground whitespace-nowrap"
+                      >
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {preview.rows.map((row, ri) => (
+                    <tr
+                      key={ri}
+                      className="border-b last:border-0 hover:bg-muted/30 transition-colors"
+                    >
+                      {row.map((cell, ci) => (
+                        <td key={ci} className="px-3 py-2 font-mono whitespace-nowrap">
+                          {cell}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Price atomic</p>
-              <p className="font-mono text-xs break-all">
-                {pricing.priceAtomic}
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {pricing.settlementCurrency} settlement at{" "}
-                {pricing.settlementDecimals} decimals
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* URLs */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" />
-            URLs
-          </CardTitle>
-          <CardDescription>Encrypted dataset location</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Dataset URL</p>
-            <div className="flex items-center gap-2">
-              <p className="flex-1 font-mono text-xs break-all">
-                {dataset.dataset_url}
-              </p>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() =>
-                  copyToClipboard(dataset.dataset_url, "Dataset URL")
-                }
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="border-dashed">
+          <CardContent className="flex items-center gap-3 py-5 text-sm text-muted-foreground">
+            <TableIcon className="h-5 w-5 shrink-0 opacity-50" />
+            <span>Dataset preview is not available for this listing yet.</span>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Seller */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5" />
-            Seller Information
+            Seller
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Seller Address</p>
-            <div className="mb-2">
-              <Badge variant="outline" className="gap-1.5">
-                {sellerChain === "evm" ? (
-                  <>
-                    <ChainIcon chain="evm" className="h-3.5 w-3.5" />
-                    Ethereum
-                  </>
-                ) : sellerChain === "solana" ? (
-                  <>
-                    <ChainIcon chain="solana" className="h-3.5 w-3.5" />
-                    Solana
-                  </>
-                ) : (
-                  "Unknown Chain"
-                )}
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              {sellerChain && (
-                <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted/60">
-                  <ChainIcon chain={sellerChain} className="h-5 w-5" />
-                </div>
+        <CardContent className="space-y-3">
+          <div className="mb-1">
+            <Badge variant="outline" className="gap-1.5">
+              {sellerChain === "evm" ? (
+                <>
+                  <ChainIcon chain="evm" className="h-3.5 w-3.5" />
+                  Ethereum
+                </>
+              ) : sellerChain === "solana" ? (
+                <>
+                  <ChainIcon chain="solana" className="h-3.5 w-3.5" />
+                  Solana
+                </>
+              ) : (
+                "Unknown Chain"
               )}
-              <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm">
-                {dataset.seller}
-              </code>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() =>
-                  copyToClipboard(dataset.seller, "Seller address")
-                }
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
+            </Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            {sellerChain && (
+              <div className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted/60">
+                <ChainIcon chain={sellerChain} className="h-5 w-5" />
+              </div>
+            )}
+            <code className="flex-1 rounded bg-muted px-3 py-2 font-mono text-sm">
+              {dataset.seller}
+            </code>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => copyToClipboard(dataset.seller, "Seller address")}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Integrity Hashes */}
+      {/* Integrity */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Integrity Hashes
+            Integrity
           </CardTitle>
-          <CardDescription>
-            SHA-256 hashes for data verification
-          </CardDescription>
+          <CardDescription>SHA-256 hash of the encrypted dataset</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <p className="text-sm text-muted-foreground mb-2">Dataset Hash</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-xs break-all">
-                {dataset.dataset_hash}
-              </code>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() =>
-                  copyToClipboard(dataset.dataset_hash, "Dataset hash")
-                }
-              >
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
+        <CardContent>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 bg-muted px-3 py-2 rounded font-mono text-xs break-all">
+              {dataset.dataset_hash}
+            </code>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => copyToClipboard(dataset.dataset_hash, "Dataset hash")}
+            >
+              <Copy className="h-4 w-4" />
+            </Button>
           </div>
         </CardContent>
       </Card>

@@ -6,8 +6,11 @@ import type {
   PurchasedItemsRequest,
   PurchasedItemsResponse,
 } from "@/types/contract";
-import type { KeyReleaseRequest, KeyReleaseResponse } from "@/types/dataset";
-import type { JobResponse, JobStatusResponse } from "@/types/llm";
+import type {
+  DatasetEmbedResponse,
+  KeyReleaseRequest,
+  KeyReleaseResponse,
+} from "@/types/dataset";
 import type {
   SimilaritySearchRequest,
   SimilaritySearchResponse,
@@ -21,6 +24,7 @@ import type {
   PurchaseRequestListResponse,
 } from "@/types/agent";
 import { normalizeAtomicString } from "@/lib/atomic";
+import { mockBackend } from "@/lib/mock-backend";
 import { uuidToBytes32 } from "@/lib/ids";
 import { SETTLEMENT_TOKENS } from "@/types/contract";
 import type { SettlementCurrency } from "@/types/contract";
@@ -103,15 +107,12 @@ function normalizeMarketplaceItem(
   };
 }
 
-export const backend = {
-  submitEmbedBatch: (formData: FormData) =>
-    apiRequest<JobResponse>("/api/v1/llm/embed/batch", {
+const realBackend = {
+  submitDataset: (formData: FormData) =>
+    apiRequest<DatasetEmbedResponse>("/api/v1/datasets/embed", {
       method: "POST",
       body: formData,
     }),
-
-  getJobStatus: (jobId: string) =>
-    apiRequest<JobStatusResponse>(`/api/v1/llm/jobs/${jobId}`),
 
   getMarketplaceItems: async () => {
     const items = await apiRequest<MarketplaceApiItem[]>(
@@ -140,6 +141,11 @@ export const backend = {
         method: "POST",
         body: JSON.stringify(payload),
       },
+    ),
+
+  getDatasetPreview: (listingId: string) =>
+    apiRequest<{ column_names: string[]; rows: string[][] }>(
+      `/api/v1/datasets/${listingId}/preview`,
     ),
 
   similaritySearch: async (
@@ -259,3 +265,8 @@ export const backend = {
       },
     ),
 };
+
+type Backend = typeof realBackend;
+
+export const backend: Backend =
+  import.meta.env.VITE_MOCK === "true" ? mockBackend : realBackend;

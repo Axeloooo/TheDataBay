@@ -32,7 +32,7 @@ type WalletPersistedState = {
   userDisconnected: boolean;
 };
 
-const STORAGE_KEY = "bridgemart_wallet_v4";
+const STORAGE_KEY = "thedatabay_wallet_v4";
 
 export const useWalletStore = create<WalletStore>()(
   persist(

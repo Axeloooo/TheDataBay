@@ -1,10 +1,11 @@
 {
-  "name": "cross-chain-data-marketplace-frontend",
+  "name": "thedatabay-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:demo": "VITE_MOCK=true vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",

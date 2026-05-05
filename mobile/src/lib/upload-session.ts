@@ -22,7 +22,7 @@ export type PersistedUploadSession = {
   priceWei?: string;
 };
 
-const STORAGE_KEY = "bridgemart_upload_session_v1";
+const STORAGE_KEY = "thedatabay_upload_session_v1";
 
 export async function loadUploadSession() {
   try {

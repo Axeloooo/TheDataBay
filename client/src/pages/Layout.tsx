@@ -7,11 +7,13 @@ interface LayoutProps {
 
 function Layout({ children }: LayoutProps) {
   const messages = [
-    "BridgeMart is in active beta — features and APIs are evolving. Check back often.",
-    "Every dataset is AES-encrypted before it reaches IPFS. The decryption key only releases after on-chain purchase.",
-    "Tip: confirm your MetaMask network and contract address match before signing any transaction.",
-    "On-chain settlement is live. Solana and additional chains are on the roadmap.",
-    "Prices display in your preferred quote currency — settlement uses each listing's configured token.",
+    "🧪 Beta on Base Sepolia — buy and sell real datasets on a live testnet today.",
+    "💵 USDC support — price and settle your datasets in USDC with on-chain guarantees.",
+    "🍁 CADC support — list and purchase datasets priced in Canadian Dollar Coin.",
+    "🤖 AI agents — autonomous agents can discover, recommend, and request dataset purchases on your behalf.",
+    "🔐 AES-256 encryption — every dataset is encrypted before reaching IPFS; the key releases only after purchase.",
+    "🔍 RAG & vector search — semantic similarity search powered by pgvector surfaces the most relevant datasets.",
+    "⛓️ On-chain settlement — every purchase is verified and settled directly on Base Sepolia.",
   ];
 
   return (

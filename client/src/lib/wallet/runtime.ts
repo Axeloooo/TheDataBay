@@ -129,10 +129,10 @@ class WalletRuntimeImpl implements WalletRuntime {
         chains: [configuredChain],
         showQrModal: true,
         metadata: {
-          name: "BridgeMart",
+          name: "TheDataBay",
           description: "Decentralized dataset marketplace",
-          url: "https://bridgemart.app",
-          icons: ["https://bridgemart.app/icon.png"],
+          url: "https://thedatabay.com",
+          icons: ["https://thedatabay.com/icon.png"],
         },
       });
 

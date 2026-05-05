@@ -117,6 +117,10 @@ function DatasetDetail() {
   const [integrityDetail, setIntegrityDetail] = useState<string | undefined>(
     undefined,
   );
+  const [preview, setPreview] = useState<{
+    column_names: string[];
+    rows: string[][];
+  } | null>(null);
 
   const listingUuid = useMemo(() => {
     if (!id) return null;
@@ -156,6 +160,18 @@ function DatasetDetail() {
     return () => {
       active = false;
     };
+  }, [listingUuid]);
+
+  useEffect(() => {
+    if (!listingUuid) return;
+    let active = true;
+    backend.getDatasetPreview(listingUuid).then((data) => {
+      if (!active) return;
+      setPreview(data);
+    }).catch(() => {
+      // Preview unavailable (server restart or not yet indexed) — silent failure
+    });
+    return () => { active = false; };
   }, [listingUuid]);
 
   useEffect(() => {
@@ -281,6 +297,7 @@ function DatasetDetail() {
           isPurchased={isPurchased}
           integrityStatus={integrityStatus}
           integrityDetail={integrityDetail}
+          preview={preview}
         />
         {listingUuid && <DatasetRecommendations listingId={listingUuid} />}
         {actionError && (

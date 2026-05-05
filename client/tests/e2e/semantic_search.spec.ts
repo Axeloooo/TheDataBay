@@ -13,8 +13,8 @@ const __dirname: string = path.dirname(__filename);
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const WALLET_STORAGE_KEY: string = "bridgemart_wallet_v4";
-const UPLOAD_STORAGE_KEY: string = "bridgemart_upload_store_v1";
+const WALLET_STORAGE_KEY: string = "thedatabay_wallet_v4";
+const UPLOAD_STORAGE_KEY: string = "thedatabay_upload_store_v1";
 const BACKEND_URL: string =
   process.env.E2E_BACKEND_URL ?? "http://localhost:8080";
 
@@ -145,7 +145,7 @@ class SemanticSearchPage {
   }
 
   /**
-   * Waits up to 90 s for the embedding job to reach "Completed".
+   * Waits up to 90 s for dataset processing to reach "Completed".
    * Fails immediately with a clear message if an "Operation failed" error panel appears.
    */
   async waitForJobCompletion(): Promise<void> {
@@ -166,7 +166,7 @@ class SemanticSearchPage {
         .textContent()
         .catch(() => null);
       throw new Error(
-        `Upload job failed: "${detail?.trim() ?? "unknown error"}". ` +
+        `Dataset processing failed: "${detail?.trim() ?? "unknown error"}". ` +
           `Ensure the backend is running at ${BACKEND_URL}.`,
       );
     }

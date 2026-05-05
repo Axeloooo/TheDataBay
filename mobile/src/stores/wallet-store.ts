@@ -27,7 +27,7 @@ type WalletStore = WalletConnectionSnapshot &
     subscribeToRuntime: () => () => void;
   };
 
-const STORAGE_KEY = "bridgemart_wallet_store_v2";
+const STORAGE_KEY = "thedatabay_wallet_store_v2";
 
 const initialConnection: WalletConnectionSnapshot = {
   address: null,
@@ -45,7 +45,9 @@ const initialMutation: WalletTransactionSnapshot = {
   transactionError: null,
 };
 
-function snapshotToConnection(snap: WalletSessionSnapshot): WalletConnectionSnapshot {
+function snapshotToConnection(
+  snap: WalletSessionSnapshot,
+): WalletConnectionSnapshot {
   return {
     address: snap.address,
     chainId: snap.chainId != null ? String(snap.chainId) : null,

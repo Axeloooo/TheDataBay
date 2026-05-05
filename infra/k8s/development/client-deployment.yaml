@@ -14,40 +14,50 @@ spec:
     spec:
       containers:
         - name: client
-          image: bridgemart/client
+          image: thedatabay/client
           env:
             - name: VITE_API_URL
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: thedatabay-secrets
                   key: API_URL
             - name: VITE_CONTRACT_ADDRESS
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: thedatabay-secrets
                   key: CONTRACT_ADDRESS
-            - name: VITE_PAYMENT_TOKEN_ADDRESS
+            - name: VITE_USDC_TOKEN_ADDRESS
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
-                  key: PAYMENT_TOKEN_ADDRESS
+                  name: thedatabay-secrets
+                  key: USDC_TOKEN_ADDRESS
+            - name: VITE_CADC_TOKEN_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CADC_TOKEN_ADDRESS
             - name: VITE_PINATA_GATEWAY_URL
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: thedatabay-secrets
                   key: PINATA_GATEWAY_URL
             - name: VITE_WALLETCONNECT_PROJECT_ID
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: thedatabay-secrets
                   key: WALLETCONNECT_PROJECT_ID
+            - name: VITE_CHAIN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CHAIN_ID
           resources:
             requests:
-              memory: "384Mi"
+              memory: "512Mi"
               cpu: "25m"
             limits:
-              memory: "512Mi"
-              cpu: "200m"
+              memory: "1Gi"
+              cpu: "500m"
           ports:
             - containerPort: 5173
 ---

@@ -1,0 +1,16 @@
+location                 = "mexicocentral"
+project_name             = "thedatabay"
+environment              = "production"
+owner                    = "axelsanchez"
+aks_kubernetes_version   = "1.33"
+aks_node_vm_size         = "Standard_B2s_v2"
+aks_node_count           = 1
+aks_min_count            = 1
+aks_max_count            = 2
+aks_sku_tier             = "Free"
+aks_auto_scaling_enabled = false
+aks_os_disk_size_gb      = 30
+acr_sku                  = "Basic"
+vnet_address_space       = ["10.0.0.0/8"]
+aks_subnet_prefix        = "10.240.0.0/16"
+domain_name              = "thedatabay.com"

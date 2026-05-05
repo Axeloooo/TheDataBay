@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: postgres
-          image: postgres:17.6-alpine3.22
+          image: pgvector/pgvector:pg17
           ports:
             - containerPort: 5432
               name: postgres
@@ -23,17 +23,17 @@ spec:
             - name: POSTGRES_DB
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: thedatabay-secrets
                   key: POSTGRES_DB
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: thedatabay-secrets
                   key: POSTGRES_USER
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: bridgemart-secrets
+                  name: thedatabay-secrets
                   key: POSTGRES_PASSWORD
           volumeMounts:
             - name: postgres-data

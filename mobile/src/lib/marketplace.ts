@@ -33,12 +33,12 @@ function getContractAddress(): string {
   }
 }
 
-export function getPaymentTokenAddress(): string {
-  if (!ENV.PAYMENT_TOKEN_ADDRESS) {
-    throw new Error("Missing Expo extra paymentTokenAddress.");
+export function getUsdcTokenAddress(): string {
+  if (!ENV.USDC_TOKEN_ADDRESS) {
+    throw new Error("Missing Expo extra usdcTokenAddress.");
   }
 
-  const paymentToken = getAddress(ENV.PAYMENT_TOKEN_ADDRESS);
+  const paymentToken = getAddress(ENV.USDC_TOKEN_ADDRESS);
   if (paymentToken === "0x0000000000000000000000000000000000000000") {
     throw new Error("Payment token is not configured.");
   }
@@ -145,7 +145,7 @@ export async function createItemTx(params: {
 export async function buyItemTx(
   listingId: string,
   priceAtomic: string | bigint,
-  paymentTokenAddress: string,
+  usdcTokenAddress: string,
 ) {
   try {
     const provider = await getEvmProvider();
@@ -156,7 +156,7 @@ export async function buyItemTx(
     const fee = (normalizedPrice * feeBps) / 10_000n;
     const total = normalizedPrice + fee;
 
-    const paymentToken = getAddress(paymentTokenAddress);
+    const paymentToken = getAddress(usdcTokenAddress);
     const token = new Contract(paymentToken, erc20Abi, signer);
     const buyerAddress = await signer.getAddress();
     const allowance = (await token.allowance(

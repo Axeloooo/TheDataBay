@@ -6,12 +6,12 @@ function readEnv(name: string, fallback = "") {
 }
 
 const config: ExpoConfig = {
-  name: "BridgeMart",
-  slug: "mobile",
+  name: "TheDataBay",
+  slug: "thedatabay",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: "mobile",
+  scheme: "thedatabay",
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
@@ -57,9 +57,9 @@ const config: ExpoConfig = {
       "PINATA_GATEWAY_URL",
       "https://gateway.pinata.cloud",
     ),
-    walletConnectProjectId: readEnv("WALLET_CONNECT_PROJECT_ID"),
+    walletConnectProjectId: readEnv("WALLETCONNECT_PROJECT_ID"),
     contractAddress: readEnv("CONTRACT_ADDRESS"),
-    paymentTokenAddress: readEnv("PAYMENT_TOKEN_ADDRESS"),
+    usdcTokenAddress: readEnv("USDC_TOKEN_ADDRESS"),
     cadcTokenAddress: readEnv("CADC_TOKEN_ADDRESS"),
     chainId: readEnv("CHAIN_ID", "31337"),
     rpcUrl: readEnv("RPC_URL", "http://127.0.0.1:8545"),

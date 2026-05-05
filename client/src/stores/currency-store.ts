@@ -23,7 +23,7 @@ type CurrencyStore = {
   stopRatesPolling: () => void;
 };
 
-const STORAGE_KEY = "bridgemart_preferred_currency_v1";
+const STORAGE_KEY = "thedatabay_preferred_currency_v1";
 
 function normalizeCurrency(raw: string): DisplayCurrency {
   switch (raw.trim()) {

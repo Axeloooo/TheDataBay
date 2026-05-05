@@ -1,23 +1,24 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { toast } from "sonner";
+import { parseUnits } from "ethers";
 import { backend } from "@/lib/backend";
-import { createItemTx, getPaymentTokenAddressForCurrency } from "@/lib/marketplace";
+import {
+  createItemTx,
+  getPaymentTokenAddressForCurrency,
+} from "@/lib/marketplace";
 import { uuidToBytes32 } from "@/lib/ids";
 import { fireConfettiBurst } from "@/lib/confetti";
 import type { DisplayCurrency } from "@/lib/fx";
-import { parseUnits } from "ethers";
-import { SETTLEMENT_TOKENS } from "@/types/contract";
-import type { SettlementCurrency } from "@/types/contract";
-import type { JobResponse, JobStatusResponse } from "@/types/llm";
+import { SETTLEMENT_TOKENS, type SettlementCurrency } from "@/types/contract";
+import type { DatasetEmbedResponse } from "@/types/dataset";
 import {
   clearUploadSession,
   loadUploadSession,
   saveUploadSession,
   type PersistedUploadSession,
 } from "@/lib/upload-session";
-
-type UploadStatus = "queued" | "running" | "completed" | "failed";
+import { walletRuntime } from "@/lib/wallet/runtime";
 
 type UploadStore = {
   title: string;
@@ -26,14 +27,12 @@ type UploadStore = {
   settlementCurrency: SettlementCurrency;
   displayCurrency: DisplayCurrency;
   file: File | null;
-  job: JobResponse | null;
-  jobStatus: JobStatusResponse | null;
+  embedResult: DatasetEmbedResponse | null;
   loading: boolean;
   error: string | null;
   createTxHash: string | null;
   isCreating: boolean;
   persistedSession: PersistedUploadSession | null;
-  pollTimerId: number | null;
   hasInitialized: boolean;
   setTitle: (value: string) => void;
   setDescription: (value: string) => void;
@@ -44,14 +43,11 @@ type UploadStore = {
   setError: (value: string | null) => void;
   initializeUploadState: (preferredCurrency: DisplayCurrency) => void;
   submitUpload: (address: string | null) => Promise<void>;
-  pollJob: (jobId: string) => Promise<boolean>;
-  startPolling: () => void;
-  stopPolling: () => void;
   clearPendingSession: () => void;
   createItemOnChain: (address: string | null) => Promise<string | null>;
 };
 
-const STORAGE_KEY = "bridgemart_upload_store_v2";
+const STORAGE_KEY = "thedatabay_upload_store_v3";
 const ZERO_BYTES32 = `0x${"0".repeat(64)}`;
 
 function settlementDecimalsFor(currency: SettlementCurrency): number {
@@ -70,56 +66,31 @@ function parsePriceAtomic(
   }
 }
 
-function statusToUploadStatus(status: string | null | undefined): UploadStatus {
-  if (status === "completed") return "completed";
-  if (status === "failed") return "failed";
-  if (status === "running") return "running";
-  return "queued";
-}
-
-function syncSessionFromStatus(
-  status: JobStatusResponse,
-  current: PersistedUploadSession,
+function sessionFromResult(
+  response: DatasetEmbedResponse,
+  state: UploadStore,
+  seller: string,
+  priceAtomic: string,
 ): PersistedUploadSession {
-  const updated: PersistedUploadSession = {
-    ...current,
-    listingId: status.listing_id ?? current.listingId,
-    status: statusToUploadStatus(status.status),
-    datasetUrl: status.dataset_url ?? current.datasetUrl,
-    datasetHash: status.dataset_hash ?? current.datasetHash,
-    error: status.error ?? current.error,
+  return {
+    listingId: response.listing_id,
+    title: state.title,
+    description: state.description,
+    seller,
+    priceAtomic,
+    settlementCurrency: state.settlementCurrency,
+    settlementDecimals: settlementDecimalsFor(state.settlementCurrency),
+    fileName: state.file?.name,
+    status: "completed",
+    datasetUrl: response.dataset_url,
+    datasetHash: response.dataset_hash,
+    preview: response.preview,
+    stats: response.stats,
+    vectorSpec: response.vector_spec,
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    toastNotifiedStatus: "completed",
   };
-  saveUploadSession(updated);
-  return updated;
-}
-
-function maybeNotifyTerminalStatus(
-  session: PersistedUploadSession,
-  status: JobStatusResponse,
-) {
-  const terminal = status.status === "completed" || status.status === "failed";
-  if (!terminal) return session;
-  if (session.toastNotifiedStatus === status.status) return session;
-
-  if (status.status === "completed") {
-    toast.success("Embedding job completed", {
-      description:
-        "Dataset encrypted and uploaded. Ready to sign on-chain listing.",
-    });
-  } else {
-    toast.error("Embedding job failed", {
-      description: status.error ?? "Review the error details and retry.",
-    });
-  }
-
-  const updated: PersistedUploadSession = {
-    ...session,
-    toastNotifiedStatus: status.status === "completed" ? "completed" : "failed",
-    updatedAt: new Date().toISOString(),
-  };
-  saveUploadSession(updated);
-  return updated;
 }
 
 export const useUploadStore = create<UploadStore>()(
@@ -128,17 +99,15 @@ export const useUploadStore = create<UploadStore>()(
       title: "",
       description: "",
       priceUsdc: "",
-      settlementCurrency: "USDC" as SettlementCurrency,
+      settlementCurrency: "USDC",
       displayCurrency: "USDC",
       file: null,
-      job: null,
-      jobStatus: null,
+      embedResult: null,
       loading: false,
       error: null,
       createTxHash: null,
       isCreating: false,
       persistedSession: null,
-      pollTimerId: null,
       hasInitialized: false,
       setTitle: (value) => set({ title: value }),
       setDescription: (value) => set({ description: value }),
@@ -156,9 +125,7 @@ export const useUploadStore = create<UploadStore>()(
           priceEth?: string;
           payCurrency?: DisplayCurrency;
         };
-        const nextState: Partial<UploadStore> = {
-          hasInitialized: true,
-        };
+        const nextState: Partial<UploadStore> = { hasInitialized: true };
         const hasDraft =
           !!state.title ||
           !!state.description ||
@@ -166,6 +133,7 @@ export const useUploadStore = create<UploadStore>()(
           !!legacyState.priceEth ||
           legacyState.displayCurrency !== "USDC" ||
           legacyState.payCurrency !== undefined;
+
         if (!hasDraft && !session) {
           nextState.displayCurrency = preferredCurrency;
         }
@@ -176,14 +144,8 @@ export const useUploadStore = create<UploadStore>()(
         }
 
         nextState.persistedSession = session;
-        if (!state.title) {
-          nextState.title = session.title;
-        }
-        if (!state.description) {
-          nextState.description = session.description;
-        }
-        // Only migrate priceAtomic; legacy priceWei (ETH, 18 decimals) is incompatible.
-        // If session has priceWei but no priceAtomic, skip migration (will force re-entry).
+        if (!state.title) nextState.title = session.title;
+        if (!state.description) nextState.description = session.description;
         if (!legacyState.priceUsdc && session.priceAtomic) {
           const sessionCurrency: SettlementCurrency =
             session.settlementCurrency === "CADC" ? "CADC" : "USDC";
@@ -204,30 +166,22 @@ export const useUploadStore = create<UploadStore>()(
         } else if (legacyState.payCurrency) {
           nextState.displayCurrency = legacyState.payCurrency;
         }
-        if (session.jobId && !state.job) {
-          nextState.job = {
-            job_id: session.jobId,
-            listing_id: session.listingId ?? "",
-            status: session.status ?? "queued",
-          };
-        }
-        if (
-          session.listingId &&
-          session.status &&
-          (session.status === "completed" || session.status === "failed") &&
-          !state.jobStatus
-        ) {
-          nextState.jobStatus = {
-            job_id: session.jobId,
-            status: session.status,
+        if (session.listingId && session.datasetUrl && session.datasetHash) {
+          nextState.embedResult = {
             listing_id: session.listingId,
-            created_at: session.createdAt,
-            started_at: null,
-            completed_at: null,
-            filename: session.fileName ?? "dataset.csv",
-            error: session.error,
             dataset_url: session.datasetUrl,
             dataset_hash: session.datasetHash,
+            preview: session.preview ?? { column_names: [], rows: [] },
+            stats: session.stats ?? {
+              total_rows: 0,
+              total_columns: 0,
+              has_header: false,
+              empty_rows_skipped: 0,
+            },
+            vector_spec: session.vectorSpec ?? {
+              model: "nomic-embed-text",
+              dimension: 768,
+            },
           };
         }
 
@@ -244,10 +198,7 @@ export const useUploadStore = create<UploadStore>()(
           set({ error: "Select a dataset file." });
           return;
         }
-        const legacyState = state as UploadStore & {
-          priceEth?: string;
-        };
-        // Explicit migration handling: do not silently reinterpret ETH price as USDC.
+        const legacyState = state as UploadStore & { priceEth?: string };
         if (legacyState.priceEth && !legacyState.priceUsdc) {
           set({
             error:
@@ -275,41 +226,28 @@ export const useUploadStore = create<UploadStore>()(
           "settlement_decimals",
           String(settlementDecimalsFor(state.settlementCurrency)),
         );
-        // Legacy compatibility while the backend finishes the migration.
-        formData.append("price", priceAtomic);
         formData.append("seller_wallet_type", "evm");
 
         set({ loading: true, error: null });
 
         try {
-          const response = await backend.submitEmbedBatch(formData);
-          const nextSession: PersistedUploadSession = {
-            jobId: response.job_id,
-            listingId: response.listing_id ?? null,
-            title: state.title,
-            description: state.description,
-            seller: address,
+          const response = await backend.submitDataset(formData);
+          const nextSession = sessionFromResult(
+            response,
+            state,
+            address,
             priceAtomic,
-            settlementCurrency: state.settlementCurrency,
-            settlementDecimals: settlementDecimalsFor(state.settlementCurrency),
-            fileName: state.file.name,
-            status: "queued",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            toastNotifiedStatus: null,
-          };
-
+          );
           saveUploadSession(nextSession);
-          set({
-            job: response,
-            persistedSession: nextSession,
-            loading: true,
+          toast.success("Dataset prepared", {
+            description:
+              "Dataset encrypted and uploaded. Ready to sign on-chain listing.",
           });
-
-          const keepPolling = await get().pollJob(response.job_id);
-          if (keepPolling) {
-            get().startPolling();
-          }
+          set({
+            embedResult: response,
+            persistedSession: nextSession,
+            loading: false,
+          });
         } catch (err) {
           set({
             error: err instanceof Error ? err.message : "Upload failed",
@@ -317,78 +255,11 @@ export const useUploadStore = create<UploadStore>()(
           });
         }
       },
-      pollJob: async (jobId) => {
-        try {
-          const status = await backend.getJobStatus(jobId);
-          let session = get().persistedSession;
-
-          if (!session) {
-            session = loadUploadSession();
-          }
-
-          if (session && session.jobId === jobId) {
-            const synced = syncSessionFromStatus(status, session);
-            const notified = maybeNotifyTerminalStatus(synced, status);
-            set({ persistedSession: notified });
-          }
-
-          set({ jobStatus: status });
-
-          if (status.status === "completed" || status.status === "failed") {
-            get().stopPolling();
-            set({ loading: false });
-            return false;
-          }
-
-          return true;
-        } catch (err) {
-          const message =
-            err instanceof Error ? err.message : "Failed to fetch job status";
-          if (message.toLowerCase().includes("job not found")) {
-            set({
-              error:
-                "Session found, but job is no longer available on server memory. If upload already completed, you can still sign if required fields are present.",
-              loading: false,
-            });
-            return false;
-          }
-
-          set({ error: message, loading: false });
-          return false;
-        }
-      },
-      startPolling: () => {
-        const state = get();
-        const activeJobId = state.job?.job_id ?? state.persistedSession?.jobId;
-        const activeStatus =
-          state.jobStatus?.status ?? state.persistedSession?.status;
-
-        if (!activeJobId) return;
-        if (activeStatus === "completed" || activeStatus === "failed") return;
-
-        get().stopPolling();
-        set({ loading: true });
-
-        void get().pollJob(activeJobId);
-        const intervalId = window.setInterval(() => {
-          void get().pollJob(activeJobId);
-        }, 8000);
-
-        set({ pollTimerId: intervalId });
-      },
-      stopPolling: () => {
-        const intervalId = get().pollTimerId;
-        if (intervalId === null) return;
-        window.clearInterval(intervalId);
-        set({ pollTimerId: null });
-      },
       clearPendingSession: () => {
         clearUploadSession();
-        get().stopPolling();
         set({
           persistedSession: null,
-          job: null,
-          jobStatus: null,
+          embedResult: null,
           createTxHash: null,
           error: null,
           loading: false,
@@ -397,13 +268,14 @@ export const useUploadStore = create<UploadStore>()(
       createItemOnChain: async (address) => {
         const state = get();
         const currentListingId =
-          state.jobStatus?.listing_id ??
+          state.embedResult?.listing_id ??
           state.persistedSession?.listingId ??
           null;
         const currentDatasetUrl =
-          state.jobStatus?.dataset_url ?? state.persistedSession?.datasetUrl;
+          state.embedResult?.dataset_url ?? state.persistedSession?.datasetUrl;
         const currentDatasetHash =
-          state.jobStatus?.dataset_hash ?? state.persistedSession?.datasetHash;
+          state.embedResult?.dataset_hash ??
+          state.persistedSession?.datasetHash;
 
         if (!address) {
           set({ error: "Connect wallet to create item." });
@@ -414,7 +286,10 @@ export const useUploadStore = create<UploadStore>()(
           return null;
         }
 
-        const parsedPriceAtomic = parsePriceAtomic(state.priceUsdc);
+        const parsedPriceAtomic = parsePriceAtomic(
+          state.priceUsdc,
+          state.settlementCurrency,
+        );
         const effectivePriceAtomic =
           state.persistedSession?.priceAtomic ?? parsedPriceAtomic;
 
@@ -438,6 +313,7 @@ export const useUploadStore = create<UploadStore>()(
         set({ isCreating: true, error: null });
 
         try {
+          await walletRuntime.switchToConfiguredChain();
           const settlementCurrency =
             state.persistedSession?.settlementCurrency ??
             state.settlementCurrency;
@@ -462,8 +338,7 @@ export const useUploadStore = create<UploadStore>()(
           set({
             createTxHash: txHash,
             persistedSession: null,
-            job: null,
-            jobStatus: null,
+            embedResult: null,
             isCreating: false,
           });
 
@@ -486,8 +361,7 @@ export const useUploadStore = create<UploadStore>()(
         priceUsdc: state.priceUsdc,
         settlementCurrency: state.settlementCurrency,
         displayCurrency: state.displayCurrency,
-        job: state.job,
-        jobStatus: state.jobStatus,
+        embedResult: state.embedResult,
         persistedSession: state.persistedSession,
         createTxHash: state.createTxHash,
       }),
@@ -497,8 +371,6 @@ export const useUploadStore = create<UploadStore>()(
         state.loading = false;
         state.isCreating = false;
         state.error = null;
-        state.pollTimerId = null;
-        // Migration: default settlementCurrency if missing from older persisted state.
         if (!state.settlementCurrency) {
           state.settlementCurrency = "USDC";
         }

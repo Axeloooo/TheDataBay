@@ -25,7 +25,7 @@ export type FxRates = {
   updatedAt: number;
 };
 
-const FX_CACHE_KEY = "bridgemart_fx_rates_v1";
+const FX_CACHE_KEY = "thedatabay_fx_rates_v1";
 const DEFAULT_TTL_MS = 60_000;
 
 export async function fetchFxRates(): Promise<FxRates> {
@@ -103,7 +103,9 @@ export function convertSettlementToCurrency(
   let settlementAmount: number;
 
   try {
-    settlementAmount = Number(formatUnits(settlementAtomic, settlementDecimals));
+    settlementAmount = Number(
+      formatUnits(settlementAtomic, settlementDecimals),
+    );
   } catch {
     return null;
   }

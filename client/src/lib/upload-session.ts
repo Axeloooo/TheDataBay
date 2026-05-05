@@ -1,5 +1,6 @@
 export type PersistedUploadSession = {
-  jobId: string;
+  /** Legacy job id from pre-synchronous uploads. */
+  jobId?: string;
   listingId: string | null;
   title: string;
   description: string;
@@ -13,6 +14,14 @@ export type PersistedUploadSession = {
   status?: "queued" | "running" | "completed" | "failed";
   datasetUrl?: string;
   datasetHash?: string;
+  preview?: { column_names: string[]; rows: string[][] };
+  stats?: {
+    total_rows: number;
+    total_columns: number;
+    has_header: boolean;
+    empty_rows_skipped: number;
+  };
+  vectorSpec?: { model: string; dimension: number };
   signatureUrl?: string;
   signatureHash?: string;
   error?: string;
@@ -22,7 +31,7 @@ export type PersistedUploadSession = {
   toastNotifiedStatus?: "completed" | "failed" | null;
 };
 
-const STORAGE_KEY = "bridgemart_upload_session_v1";
+const STORAGE_KEY = "thedatabay_upload_session_v1";
 
 export function loadUploadSession(): PersistedUploadSession | null {
   try {
