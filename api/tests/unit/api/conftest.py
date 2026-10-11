@@ -61,6 +61,9 @@ _REGISTERED_MODELS = (
 )
 
 
+TEST_JWT_SECRET = "test-secret-" + "x" * 40
+
+
 def make_settings(**overrides: Any) -> Settings:
     data = {
         "APP_NAME": "TheDataBay API",
@@ -85,6 +88,7 @@ def make_settings(**overrides: Any) -> Settings:
         "RPC_URL": "http://127.0.0.1:8545",
         "SERVER_PRIVATE_KEY": "0x" + "11" * 32,
         "POSTGRES_URL": "sqlite:///./test.db",
+        "AUTH_JWT_SECRET": TEST_JWT_SECRET,
     }
     data.update(overrides)
     return Settings(_env_file=None, **data)
