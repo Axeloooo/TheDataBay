@@ -154,6 +154,28 @@ set_secret CHAIN-ID "$CHAIN_ID"
 set_secret RPC-URL "$RPC_URL"
 ```
 
+### Wallet sign-in secret (`AUTH_JWT_SECRET`)
+
+The API signs short-lived bearer tokens (HS256) for dataset key release and
+owner-only admin routes. Without `AUTH_JWT_SECRET` (or with one shorter than 32
+characters) sign-in and every protected route return `503`, so add it before
+deploying a backend image that includes wallet sign-in:
+
+```bash
+set_secret AUTH-JWT-SECRET "$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
+```
+
+Then expose it to the backend: add an `AUTH-JWT-SECRET` object to
+`infra/k8s/production/secret-provider-class.yaml` (both the `objects` list and
+the synced secret's `data` keys) and an `AUTH_JWT_SECRET` env entry in
+`backend-deployment.yaml`, following the existing `SERVER-PRIVATE-KEY` /
+`SERVER_PRIVATE_KEY` entries.
+Add the object only after the Key Vault secret exists, or the CSI mount fails
+and pods will not start. Rotating the secret signs every user out; they sign in
+again on their next download. Optional overrides: `AUTH_TOKEN_TTL_SECONDS`
+(default 3600), `AUTH_NONCE_TTL_SECONDS` (default 300) and `AUTH_DOMAIN`
+(default `thedatabay.com`, shown in the message users sign).
+
 ## Phase 4: Build and Push Docker Images Manually
 
 GitHub Actions normally handles this. Use these commands for an emergency

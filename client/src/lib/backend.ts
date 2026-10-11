@@ -8,9 +8,9 @@ import type {
 } from "@/types/contract";
 import type {
   DatasetEmbedResponse,
-  KeyReleaseRequest,
   KeyReleaseResponse,
 } from "@/types/dataset";
+import { authHeaders, withSession } from "@/lib/auth";
 import type {
   SimilaritySearchRequest,
   SimilaritySearchResponse,
@@ -128,11 +128,14 @@ const realBackend = {
     return normalizeMarketplaceItem(item);
   },
 
-  requestKeyRelease: (listingId: string, payload: KeyReleaseRequest) =>
-    apiRequest<KeyReleaseResponse>(`/api/v1/datasets/${listingId}/key`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+  // The wallet identity comes from the signed-in session token, not the body.
+  requestKeyRelease: (listingId: string) =>
+    withSession((token) =>
+      apiRequest<KeyReleaseResponse>(`/api/v1/datasets/${listingId}/key`, {
+        method: "POST",
+        headers: authHeaders(token),
+      }),
+    ),
 
   checkAccess: (listingId: string, payload: WalletAccessRequest) =>
     apiRequest<AccessCheckResponse>(
