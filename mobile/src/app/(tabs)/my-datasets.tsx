@@ -1,7 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 import ErrorPanel from "@/components/error-panel";
 import { AppButton } from "@/components/ui/app-button";
@@ -16,18 +16,24 @@ import { useWalletStore } from "@/src/stores/wallet-store";
 export default function MyDatasetsScreen() {
   const palette = useAppTheme();
   const { address, isConnected } = useWalletStore();
-  const { purchases, purchasesLoading, purchasesLoaded, purchasesError } =
+  const { purchases, purchasesLoaded, purchasesError } =
     useMeStore();
   const fetchPurchases = useMeStore((s) => s.fetchPurchases);
   const clear = useMeStore((s) => s.clear);
 
+  // A different wallet (or a disconnect) must never see the previous wallet's rows.
   useEffect(() => {
-    if (isConnected && address) {
-      void fetchPurchases();
-    } else {
-      clear();
-    }
-  }, [address, isConnected, fetchPurchases, clear]);
+    clear();
+  }, [address, isConnected, clear]);
+
+  // Tabs stay mounted, so refetch every time the screen gains focus.
+  useFocusEffect(
+    useCallback(() => {
+      if (isConnected && address) {
+        void fetchPurchases();
+      }
+    }, [address, isConnected, fetchPurchases]),
+  );
 
   return (
     <SafeAreaView
@@ -50,7 +56,7 @@ export default function MyDatasetsScreen() {
             message={purchasesError}
             onRetry={() => void fetchPurchases()}
           />
-        ) : purchasesLoading && !purchasesLoaded ? (
+        ) : !purchasesLoaded ? (
           <Text style={[styles.hint, { color: palette.subtleText }]}>
             Loading…
           </Text>

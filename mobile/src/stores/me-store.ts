@@ -37,16 +37,24 @@ const empty = (): Pick<
   listingsError: null,
 });
 
+// Bumped by clear() (wallet switch or disconnect). A request started under an
+// older generation belongs to a previous wallet, so its result is discarded
+// and it never touches the loading flags of the current wallet's request.
+let generation = 0;
+
 export const useMeStore = create<MeStore>()((set, get) => ({
   ...empty(),
 
   fetchPurchases: async () => {
     if (get().purchasesLoading) return;
+    const started = generation;
     set({ purchasesLoading: true, purchasesError: null });
     try {
       const purchases = await backend.getMyPurchases();
+      if (started !== generation) return;
       set({ purchases, purchasesLoading: false, purchasesLoaded: true });
     } catch (error) {
+      if (started !== generation) return;
       set({
         purchasesLoading: false,
         purchasesError:
@@ -57,11 +65,14 @@ export const useMeStore = create<MeStore>()((set, get) => ({
 
   fetchListings: async () => {
     if (get().listingsLoading) return;
+    const started = generation;
     set({ listingsLoading: true, listingsError: null });
     try {
       const listings = await backend.getMyListings();
+      if (started !== generation) return;
       set({ listings, listingsLoading: false, listingsLoaded: true });
     } catch (error) {
+      if (started !== generation) return;
       set({
         listingsLoading: false,
         listingsError:
@@ -70,5 +81,8 @@ export const useMeStore = create<MeStore>()((set, get) => ({
     }
   },
 
-  clear: () => set({ ...empty() }),
+  clear: () => {
+    generation += 1;
+    set({ ...empty() });
+  },
 }));

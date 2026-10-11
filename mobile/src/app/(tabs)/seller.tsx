@@ -1,7 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 
 import ErrorPanel from "@/components/error-panel";
 import { AppButton } from "@/components/ui/app-button";
@@ -16,18 +16,24 @@ import { useWalletStore } from "@/src/stores/wallet-store";
 export default function SellerScreen() {
   const palette = useAppTheme();
   const { address, isConnected } = useWalletStore();
-  const { listings, listingsLoading, listingsLoaded, listingsError } =
+  const { listings, listingsLoaded, listingsError } =
     useMeStore();
   const fetchListings = useMeStore((s) => s.fetchListings);
   const clear = useMeStore((s) => s.clear);
 
+  // A different wallet (or a disconnect) must never see the previous wallet's rows.
   useEffect(() => {
-    if (isConnected && address) {
-      void fetchListings();
-    } else {
-      clear();
-    }
-  }, [address, isConnected, fetchListings, clear]);
+    clear();
+  }, [address, isConnected, clear]);
+
+  // Tabs stay mounted, so refetch every time the screen gains focus.
+  useFocusEffect(
+    useCallback(() => {
+      if (isConnected && address) {
+        void fetchListings();
+      }
+    }, [address, isConnected, fetchListings]),
+  );
 
   return (
     <SafeAreaView
@@ -52,7 +58,7 @@ export default function SellerScreen() {
             message={listingsError}
             onRetry={() => void fetchListings()}
           />
-        ) : listingsLoading && !listingsLoaded ? (
+        ) : !listingsLoaded ? (
           <Text style={[styles.hint, { color: palette.subtleText }]}>
             Loading…
           </Text>
@@ -83,9 +89,11 @@ export default function SellerScreen() {
               </View>
               <Text style={[styles.hint, { color: palette.subtleText }]}>
                 {item.sales_count} {item.sales_count === 1 ? "sale" : "sales"}
-                {Object.values(item.earnings_by_token).map(
-                  (amount) =>
-                    ` · ${formatSettlementAmount(amount, item.token_decimals)} ${item.token_symbol}`,
+                {Object.entries(item.earnings_by_token).map(
+                  ([token, amount]) =>
+                    token.toLowerCase() === item.payment_token.toLowerCase()
+                      ? ` · ${formatSettlementAmount(amount, item.token_decimals)} ${item.token_symbol}`
+                      : ` · ${amount} base units of ${token}`,
                 )}
                 {item.source === "contract"
                   ? " · earnings unavailable until the indexer is synced"
@@ -93,7 +101,7 @@ export default function SellerScreen() {
               </Text>
               <Text style={[styles.hint, { color: palette.subtleText }]}>
                 {item.price_editable
-                  ? "Price edits need a wallet-signed transaction, which is not available yet."
+                  ? "Editing prices from your wallet is coming soon."
                   : "Price can't change after the first sale."}
               </Text>
               <AppButton label="Edit price" disabled onPress={() => undefined} />
