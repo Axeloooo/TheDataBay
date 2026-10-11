@@ -272,3 +272,11 @@ For Tilt/Kubernetes, set `infra/k8s/development/secrets.yaml` `RPC_URL` to a hos
 - Signature files may be missing/unavailable or below threshold.
 - Validate `signature_url`/`signature_hash` for listed items.
 - Try broader query terms.
+
+## Contributing
+
+- Branch names: `feature/short-description` or `fix/short-description`.
+- Commit prefixes: `feat: short-description` or `fix: short-description`.
+- Open pull requests against `devel`.
+- Releases are a pull request from `devel` to `main`; semantic-release updates `CHANGELOG.md` on `main`.
+- After a release, merge `main` back into `devel` to keep the branches in sync.
