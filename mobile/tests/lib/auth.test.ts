@@ -12,21 +12,41 @@ import {
 const ADDRESS = "0x00000000000000000000000000000000000000Aa";
 const OTHER = "0x00000000000000000000000000000000000000bB";
 const HOUR_MS = 60 * 60 * 1000;
+const DOMAIN = "thedatabay.test";
+
+function siweMessage(domain: string, address: string, nonce: string): string {
+  return [
+    `${domain} wants you to sign in with your Ethereum account:`,
+    address,
+    "",
+    "Sign in to TheDataBay.",
+    "",
+    `URI: https://${domain}`,
+    "Version: 1",
+    "Chain ID: 31337",
+    `Nonce: ${nonce}`,
+  ].join("\n");
+}
 
 function makeDeps(start = 1_000_000) {
   let now = start;
   let address: string | null = ADDRESS;
   let session: AuthSession | null = null;
   let issued = 0;
+  let tamper: ((message: string) => string) | null = null;
 
   const deps = {
     getAddress: jest.fn(() => address),
     signMessage: jest.fn(async (message: string) => `sig:${message}`),
-    requestNonce: jest.fn(async () => ({
-      nonce: `nonce-${issued + 1}`,
-      message: `message-${issued + 1}`,
-      expires_at: new Date(now + 300_000).toISOString(),
-    })),
+    requestNonce: jest.fn(async (body: { address: string }) => {
+      const nonce = `nonce${issued + 1}`;
+      const message = siweMessage(DOMAIN, body.address, nonce);
+      return {
+        nonce,
+        message: tamper ? tamper(message) : message,
+        expires_at: new Date(now + 300_000).toISOString(),
+      };
+    }),
     verify: jest.fn(async (body: { address: string }) => {
       issued += 1;
       return {
@@ -45,6 +65,7 @@ function makeDeps(start = 1_000_000) {
       session = null;
     }),
     now: () => now,
+    expectedDomain: () => DOMAIN,
   } satisfies SessionDeps;
 
   return {
@@ -54,6 +75,9 @@ function makeDeps(start = 1_000_000) {
     },
     setAddress: (next: string | null) => {
       address = next;
+    },
+    setTamper: (fn: (message: string) => string) => {
+      tamper = fn;
     },
   };
 }
@@ -87,12 +111,12 @@ describe("ensureSession", () => {
 
     await ensureSession();
 
-    expect(ctx.deps.signMessage).toHaveBeenCalledWith("message-1");
+    expect(ctx.deps.signMessage).toHaveBeenCalledWith(siweMessage(DOMAIN, ADDRESS, "nonce1"));
     expect(ctx.deps.verify).toHaveBeenCalledWith({
       wallet_type: "evm",
       address: ADDRESS,
-      nonce: "nonce-1",
-      signature: "sig:message-1",
+      nonce: "nonce1",
+      signature: `sig:${siweMessage(DOMAIN, ADDRESS, "nonce1")}`,
     });
   });
 
@@ -167,5 +191,30 @@ describe("withSession", () => {
 
     await expect(withSession(call)).rejects.toThrow("forbidden");
     expect(call).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("sign-in message checks", () => {
+  it.each([
+    ["another domain", (m: string) => m.replaceAll(DOMAIN, "evil.example")],
+    ["another address", (m: string) => m.replace(ADDRESS, OTHER)],
+    ["another nonce", (m: string) => m.replace("Nonce: nonce1", "Nonce: other")],
+    ["a missing address line", (m: string) => m.replace(ADDRESS + "\n", "")],
+  ])("refuses to sign a message for %s", async (_label, tamper) => {
+    const ctx = makeDeps();
+    ctx.setTamper(tamper);
+    const { ensureSession } = createSessionClient(ctx.deps);
+
+    await expect(ensureSession()).rejects.toThrow(/sign-in message/i);
+    expect(ctx.deps.signMessage).not.toHaveBeenCalled();
+    expect(ctx.deps.verify).not.toHaveBeenCalled();
+  });
+
+  it("accepts the connected address in a different letter case", async () => {
+    const ctx = makeDeps();
+    ctx.setTamper((m) => m.replace(ADDRESS, ADDRESS.toLowerCase()));
+    const { ensureSession } = createSessionClient(ctx.deps);
+
+    await expect(ensureSession()).resolves.toBe("token-1");
   });
 });

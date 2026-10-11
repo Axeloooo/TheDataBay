@@ -7,9 +7,16 @@ export type { AuthSession };
 /** Re-sign when the token has less than this long left. */
 export const SESSION_REFRESH_MARGIN_MS = 60_000;
 
-export type NonceRequest = { wallet_type: "evm"; address: string };
+export type NonceRequest = {
+  wallet_type: "evm";
+  address: string;
+  scope: "user";
+};
 export type NonceResponse = { nonce: string; message: string; expires_at: string };
-export type VerifyRequest = NonceRequest & { nonce: string; signature: string };
+export type VerifyRequest = Omit<NonceRequest, "scope"> & {
+  nonce: string;
+  signature: string;
+};
 export type TokenResponse = {
   access_token: string;
   token_type: string;
@@ -26,6 +33,8 @@ export type SessionDeps = {
   getSession(): AuthSession | null;
   setSession(session: AuthSession): void;
   clearSession(): void;
+  /** Host the API names in the sign-in message (its AUTH_DOMAIN). */
+  expectedDomain(): string;
   now?(): number;
 };
 
@@ -33,12 +42,46 @@ function sameAddress(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 
+/**
+ * Refuse to sign unless the server's message is for this app's domain, the
+ * connected wallet and the issued nonce, so a hostile or misconfigured API
+ * cannot get a signature for another site or account.
+ */
+export function assertSignInMessage(
+  message: string,
+  expected: { domain: string; address: string; nonce: string },
+): void {
+  const lines = message.split("\n");
+  const ok =
+    expected.domain.length > 0 &&
+    lines[0] ===
+      `${expected.domain} wants you to sign in with your Ethereum account:` &&
+    typeof lines[1] === "string" &&
+    sameAddress(lines[1], expected.address) &&
+    lines.includes(`URI: https://${expected.domain}`) &&
+    lines.includes(`Nonce: ${expected.nonce}`);
+  if (!ok) {
+    throw new Error(
+      "Refusing to sign: the sign-in message does not match this app and wallet.",
+    );
+  }
+}
+
 export function createSessionClient(deps: SessionDeps) {
   const now = () => (deps.now ? deps.now() : Date.now());
   let inflight: Promise<string> | null = null;
 
   async function signIn(address: string): Promise<string> {
-    const challenge = await deps.requestNonce({ wallet_type: "evm", address });
+    const challenge = await deps.requestNonce({
+      wallet_type: "evm",
+      address,
+      scope: "user",
+    });
+    assertSignInMessage(challenge.message, {
+      domain: deps.expectedDomain(),
+      address,
+      nonce: challenge.nonce,
+    });
     const signature = await deps.signMessage(challenge.message);
     const result = await deps.verify({
       wallet_type: "evm",
@@ -121,6 +164,10 @@ const defaultClient = createSessionClient({
   getSession: () => useSessionStore.getState().session,
   setSession: (session) => useSessionStore.getState().setSession(session),
   clearSession: () => useSessionStore.getState().clearSession(),
+  // AUTH_DOMAIN when set at build time, otherwise the host serving this app.
+  expectedDomain: () =>
+    (import.meta.env.VITE_AUTH_DOMAIN as string | undefined)?.trim() ||
+    window.location.host,
 });
 
 export const ensureSession = defaultClient.ensureSession;
