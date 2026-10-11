@@ -7,6 +7,7 @@ import type { PurchasedListing } from "@/types/me";
 const getMyPurchases = vi.fn();
 const download = vi.fn();
 let connected = true;
+let addr = "0xabc";
 
 vi.mock("@/lib/backend", () => ({
   backend: { getMyPurchases: () => getMyPurchases() },
@@ -20,7 +21,7 @@ vi.mock("@/stores/wallet-store", () => ({
   ) =>
     selector({
       isConnected: connected,
-      address: connected ? "0xabc" : null,
+      address: connected ? addr : null,
     }),
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
@@ -51,6 +52,7 @@ describe("MyDatasets", () => {
     getMyPurchases.mockReset();
     download.mockReset();
     connected = true;
+    addr = "0xabc";
   });
 
   it("shows an empty state when the wallet has no purchases", async () => {
@@ -85,6 +87,22 @@ describe("MyDatasets", () => {
     getMyPurchases.mockRejectedValue(new Error("boom"));
     renderPage();
     expect(await screen.findByText("boom")).toBeInTheDocument();
+  });
+
+  it("hides the previous wallet's rows while the new wallet loads", async () => {
+    getMyPurchases.mockResolvedValueOnce([purchase]);
+    const view = renderPage();
+    expect(await screen.findByText("Climate Data")).toBeInTheDocument();
+
+    getMyPurchases.mockReturnValueOnce(new Promise(() => {}));
+    addr = "0xdef";
+    view.rerender(
+      <MemoryRouter>
+        <MyDatasets />
+      </MemoryRouter>,
+    );
+    expect(screen.queryByText("Climate Data")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /download/i })).not.toBeInTheDocument();
   });
 
   it("asks to connect a wallet when disconnected", () => {

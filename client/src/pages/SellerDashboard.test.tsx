@@ -84,7 +84,7 @@ describe("SellerDashboard", () => {
     renderPage();
     const edit = await screen.findByRole("button", { name: /edit price/i });
     expect(edit).toBeDisabled();
-    expect(screen.getByText(/wallet-signed transaction/i)).toBeInTheDocument();
+    expect(screen.getByText(/coming soon/i)).toBeInTheDocument();
   });
 
   it("shows an error panel when loading fails", async () => {

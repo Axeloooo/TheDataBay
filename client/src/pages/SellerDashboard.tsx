@@ -18,17 +18,26 @@ import type { SellerListing } from "@/types/me";
 
 type TokenTotal = { symbol: string; decimals: number; total: bigint };
 
+/**
+ * Sum earnings per token address. Each token carries its own symbol and
+ * decimals, taken from a listing that is actually priced in that token.
+ */
 function earningsTotals(listings: SellerListing[]): TokenTotal[] {
+  const meta = new Map<string, { symbol: string; decimals: number }>();
+  for (const listing of listings) {
+    meta.set(listing.payment_token.toLowerCase(), {
+      symbol: listing.token_symbol,
+      decimals: listing.token_decimals,
+    });
+  }
   const totals = new Map<string, TokenTotal>();
   for (const listing of listings) {
     for (const [token, amount] of Object.entries(listing.earnings_by_token)) {
-      const current = totals.get(token) ?? {
-        symbol: listing.token_symbol,
-        decimals: listing.token_decimals,
-        total: 0n,
-      };
+      const id = token.toLowerCase();
+      const info = meta.get(id) ?? { symbol: token, decimals: 0 };
+      const current = totals.get(id) ?? { ...info, total: 0n };
       current.total += BigInt(amount);
-      totals.set(token, current);
+      totals.set(id, current);
     }
   }
   return [...totals.values()];
@@ -38,16 +47,21 @@ function SellerDashboard() {
   const isConnected = useWalletStore((state) => state.isConnected);
   const address = useWalletStore((state) => state.address);
 
-  const [listings, setListings] = useState<SellerListing[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
   const [attempt, setAttempt] = useState(0);
+  const [result, setResult] = useState<{
+    key: string;
+    rows?: SellerListing[];
+    error?: string;
+  } | null>(null);
 
-  const retry = () => {
-    setError(null);
-    setListings(null);
-    setAttempt((n) => n + 1);
-  };
+  // Results are tied to the wallet and attempt that requested them, so a
+  // different wallet never sees the previous wallet's rows.
+  const key = `${address ?? ""}:${attempt}`;
+  const current = result?.key === key ? result : null;
+  const listings = current?.rows ?? null;
+  const error = current?.error ?? null;
+
+  const retry = () => setAttempt((n) => n + 1);
 
   useEffect(() => {
     if (!isConnected || !address) return;
@@ -55,16 +69,20 @@ function SellerDashboard() {
     backend
       .getMyListings()
       .then((rows) => {
-        if (!cancelled) setListings(rows);
+        if (!cancelled) setResult({ key, rows });
       })
       .catch((err: unknown) => {
         if (!cancelled)
-          setError(err instanceof Error ? err.message : "Failed to load listings.");
+          setResult({
+            key,
+            error: err instanceof Error ? err.message : "Failed to load listings.",
+          });
       });
     return () => {
       cancelled = true;
     };
-  }, [isConnected, address, attempt]);
+  }, [isConnected, address, key]);
+
 
   if (!isConnected) {
     return (
@@ -175,7 +193,7 @@ function SellerDashboard() {
                       </p>
                       <p className="text-xs text-muted-foreground">
                         {listing.price_editable
-                          ? "Price edits need a wallet-signed transaction, which is not available yet."
+                          ? "Editing prices from your wallet is coming soon."
                           : "Price can't change after the first sale."}
                       </p>
                     </div>

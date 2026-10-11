@@ -32,18 +32,23 @@ function MyDatasets() {
   const isConnected = useWalletStore((state) => state.isConnected);
   const address = useWalletStore((state) => state.address);
 
-  const [items, setItems] = useState<PurchasedListing[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [result, setResult] = useState<{
+    key: string;
+    rows?: PurchasedListing[];
+    error?: string;
+  } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [step, setStep] = useState<DownloadStep | null>(null);
 
-  const [attempt, setAttempt] = useState(0);
+  // Results are tied to the wallet and attempt that requested them, so a
+  // different wallet never sees the previous wallet's rows.
+  const key = `${address ?? ""}:${attempt}`;
+  const current = result?.key === key ? result : null;
+  const items = current?.rows ?? null;
+  const error = current?.error ?? null;
 
-  const retry = () => {
-    setError(null);
-    setItems(null);
-    setAttempt((n) => n + 1);
-  };
+  const retry = () => setAttempt((n) => n + 1);
 
   useEffect(() => {
     if (!isConnected || !address) return;
@@ -51,16 +56,20 @@ function MyDatasets() {
     backend
       .getMyPurchases()
       .then((rows) => {
-        if (!cancelled) setItems(rows);
+        if (!cancelled) setResult({ key, rows });
       })
       .catch((err: unknown) => {
         if (!cancelled)
-          setError(err instanceof Error ? err.message : "Failed to load datasets.");
+          setResult({
+            key,
+            error: err instanceof Error ? err.message : "Failed to load datasets.",
+          });
       });
     return () => {
       cancelled = true;
     };
-  }, [isConnected, address, attempt]);
+  }, [isConnected, address, key]);
+
 
   const handleDownload = async (item: PurchasedListing) => {
     setBusyId(item.listing_id);
