@@ -13,6 +13,7 @@ import {
   MOCK_PURCHASED_IDS,
 } from "@/lib/mock-data";
 import { uuidToBytes32 } from "@/lib/ids";
+import type { PurchasedListing, SellerListing } from "@/types/me";
 
 function delay<T>(data: T, ms = 250): Promise<T> {
   return new Promise((resolve) => setTimeout(() => resolve(data), ms));
@@ -40,6 +41,10 @@ export const mockBackend = {
   requestKeyRelease: (): Promise<KeyReleaseResponse> => {
     return Promise.reject(new Error("Key release is not available in demo mode."));
   },
+
+  getMyPurchases: (): Promise<PurchasedListing[]> => delay([]),
+
+  getMyListings: (): Promise<SellerListing[]> => delay([]),
 
   checkAccess: (listingId: string): Promise<AccessCheckResponse> => {
     return delay({ has_access: MOCK_PURCHASED_IDS.has(listingId) });

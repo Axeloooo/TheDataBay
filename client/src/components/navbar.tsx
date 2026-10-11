@@ -16,6 +16,8 @@ import {
   CircleHelp,
   Bot,
   ShoppingCart,
+  Library,
+  Store,
 } from "lucide-react";
 
 import { Button } from "./ui/button";
@@ -210,6 +212,38 @@ function Navbar() {
                 >
                   <ShoppingCart className="h-4 w-4" />
                   <span className="hidden md:inline">Requests</span>
+                </Button>
+              )}
+            </NavLink>
+          )}
+
+          {isConnected && (
+            <NavLink to="/my-datasets">
+              {({ isActive }) => (
+                <Button
+                  variant="ghost"
+                  className={`h-9 gap-1.5 px-2 text-xs md:px-3 md:text-sm ${
+                    isActive ? "bg-accent text-accent-foreground" : ""
+                  }`}
+                >
+                  <Library className="h-4 w-4" />
+                  <span className="hidden md:inline">My datasets</span>
+                </Button>
+              )}
+            </NavLink>
+          )}
+
+          {isConnected && (
+            <NavLink to="/seller">
+              {({ isActive }) => (
+                <Button
+                  variant="ghost"
+                  className={`h-9 gap-1.5 px-2 text-xs md:px-3 md:text-sm ${
+                    isActive ? "bg-accent text-accent-foreground" : ""
+                  }`}
+                >
+                  <Store className="h-4 w-4" />
+                  <span className="hidden md:inline">Selling</span>
                 </Button>
               )}
             </NavLink>
