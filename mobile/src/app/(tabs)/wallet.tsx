@@ -162,6 +162,22 @@ export default function WalletScreen() {
 
         <SurfaceCard style={styles.card}>
           <Text style={[styles.sectionTitle, { color: palette.text }]}>
+            Your marketplace
+          </Text>
+          <AppButton
+            label="My datasets"
+            variant="secondary"
+            onPress={() => router.push("/my-datasets")}
+          />
+          <AppButton
+            label="Seller dashboard"
+            variant="secondary"
+            onPress={() => router.push("/seller")}
+          />
+        </SurfaceCard>
+
+        <SurfaceCard style={styles.card}>
+          <Text style={[styles.sectionTitle, { color: palette.text }]}>
             Runtime config
           </Text>
           <Text style={[styles.sectionHint, { color: palette.subtleText }]}>
