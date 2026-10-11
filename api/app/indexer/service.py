@@ -262,6 +262,22 @@ def index_range(session: Session, contract: Contract, from_block: int, to_block:
     return written
 
 
+def synced_state(session: Session, settings: Settings) -> IndexerState | None:
+    """Return the indexer state when its tables can serve reads, else None.
+
+    Tables serve reads only when the indexer is enabled, has completed a run,
+    and that run reached the confirmed head (it is not still backfilling).
+    """
+    if not settings.indexer_enabled:
+        return None
+    state = session.get(IndexerState, STATE_NAME)
+    if state is None or state.chain_head_block is None:
+        return None
+    if state.last_indexed_block < state.chain_head_block - settings.indexer_confirmations:
+        return None
+    return state
+
+
 def _advance_cursor(session: Session, last_block: int, chain_head: int) -> None:
     state = session.get(IndexerState, STATE_NAME)
     if state is None:

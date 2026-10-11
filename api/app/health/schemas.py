@@ -3,7 +3,7 @@ Pydantic schemas for health endpoints.
 """
 
 from pydantic import BaseModel, Field
-from typing import Dict
+from typing import Dict, Optional
 
 
 class HealthResponse(BaseModel):
@@ -20,4 +20,12 @@ class ReadinessResponse(BaseModel):
     ready: bool = Field(..., description="Whether the service is ready")
     dependencies: Dict[str, str] = Field(
         default_factory=dict, description="Status of dependencies"
+    )
+    indexer_lag_blocks: Optional[int] = Field(
+        default=None,
+        description=(
+            "Blocks between the chain head and the last indexed block, as of "
+            "the indexer's last run. Null when the indexer is disabled or has "
+            "not completed a run."
+        ),
     )

@@ -6,8 +6,10 @@ import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session
 
 from ..config.settings import Settings, get_settings
+from ..database.engine import get_session
 from .schemas import (
     AccessCheckResponse,
     BuyItemRequest,
@@ -85,16 +87,24 @@ def get_owner(settings: Settings = Depends(get_settings)) -> str:
 @router.get("/items/all", response_model=List[MarketplaceDataItem])
 def get_all_items(
     settings: Settings = Depends(get_settings),
+    session: Session = Depends(get_session),
 ) -> List[MarketplaceDataItem]:
-    """Get all marketplace items from the contract.
+    """Get all marketplace items.
+
+    Served from the event indexer tables when the indexer is synced, and from
+    direct contract reads otherwise.
 
     Args:
         settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
+        session (Session, optional): Database session. Defaults to Depends(get_session).
 
     Returns:
         List[MarketplaceDataItem]: Full list of marketplace items
     """
     logger.info("contract.get_all_items called")
+    indexed = contract_service.get_indexed_items(session, settings)
+    if indexed is not None:
+        return indexed
     return contract_service.get_all_items(settings)
 
 
@@ -139,8 +149,12 @@ def get_item_view(
 def get_purchases_by_wallet(
     request: PurchasedItemsRequest,
     settings: Settings = Depends(get_settings),
+    session: Session = Depends(get_session),
 ) -> PurchasedItemsResponse:
-    """Get purchased marketplace items for a wallet via ItemPurchased event indexing.
+    """Get purchased marketplace items for a wallet via ItemPurchased events.
+
+    Served from the event indexer tables when the indexer is synced, and from
+    an on-demand log scan otherwise.
 
     Args:
         request (PurchasedItemsRequest): Purchased items query payload.
@@ -154,15 +168,20 @@ def get_purchases_by_wallet(
         request.wallet_type,
         request.address,
     )
-    wallet_id_hex, items = contract_service.get_purchased_items_by_wallet(
-        wallet_type=request.wallet_type,
-        address=request.address,
-        settings=settings,
-        start_block=request.start_block,
-        end_block=request.end_block,
-        limit=request.limit,
-        offset=request.offset,
-    )
+    query = {
+        "wallet_type": request.wallet_type,
+        "address": request.address,
+        "settings": settings,
+        "start_block": request.start_block,
+        "end_block": request.end_block,
+        "limit": request.limit,
+        "offset": request.offset,
+    }
+    indexed = contract_service.get_indexed_purchased_items_by_wallet(session, **query)
+    if indexed is not None:
+        wallet_id_hex, items = indexed
+    else:
+        wallet_id_hex, items = contract_service.get_purchased_items_by_wallet(**query)
     return PurchasedItemsResponse(
         wallet_id=wallet_id_hex, items=items, count=len(items)
     )

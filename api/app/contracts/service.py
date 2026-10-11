@@ -13,7 +13,12 @@ from typing import Any, Dict, List, Union
 from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import HTTPException
+from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
+from sqlmodel import Session, select
 from ..datasets.schemas import WalletType
+from ..indexer.models import IndexedListing, IndexedPurchase
+from ..indexer.service import synced_state
 from .marketplace_schemas import (
     MarketplaceDataItem,
     TOKEN_DECIMALS,
@@ -1043,3 +1048,136 @@ def grant_access(listing_id: str, wallet_id_bytes: bytes, settings: Settings) ->
     item_id = uuid_to_bytes32(listing_id)
     tx = contract.functions.grantAccess(item_id, wallet_id_bytes)
     return _send_tx(tx, settings)
+
+
+# ---------------------------------------------------------------------------
+# Indexed reads: served from the event indexer tables when it is synced.
+# Each returns None when the caller should fall back to contract reads.
+# ---------------------------------------------------------------------------
+
+
+def _indexed_listing_to_schema(
+    row: IndexedListing, purchase_count: int, settings: Settings
+) -> MarketplaceDataItem:
+    return MarketplaceDataItem(
+        id=row.listing_id,
+        title=row.title,
+        description=row.description,
+        seller=row.seller,
+        payment_token=row.payment_token,
+        price_atomic=str(int(row.price)),
+        settlement_currency=_settlement_currency_for_token(
+            row.payment_token, settings, row.payment_token_decimals
+        ),
+        settlement_decimals=row.payment_token_decimals,
+        dataset_url=row.dataset_url,
+        dataset_hash=row.dataset_hash,
+        signature_url=row.signature_url,
+        signature_hash=row.signature_hash,
+        exists=True,
+        purchase_count=purchase_count,
+    )
+
+
+def _purchase_counts(
+    session: Session, listing_ids: list[str] | None = None
+) -> dict[str, int]:
+    stmt = select(IndexedPurchase.listing_id, func.count()).group_by(
+        IndexedPurchase.listing_id
+    )
+    if listing_ids is not None:
+        stmt = stmt.where(IndexedPurchase.listing_id.in_(listing_ids))  # type: ignore[attr-defined]
+    return {listing_id: int(count) for listing_id, count in session.exec(stmt).all()}
+
+
+def get_indexed_items(
+    session: Session, settings: Settings
+) -> List[MarketplaceDataItem] | None:
+    """All listings from the indexer tables, in creation order.
+
+    Returns:
+        List[MarketplaceDataItem] | None: Items, or None when the indexer
+        cannot serve reads (disabled, never ran, backfilling, or DB error).
+    """
+    try:
+        if synced_state(session, settings) is None:
+            return None
+        rows = session.exec(
+            select(IndexedListing).order_by(
+                IndexedListing.created_block, IndexedListing.listing_id  # type: ignore[arg-type]
+            )
+        ).all()
+        counts = _purchase_counts(session)
+    except SQLAlchemyError:
+        logger.exception("Indexed listings read failed; falling back to contract")
+        return None
+    return [
+        _indexed_listing_to_schema(row, counts.get(row.listing_id, 0), settings)
+        for row in rows
+    ]
+
+
+def get_indexed_purchased_items_by_wallet(
+    session: Session,
+    wallet_type: Union[WalletType, str],
+    address: str,
+    settings: Settings,
+    start_block: int | None = None,
+    end_block: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[str, List[MarketplaceDataItem]] | None:
+    """Purchased listings for a wallet from the indexer tables, newest first.
+
+    Returns:
+        tuple[str, List[MarketplaceDataItem]] | None: WalletId hex and items,
+        or None when the caller should fall back to contract reads.
+    """
+    wallet_type_str = (
+        wallet_type.value.lower()
+        if isinstance(wallet_type, WalletType)
+        else str(wallet_type).lower()
+    )
+    if wallet_type_str != WalletType.EVM.value:
+        return None
+    try:
+        buyer = Web3.to_checksum_address(address)
+    except ValueError:
+        return None
+
+    try:
+        if synced_state(session, settings) is None:
+            return None
+        stmt = select(IndexedPurchase.listing_id).where(IndexedPurchase.buyer == buyer)
+        if start_block is not None:
+            stmt = stmt.where(IndexedPurchase.block_number >= start_block)
+        if end_block is not None:
+            stmt = stmt.where(IndexedPurchase.block_number <= end_block)
+        stmt = stmt.order_by(
+            IndexedPurchase.block_number.desc(),  # type: ignore[attr-defined]
+            IndexedPurchase.log_index.desc(),  # type: ignore[attr-defined]
+        )
+        listing_ids = list(dict.fromkeys(session.exec(stmt).all()))
+        page = listing_ids[offset : offset + limit]
+        rows = {
+            row.listing_id: row
+            for row in session.exec(
+                select(IndexedListing).where(IndexedListing.listing_id.in_(page))  # type: ignore[attr-defined]
+            ).all()
+        }
+        counts = _purchase_counts(session, page)
+    except SQLAlchemyError:
+        logger.exception("Indexed purchases read failed; falling back to contract")
+        return None
+
+    items: List[MarketplaceDataItem] = []
+    for listing_id in page:
+        row = rows.get(listing_id)
+        if row is None:
+            logger.warning("Indexed purchase references unknown listing %s", listing_id)
+            continue
+        items.append(
+            _indexed_listing_to_schema(row, counts.get(listing_id, 0), settings)
+        )
+    wallet_id_hex = Web3.to_hex(wallet_id(wallet_type_str, address, settings))
+    return wallet_id_hex, items

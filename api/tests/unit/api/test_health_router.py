@@ -23,5 +23,7 @@ def test_readiness_check_returns_expected_dependencies(client):
         "dependencies": {
             "ollama": "available",
             "database": "not_configured",
+            "indexer": "disabled",
         },
+        "indexer_lag_blocks": None,
     }
