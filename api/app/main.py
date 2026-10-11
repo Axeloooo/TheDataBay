@@ -65,7 +65,20 @@ async def lifespan(app: FastAPI):
         engine = get_engine()
         with SQLSession(engine) as session:
             seed_agents(session)
+
+    indexer_task = None
+    if settings.indexer_enabled:
+        import asyncio
+        from .indexer import runner as indexer_runner
+
+        indexer_task = asyncio.create_task(indexer_runner.run_forever(settings))
     yield
+    if indexer_task is not None:
+        indexer_task.cancel()
+        try:
+            await indexer_task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(

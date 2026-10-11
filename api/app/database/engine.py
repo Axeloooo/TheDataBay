@@ -13,6 +13,7 @@ from sqlmodel import SQLModel
 MODEL_MODULES = (
     "app.agents.models",
     "app.datasets.models",
+    "app.indexer.models",
     "app.auth.models",
 )
 

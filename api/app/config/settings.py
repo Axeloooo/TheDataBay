@@ -78,6 +78,14 @@ class Settings(BaseSettings):
     # Database settings
     database_url: SecretStr = Field(alias="POSTGRES_URL")
 
+    # Event indexer settings. Indexed reads (browse, purchases by wallet) lag
+    # the chain by INDEXER_CONFIRMATIONS blocks plus up to one poll interval;
+    # listings created before INDEXER_START_BLOCK never appear in them.
+    indexer_enabled: bool = Field(default=False, alias="INDEXER_ENABLED")
+    indexer_start_block: int = Field(default=0, ge=0, alias="INDEXER_START_BLOCK")
+    indexer_block_chunk: int = Field(default=2000, ge=1, alias="INDEXER_BLOCK_CHUNK")
+    indexer_confirmations: int = Field(default=2, ge=0, alias="INDEXER_CONFIRMATIONS")
+    indexer_poll_seconds: int = Field(default=5, ge=1, alias="INDEXER_POLL_SECONDS")
     # Wallet sign-in settings (auth fails closed with 503 when the secret is unset)
     auth_jwt_secret: SecretStr | None = Field(default=None, alias="AUTH_JWT_SECRET")
     auth_token_ttl_seconds: int = Field(
