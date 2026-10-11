@@ -9,6 +9,14 @@ Security properties:
   client never supplies it.
 - Tokens are HS256 JWTs. Issuing or checking one fails closed (503) when
   ``AUTH_JWT_SECRET`` is unset or shorter than 32 characters.
+- Tokens carry a scope. ``user`` tokens (key release) and ``admin`` tokens
+  (owner-only contract routes) use different audiences, so one is never
+  accepted in place of the other. Admin tokens live at most 5 minutes and come
+  from a message that plainly says it authorizes administrative actions.
+- The audience includes ``AUTH_DOMAIN``, so tokens from one environment are
+  rejected by another that shares the secret.
+- Each address has at most MAX_OUTSTANDING_NONCES live nonces (oldest dropped)
+  and expired rows are pruned in bounded batches.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -28,19 +36,46 @@ from ..contracts import service as contract_service
 from ..datasets.schemas import WalletType
 from ..shared.errors import ApiError
 from .models import AuthNonce
-from .schemas import NonceResponse, TokenResponse
+from .schemas import AuthScope, NonceResponse, TokenResponse
 
 logger = logging.getLogger(__name__)
 
 TOKEN_ALGORITHM = "HS256"
 TOKEN_ISSUER = "thedatabay-api"
-TOKEN_AUDIENCE = "thedatabay"
 MIN_SECRET_LENGTH = 32
-NONCE_RETENTION = timedelta(hours=1)
+MAX_OUTSTANDING_NONCES = 5
+NONCE_RETENTION = timedelta(minutes=5)
+PRUNE_BATCH_SIZE = 500
 SIGN_IN_STATEMENT = (
     "Sign in to TheDataBay. This request will not trigger a blockchain "
     "transaction or cost any fees."
 )
+ADMIN_SIGN_IN_STATEMENT = (
+    "ADMINISTRATOR SIGN-IN for the TheDataBay marketplace. Signing this message "
+    "authorizes administrative contract actions for the next 5 minutes: fee "
+    "changes, access grants, and listing price and dataset URL edits. Only sign "
+    "if you are the marketplace operator and started this action yourself."
+)
+
+
+def _scope(value: Union[AuthScope, str]) -> AuthScope:
+    try:
+        return AuthScope(value.value if isinstance(value, AuthScope) else value)
+    except ValueError as exc:
+        raise ApiError(
+            status_code=400, error="invalid_scope", message="Unsupported token scope."
+        ) from exc
+
+
+def token_audience(settings: Settings, scope: Union[AuthScope, str]) -> str:
+    """Audience bound to this deployment's AUTH_DOMAIN and the token scope."""
+    return f"thedatabay:{settings.auth_domain}:{_scope(scope).value}"
+
+
+def _token_ttl_seconds(settings: Settings, scope: AuthScope) -> int:
+    if scope == AuthScope.ADMIN:
+        return settings.auth_admin_token_ttl_seconds
+    return settings.auth_token_ttl_seconds
 
 
 def _utcnow() -> datetime:
@@ -117,6 +152,7 @@ def normalize_evm_address(address: str) -> str:
 
 def build_sign_in_message(
     *,
+    scope: AuthScope = AuthScope.USER,
     domain: str,
     address: str,
     chain_id: int,
@@ -129,7 +165,7 @@ def build_sign_in_message(
         f"{domain} wants you to sign in with your Ethereum account:\n"
         f"{address}\n"
         "\n"
-        f"{SIGN_IN_STATEMENT}\n"
+        f"{ADMIN_SIGN_IN_STATEMENT if scope == AuthScope.ADMIN else SIGN_IN_STATEMENT}\n"
         "\n"
         f"URI: https://{domain}\n"
         "Version: 1\n"
@@ -141,9 +177,32 @@ def build_sign_in_message(
 
 
 def _prune_expired(session: Session, now: datetime) -> None:
-    session.execute(
-        delete(AuthNonce).where(AuthNonce.expires_at < now - NONCE_RETENTION)
+    """Delete one bounded batch of nonces that expired over NONCE_RETENTION ago."""
+    stale_ids = (
+        select(AuthNonce.id)
+        .where(AuthNonce.expires_at < now - NONCE_RETENTION)
+        .limit(PRUNE_BATCH_SIZE)
     )
+    session.execute(delete(AuthNonce).where(AuthNonce.id.in_(stale_ids)))
+
+
+def _drop_excess_outstanding(
+    session: Session, wallet_type: str, address: str, now: datetime
+) -> None:
+    """Keep room for one new nonce under the per-address cap (oldest dropped)."""
+    outstanding = session.exec(
+        select(AuthNonce.id)
+        .where(
+            AuthNonce.wallet_type == wallet_type,
+            AuthNonce.address == address,
+            AuthNonce.used_at.is_(None),
+            AuthNonce.expires_at > now,
+        )
+        .order_by(AuthNonce.created_at.desc(), AuthNonce.id)
+    ).all()
+    excess = outstanding[MAX_OUTSTANDING_NONCES - 1 :]
+    if excess:
+        session.execute(delete(AuthNonce).where(AuthNonce.id.in_(excess)))
 
 
 def create_nonce(
@@ -151,9 +210,11 @@ def create_nonce(
     wallet_type: Union[WalletType, str],
     address: str,
     settings: Settings,
+    scope: Union[AuthScope, str] = AuthScope.USER,
 ) -> NonceResponse:
     """Issue a one-time sign-in nonce and the exact message to sign."""
     wallet_type_value = _require_evm(wallet_type)
+    scope = _scope(scope)
     jwt_secret(settings)
     checksum_address = normalize_evm_address(address)
 
@@ -161,6 +222,7 @@ def create_nonce(
     expires_at = now + timedelta(seconds=settings.auth_nonce_ttl_seconds)
     nonce = secrets.token_hex(16)
     message = build_sign_in_message(
+        scope=scope,
         domain=settings.auth_domain,
         address=checksum_address,
         chain_id=settings.chain_id,
@@ -170,9 +232,11 @@ def create_nonce(
     )
 
     _prune_expired(session, now)
+    _drop_excess_outstanding(session, wallet_type_value, checksum_address, now)
     session.add(
         AuthNonce(
             wallet_type=wallet_type_value,
+            scope=scope.value,
             address=checksum_address,
             nonce=nonce,
             message=message,
@@ -181,7 +245,9 @@ def create_nonce(
         )
     )
     session.commit()
-    logger.info("auth.nonce issued wallet_type=%s", wallet_type_value)
+    logger.info(
+        "auth.nonce issued wallet_type=%s scope=%s", wallet_type_value, scope.value
+    )
     return NonceResponse(nonce=nonce, message=message, expires_at=expires_at)
 
 
@@ -206,18 +272,23 @@ def _recover_signer(message: str, signature: str) -> str | None:
 
 
 def issue_token(
-    wallet_type: str, address: str, settings: Settings
+    wallet_type: str,
+    address: str,
+    settings: Settings,
+    scope: Union[AuthScope, str] = AuthScope.USER,
 ) -> TokenResponse:
     """Sign a bearer token for an already verified wallet."""
+    scope = _scope(scope)
     secret = jwt_secret(settings)
     issued_at = int(_utcnow().timestamp())
-    expires = issued_at + settings.auth_token_ttl_seconds
+    expires = issued_at + _token_ttl_seconds(settings, scope)
     wallet_id_hex = "0x" + bytes(
         contract_service.wallet_id(wallet_type, address, settings)
     ).hex()
     claims = {
         "iss": TOKEN_ISSUER,
-        "aud": TOKEN_AUDIENCE,
+        "aud": token_audience(settings, scope),
+        "scope": scope.value,
         "sub": address,
         "wallet_type": wallet_type,
         "wallet_id": wallet_id_hex,
@@ -232,31 +303,42 @@ def issue_token(
         expires_at=datetime.fromtimestamp(expires, tz=timezone.utc),
         wallet_type=WalletType(wallet_type),
         address=address,
+        scope=scope,
     )
 
 
-REQUIRED_CLAIMS = ["exp", "iat", "iss", "aud", "sub", "wallet_type", "wallet_id"]
+REQUIRED_CLAIMS = [
+    "exp", "iat", "iss", "aud", "scope", "sub", "wallet_type", "wallet_id",
+]
 
 
-def decode_token(token: str, settings: Settings) -> dict:
-    """Strictly verify a bearer token and return its claims.
+def decode_token(
+    token: str, settings: Settings, scope: Union[AuthScope, str] = AuthScope.USER
+) -> dict:
+    """Strictly verify a bearer token of the given scope and return its claims.
 
-    The algorithm is pinned to HS256 and ``exp``, ``iat``, issuer, audience and
-    the wallet claims are all required. Any failure raises 401.
+    The algorithm is pinned to HS256; ``exp``, ``iat``, issuer, the
+    scope-and-domain audience and the wallet claims are all required. Any
+    failure raises 401.
     """
+    scope = _scope(scope)
     secret = jwt_secret(settings)
     try:
-        return jwt.decode(
+        claims = jwt.decode(
             token,
             secret,
             algorithms=[TOKEN_ALGORITHM],
-            audience=TOKEN_AUDIENCE,
+            audience=token_audience(settings, scope),
             issuer=TOKEN_ISSUER,
             options={"require": REQUIRED_CLAIMS},
         )
     except jwt.PyJWTError as exc:
         logger.info("auth.token rejected reason=%s", type(exc).__name__)
         raise _unauthorized("Invalid or expired token.") from exc
+    if claims.get("scope") != scope.value:
+        logger.info("auth.token rejected reason=scope_mismatch")
+        raise _unauthorized("Invalid or expired token.")
+    return claims
 
 
 def verify_signature(
@@ -266,6 +348,7 @@ def verify_signature(
     nonce: str,
     signature: str,
     settings: Settings,
+    scope: Union[AuthScope, str] = AuthScope.USER,
 ) -> TokenResponse:
     """Verify a signed sign-in message and return a bearer token.
 
@@ -275,6 +358,7 @@ def verify_signature(
             any signature that does not recover to ``address``.
     """
     wallet_type_value = _require_evm(wallet_type)
+    scope = _scope(scope)
     jwt_secret(settings)
     checksum_address = normalize_evm_address(address)
 
@@ -283,6 +367,7 @@ def verify_signature(
         row is None
         or row.wallet_type != wallet_type_value
         or row.address != checksum_address
+        or row.scope != scope.value
         or row.used_at is not None
     ):
         logger.warning("auth.verify rejected reason=unknown_or_used_nonce")
@@ -302,5 +387,7 @@ def verify_signature(
         logger.warning("auth.verify rejected reason=bad_signature")
         raise _unauthorized()
 
-    logger.info("auth.verify success wallet_type=%s", wallet_type_value)
-    return issue_token(wallet_type_value, checksum_address, settings)
+    logger.info(
+        "auth.verify success wallet_type=%s scope=%s", wallet_type_value, scope.value
+    )
+    return issue_token(wallet_type_value, checksum_address, settings, scope=scope)

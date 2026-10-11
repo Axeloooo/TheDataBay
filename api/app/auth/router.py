@@ -19,7 +19,7 @@ def request_nonce(
 ) -> NonceResponse:
     """Issue a one-time nonce and the exact message the wallet must sign."""
     return auth_service.create_nonce(
-        session, request.wallet_type, request.address, settings
+        session, request.wallet_type, request.address, settings, scope=request.scope
     )
 
 
@@ -37,4 +37,5 @@ def verify(
         request.nonce,
         request.signature,
         settings,
+        scope=request.scope,
     )

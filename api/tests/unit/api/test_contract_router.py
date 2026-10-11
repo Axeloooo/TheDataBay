@@ -288,7 +288,7 @@ def test_contract_admin_endpoints_forward_to_service_for_owner(
 
     with client_factory(settings=settings) as client:
         response = getattr(client, method)(
-            path, json=body, headers=auth_headers(OWNER, settings)
+            path, json=body, headers=auth_headers(OWNER, settings, scope="admin")
         )
 
     assert response.status_code == 200
@@ -319,11 +319,22 @@ def test_contract_admin_endpoints_reject_non_owner(
     monkeypatch.setattr(contract_router.contract_service, service_attr, _fail_if_called)
 
     response = getattr(client, method)(
-        path, json=body, headers=auth_headers(NOT_OWNER)
+        path, json=body, headers=auth_headers(NOT_OWNER, scope="admin")
     )
 
     assert response.status_code == 403
     assert response.json()["error"] == "forbidden"
+
+
+@pytest.mark.parametrize(("method", "path", "body", "service_attr"), ALL_ADMIN)
+def test_contract_admin_endpoints_reject_user_scope_token_even_for_owner(
+    client, auth_headers, owner_is, monkeypatch, method, path, body, service_attr
+):
+    monkeypatch.setattr(contract_router.contract_service, service_attr, _fail_if_called)
+
+    response = getattr(client, method)(path, json=body, headers=auth_headers(OWNER))
+
+    assert response.status_code == 401
 
 
 def test_contract_grant_access_derives_wallet_id_before_service_call(
@@ -350,7 +361,7 @@ def test_contract_grant_access_derives_wallet_id_before_service_call(
 
     method, path, body = GRANT_ACCESS_ROUTE
     with client_factory(settings=settings) as client:
-        response = client.post(path, json=body, headers=auth_headers(OWNER, settings))
+        response = client.post(path, json=body, headers=auth_headers(OWNER, settings, scope="admin"))
 
     assert response.status_code == 200
     assert response.json() == {"tx_hash": "0x" + "06" * 32}
@@ -369,7 +380,7 @@ def test_ownership_routes_are_removed(client, auth_headers, owner_is, path):
     response = client.post(
         path,
         json={"new_owner": NOT_OWNER},
-        headers=auth_headers(OWNER),
+        headers=auth_headers(OWNER, scope="admin"),
     )
 
     assert response.status_code == 404

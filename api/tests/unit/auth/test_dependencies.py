@@ -1,6 +1,7 @@
 import base64
 import json
 import time
+from datetime import datetime, timedelta, timezone
 
 import jwt
 import pytest
@@ -18,7 +19,8 @@ def _claims(settings, address, **overrides):
     now = int(time.time())
     claims = {
         "iss": auth_service.TOKEN_ISSUER,
-        "aud": auth_service.TOKEN_AUDIENCE,
+        "aud": auth_service.token_audience(settings, "user"),
+        "scope": "user",
         "sub": address,
         "wallet_type": "evm",
         "wallet_id": "0x"
@@ -124,6 +126,8 @@ def test_non_hs256_algorithm_raises_401(settings):
         {"wallet_type": "solana"},
         {"sub": "not-an-address"},
         {"wallet_id": "0x" + "00" * 32},
+        {"scope": "admin"},
+        {"scope": None},
     ],
 )
 def test_invalid_claims_raise_401(settings, overrides):
@@ -173,3 +177,57 @@ def test_require_owner_rejects_non_owner_with_403(settings, monkeypatch):
         auth_deps.require_owner(wallet=wallet, settings=settings)
 
     assert exc.value.status_code == 403
+
+
+def test_admin_token_is_rejected_for_user_routes(settings):
+    address = Account.create().address
+    token = auth_service.issue_token("evm", address, settings, scope="admin")
+
+    _expect_status(401, f"Bearer {token.access_token}", settings)
+
+
+def test_user_token_is_rejected_for_admin_routes(settings):
+    address = Account.create().address
+    token = auth_service.issue_token("evm", address, settings).access_token
+
+    with pytest.raises(ApiError) as exc:
+        auth_deps.current_admin_wallet(
+            authorization=f"Bearer {token}", settings=settings
+        )
+    assert exc.value.status_code == 401
+
+
+def test_admin_token_is_accepted_for_admin_routes(settings):
+    address = Account.create().address
+    token = auth_service.issue_token("evm", address, settings, scope="admin")
+
+    wallet = auth_deps.current_admin_wallet(
+        authorization=f"Bearer {token.access_token}", settings=settings
+    )
+
+    assert wallet.address == address
+
+
+@pytest.mark.parametrize(("age", "accepted"), [(299, True), (301, False)])
+def test_admin_token_expires_after_five_minutes(settings, monkeypatch, age, accepted):
+    address = Account.create().address
+    issued_at = datetime.now(timezone.utc) - timedelta(seconds=age)
+    monkeypatch.setattr(auth_service, "_utcnow", lambda: issued_at)
+    token = auth_service.issue_token("evm", address, settings, scope="admin")
+    header = f"Bearer {token.access_token}"
+
+    if accepted:
+        assert auth_deps.current_admin_wallet(authorization=header, settings=settings)
+    else:
+        with pytest.raises(ApiError) as exc:
+            auth_deps.current_admin_wallet(authorization=header, settings=settings)
+        assert exc.value.status_code == 401
+
+
+def test_token_for_other_auth_domain_is_rejected():
+    address = Account.create().address
+    staging = make_settings(AUTH_DOMAIN="staging.thedatabay.com")
+    production = make_settings(AUTH_DOMAIN="thedatabay.com")
+    token = auth_service.issue_token("evm", address, staging).access_token
+
+    _expect_status(401, f"Bearer {token}", production)

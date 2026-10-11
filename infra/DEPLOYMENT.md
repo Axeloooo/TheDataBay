@@ -173,8 +173,16 @@ the synced secret's `data` keys) and an `AUTH_JWT_SECRET` env entry in
 Add the object only after the Key Vault secret exists, or the CSI mount fails
 and pods will not start. Rotating the secret signs every user out; they sign in
 again on their next download. Optional overrides: `AUTH_TOKEN_TTL_SECONDS`
-(default 3600), `AUTH_NONCE_TTL_SECONDS` (default 300) and `AUTH_DOMAIN`
-(default `thedatabay.com`, shown in the message users sign).
+(default 3600, 60 to 86400), `AUTH_ADMIN_TOKEN_TTL_SECONDS` (default 300, 30 to
+300), `AUTH_NONCE_TTL_SECONDS` (default 300, 30 to 900) and `AUTH_DOMAIN`
+(default `thedatabay.com`). `AUTH_DOMAIN` must equal the web app host: it is
+shown in the message users sign, checked by the clients before signing, and
+bound into the token audience, so give each environment its own value.
+
+Owner-only contract routes need an admin-scope token (`scope: "admin"` on
+`/api/v1/auth/nonce` and `/api/v1/auth/verify`), valid for at most 5 minutes.
+Normal sign-in tokens are rejected there. `/api/v1/auth/nonce` is
+unauthenticated, so put an ingress rate limit on it.
 
 ## Phase 4: Build and Push Docker Images Manually
 

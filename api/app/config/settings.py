@@ -80,8 +80,15 @@ class Settings(BaseSettings):
 
     # Wallet sign-in settings (auth fails closed with 503 when the secret is unset)
     auth_jwt_secret: SecretStr | None = Field(default=None, alias="AUTH_JWT_SECRET")
-    auth_token_ttl_seconds: int = Field(default=3600, alias="AUTH_TOKEN_TTL_SECONDS")
-    auth_nonce_ttl_seconds: int = Field(default=300, alias="AUTH_NONCE_TTL_SECONDS")
+    auth_token_ttl_seconds: int = Field(
+        default=3600, ge=60, le=86400, alias="AUTH_TOKEN_TTL_SECONDS"
+    )
+    auth_admin_token_ttl_seconds: int = Field(
+        default=300, ge=30, le=300, alias="AUTH_ADMIN_TOKEN_TTL_SECONDS"
+    )
+    auth_nonce_ttl_seconds: int = Field(
+        default=300, ge=30, le=900, alias="AUTH_NONCE_TTL_SECONDS"
+    )
     auth_domain: str = Field(default="thedatabay.com", alias="AUTH_DOMAIN")
 
     @property

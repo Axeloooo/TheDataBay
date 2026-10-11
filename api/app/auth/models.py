@@ -19,6 +19,7 @@ class AuthNonce(SQLModel, table=True):
 
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     wallet_type: str = Field(index=True)
+    scope: str = Field(default="user")
     address: str = Field(index=True)
     nonce: str = Field(index=True, unique=True)
     message: str = Field(sa_column=Column(Text, nullable=False))
@@ -26,7 +27,7 @@ class AuthNonce(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=True), nullable=False)
     )
     expires_at: datetime = Field(
-        sa_column=Column(DateTime(timezone=True), nullable=False)
+        sa_column=Column(DateTime(timezone=True), nullable=False, index=True)
     )
     used_at: Optional[datetime] = Field(
         default=None, sa_column=Column(DateTime(timezone=True), nullable=True)

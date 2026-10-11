@@ -93,3 +93,10 @@ def test_release_key_returns_404_when_key_is_missing(
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Key not found for listing"}
+
+
+def test_admin_scope_token_cannot_fetch_key(client, auth_headers, only_b_has_access):
+    response = client.post(KEY_PATH, headers=auth_headers(WALLET_B, scope="admin"))
+
+    assert response.status_code == 401
+    assert only_b_has_access.calls == []

@@ -13,6 +13,7 @@ from ..contracts import service as contract_service
 from ..datasets.schemas import WalletType
 from ..shared.errors import ApiError
 from . import service as auth_service
+from .schemas import AuthScope
 
 
 @dataclass(frozen=True)
@@ -35,13 +36,11 @@ def _bearer_token(authorization: str | None) -> str:
     return parts[1]
 
 
-def current_wallet(
-    authorization: str | None = Header(default=None),
-    settings: Settings = Depends(get_settings),
+def _wallet_from_token(
+    authorization: str | None, settings: Settings, scope: AuthScope
 ) -> AuthedWallet:
-    """Return the wallet proven by the bearer token, or raise 401."""
     token = _bearer_token(authorization)
-    claims = auth_service.decode_token(token, settings)
+    claims = auth_service.decode_token(token, settings, scope)
 
     if claims.get("wallet_type") != WalletType.EVM.value:
         raise _unauthorized()
@@ -64,11 +63,27 @@ def current_wallet(
     )
 
 
-def require_owner(
-    wallet: AuthedWallet = Depends(current_wallet),
+def current_wallet(
+    authorization: str | None = Header(default=None),
     settings: Settings = Depends(get_settings),
 ) -> AuthedWallet:
-    """Allow only the marketplace contract owner; raise 403 otherwise."""
+    """Return the wallet proven by a user-scope bearer token, or raise 401."""
+    return _wallet_from_token(authorization, settings, AuthScope.USER)
+
+
+def current_admin_wallet(
+    authorization: str | None = Header(default=None),
+    settings: Settings = Depends(get_settings),
+) -> AuthedWallet:
+    """Return the wallet proven by an admin-scope bearer token, or raise 401."""
+    return _wallet_from_token(authorization, settings, AuthScope.ADMIN)
+
+
+def require_owner(
+    wallet: AuthedWallet = Depends(current_admin_wallet),
+    settings: Settings = Depends(get_settings),
+) -> AuthedWallet:
+    """Allow only the contract owner holding an admin token; 403 otherwise."""
     owner = contract_service.owner(settings)
     if wallet.wallet_type != WalletType.EVM or str(owner).lower() != wallet.address.lower():
         raise ApiError(

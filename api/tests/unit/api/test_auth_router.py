@@ -62,3 +62,35 @@ def test_solana_nonce_returns_501(client):
     )
 
     assert response.status_code == 501
+
+
+def test_admin_scope_sign_in_returns_admin_token(client):
+    account = Account.create()
+    challenge = client.post(
+        "/api/v1/auth/nonce",
+        json={"wallet_type": "evm", "address": account.address, "scope": "admin"},
+    ).json()
+    assert "administrative" in challenge["message"].lower()
+
+    response = client.post(
+        "/api/v1/auth/verify",
+        json={
+            "wallet_type": "evm",
+            "address": account.address,
+            "nonce": challenge["nonce"],
+            "signature": _sign(account, challenge["message"]),
+            "scope": "admin",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["scope"] == "admin"
+
+
+def test_unknown_scope_is_rejected(client):
+    response = client.post(
+        "/api/v1/auth/nonce",
+        json={"wallet_type": "evm", "address": Account.create().address, "scope": "root"},
+    )
+
+    assert response.status_code == 422

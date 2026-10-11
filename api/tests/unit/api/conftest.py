@@ -109,9 +109,13 @@ def auth_headers() -> Callable[..., dict[str, str]]:
     """Build an Authorization header holding a real signed token for ``address``."""
     from app.auth import service as auth_service
 
-    def _headers(address: str, settings: Settings | None = None) -> dict[str, str]:
+    def _headers(
+        address: str, settings: Settings | None = None, scope: str = "user"
+    ) -> dict[str, str]:
         resolved = settings if settings is not None else make_settings()
-        token = auth_service.issue_token("evm", address, resolved).access_token
+        token = auth_service.issue_token(
+            "evm", address, resolved, scope=scope
+        ).access_token
         return {"Authorization": f"Bearer {token}"}
 
     return _headers
