@@ -90,7 +90,13 @@ def get_purchases(
     if indexed is not None:
         return indexed
     _, items = contract_service.get_purchased_items_by_wallet(
-        wallet.wallet_type, wallet.address, settings, limit=_CONTRACT_PAGE
+        wallet.wallet_type,
+        wallet.address,
+        settings,
+        # The helper defaults to the last 50,000 blocks; older buyers need the
+        # full history since the marketplace was deployed.
+        start_block=settings.indexer_start_block,
+        limit=_CONTRACT_PAGE,
     )
     return [
         PurchasedListing(
@@ -157,6 +163,9 @@ def _indexed_listings(
             earnings_by_token={
                 token: str(int(total)) for token, total in earned[row.listing_id].items()
             },
+            # Indexed reads lag the chain by INDEXER_CONFIRMATIONS blocks plus a
+            # poll interval, so this can briefly be true after a fresh sale.
+            # Re-check on-chain before performing any price edit.
             price_editable=sales[row.listing_id] == 0 and not row.frozen,
             source="indexer",
         )

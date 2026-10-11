@@ -1080,3 +1080,48 @@ def test_grant_access_uses_uuid_bytes_and_wallet_bytes(monkeypatch, settings):
         wallet_id_bytes,
     )
     assert captured["send_tx_args"] == (tx_object, settings)
+
+
+def test_get_purchased_items_by_wallet_chunks_and_halves_log_ranges(monkeypatch, settings):
+    """A provider range cap must not fail the query, and old purchases are found."""
+    item = bytes.fromhex("01" * 32)
+    calls = []
+
+    class FakePurchased:
+        def get_logs(self, from_block, to_block, argument_filters):
+            calls.append((from_block, to_block))
+            if to_block - from_block + 1 > 500:
+                raise ValueError("range too large")
+            if from_block <= 10 <= to_block:
+                return [SimpleNamespace(args={"itemId": item})]
+            return []
+
+    view = (
+        item, "Old", "d", "0x0000000000000000000000000000000000000001", 10,
+        "ipfs://x", bytes.fromhex("aa" * 32), "", bytes.fromhex("ab" * 32), True, 1,
+    )
+    fake_contract = SimpleNamespace(
+        events=SimpleNamespace(ItemPurchased=lambda: FakePurchased()),
+        functions=SimpleNamespace(
+            getItemView=lambda _id: SimpleNamespace(call=lambda: view)
+        ),
+    )
+    monkeypatch.setattr(contract_service, "_get_contract", lambda _s: fake_contract)
+    monkeypatch.setattr(
+        contract_service,
+        "_get_web3",
+        lambda _s: SimpleNamespace(eth=SimpleNamespace(block_number=100_000)),
+    )
+    monkeypatch.setattr(
+        contract_service, "_call_contract_read", lambda c, _op: c.call()
+    )
+
+    _, items = contract_service.get_purchased_items_by_wallet(
+        wallet_type="evm",
+        address="0x0000000000000000000000000000000000000001",
+        settings=settings,
+        start_block=0,
+    )
+
+    assert [i.title for i in items] == ["Old"]
+    assert calls[-1][1] == 100_000

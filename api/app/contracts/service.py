@@ -759,15 +759,27 @@ def get_purchased_items_by_wallet(
         offset,
     )
 
-    try:
-        events = contract.events.ItemPurchased().get_logs(
-            from_block=from_block,
-            to_block=to_block,
-            argument_filters={"buyer": buyer},
-        )
-    except Exception as exc:
-        _raise_upstream("Failed to query ItemPurchased logs", exc)
-        raise
+    events: list = []
+    chunk = max(settings.indexer_block_chunk, 1)
+    start = from_block
+    while start <= to_block:
+        end = min(start + chunk - 1, to_block)
+        try:
+            events.extend(
+                contract.events.ItemPurchased().get_logs(
+                    from_block=start,
+                    to_block=end,
+                    argument_filters={"buyer": buyer},
+                )
+            )
+        except Exception as exc:
+            if chunk > 1:
+                # Provider rejected the range: halve it and retry this window.
+                chunk = max(chunk // 2, 1)
+                continue
+            _raise_upstream("Failed to query ItemPurchased logs", exc)
+            raise
+        start = end + 1
 
     # newest first for UX
     events = list(reversed(events))

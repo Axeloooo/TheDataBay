@@ -240,3 +240,22 @@ def test_falls_back_when_indexer_state_is_stale(
     with client_factory(settings=settings) as client:
         r = client.get("/api/v1/me/listings", headers=auth_headers(ALICE, settings))
     assert r.json() == []
+
+
+def test_contract_fallback_scans_from_indexer_start_block(
+    client_factory, override_settings, auth_headers, monkeypatch
+):
+    settings = override_settings(INDEXER_ENABLED=False, INDEXER_START_BLOCK=0)
+    seen = {}
+
+    def fake(*args, **kwargs):
+        seen.update(kwargs)
+        return ("0xw", [])
+
+    monkeypatch.setattr(
+        me_service.contract_service, "get_purchased_items_by_wallet", fake
+    )
+    with client_factory(settings=settings) as client:
+        r = client.get("/api/v1/me/purchases", headers=auth_headers(ALICE, settings))
+    assert r.status_code == 200
+    assert seen["start_block"] == 0
