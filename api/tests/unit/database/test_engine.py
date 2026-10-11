@@ -21,5 +21,6 @@ def test_create_db_and_tables_imports_feature_models_before_create_all(monkeypat
     assert calls == [
         ("import", "app.agents.models"),
         ("import", "app.datasets.models"),
+        ("import", "app.indexer.models"),
         ("create_all", fake_engine),
     ]

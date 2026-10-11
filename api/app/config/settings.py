@@ -78,6 +78,13 @@ class Settings(BaseSettings):
     # Database settings
     database_url: SecretStr = Field(alias="POSTGRES_URL")
 
+    # Event indexer settings
+    indexer_enabled: bool = Field(default=False, alias="INDEXER_ENABLED")
+    indexer_start_block: int = Field(default=0, alias="INDEXER_START_BLOCK")
+    indexer_block_chunk: int = Field(default=2000, alias="INDEXER_BLOCK_CHUNK")
+    indexer_confirmations: int = Field(default=2, alias="INDEXER_CONFIRMATIONS")
+    indexer_poll_seconds: int = Field(default=5, alias="INDEXER_POLL_SECONDS")
+
     @property
     def chat_model(self) -> str:
         """Return the configured chat model."""
