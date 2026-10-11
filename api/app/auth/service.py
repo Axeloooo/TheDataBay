@@ -235,6 +235,30 @@ def issue_token(
     )
 
 
+REQUIRED_CLAIMS = ["exp", "iat", "iss", "aud", "sub", "wallet_type", "wallet_id"]
+
+
+def decode_token(token: str, settings: Settings) -> dict:
+    """Strictly verify a bearer token and return its claims.
+
+    The algorithm is pinned to HS256 and ``exp``, ``iat``, issuer, audience and
+    the wallet claims are all required. Any failure raises 401.
+    """
+    secret = jwt_secret(settings)
+    try:
+        return jwt.decode(
+            token,
+            secret,
+            algorithms=[TOKEN_ALGORITHM],
+            audience=TOKEN_AUDIENCE,
+            issuer=TOKEN_ISSUER,
+            options={"require": REQUIRED_CLAIMS},
+        )
+    except jwt.PyJWTError as exc:
+        logger.info("auth.token rejected reason=%s", type(exc).__name__)
+        raise _unauthorized("Invalid or expired token.") from exc
+
+
 def verify_signature(
     session: Session,
     wallet_type: Union[WalletType, str],
