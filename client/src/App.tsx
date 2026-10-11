@@ -10,6 +10,8 @@ import NotFound from "@/pages/NotFound";
 import Agents from "@/pages/Agents";
 import AgentProfile from "@/pages/AgentProfile";
 import PurchaseRequests from "@/pages/PurchaseRequests";
+import MyDatasets from "@/pages/MyDatasets";
+import SellerDashboard from "@/pages/SellerDashboard";
 import { AppBootstrap } from "@/bootstrap/app-bootstrap";
 
 function App() {
@@ -71,6 +73,22 @@ function App() {
             element={
               <Layout>
                 <PurchaseRequests />
+              </Layout>
+            }
+          />
+          <Route
+            path="/my-datasets"
+            element={
+              <Layout>
+                <MyDatasets />
+              </Layout>
+            }
+          />
+          <Route
+            path="/seller"
+            element={
+              <Layout>
+                <SellerDashboard />
               </Layout>
             }
           />

@@ -69,6 +69,9 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* Reached from the Wallet tab; hidden from the tab bar. */}
+      <Tabs.Screen name="my-datasets" options={{ href: null }} />
+      <Tabs.Screen name="seller" options={{ href: null }} />
     </Tabs>
   );
 }

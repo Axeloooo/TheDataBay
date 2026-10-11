@@ -11,6 +11,7 @@ import type {
   KeyReleaseResponse,
 } from "@/types/dataset";
 import { authHeaders, withSession } from "@/lib/auth";
+import type { PurchasedListing, SellerListing } from "@/types/me";
 import type {
   SimilaritySearchRequest,
   SimilaritySearchResponse,
@@ -133,6 +134,20 @@ const realBackend = {
     withSession((token) =>
       apiRequest<KeyReleaseResponse>(`/api/v1/datasets/${listingId}/key`, {
         method: "POST",
+        headers: authHeaders(token),
+      }),
+    ),
+
+  getMyPurchases: () =>
+    withSession((token) =>
+      apiRequest<PurchasedListing[]>("/api/v1/me/purchases", {
+        headers: authHeaders(token),
+      }),
+    ),
+
+  getMyListings: () =>
+    withSession((token) =>
+      apiRequest<SellerListing[]>("/api/v1/me/listings", {
         headers: authHeaders(token),
       }),
     ),

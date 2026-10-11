@@ -19,6 +19,7 @@ from .datasets import router as datasets_router
 from .contracts import router as contract_router
 from .agents import router as agent_router
 from .auth import router as auth_router
+from .me import router as me_router
 from .database.engine import create_db_and_tables
 from .shared.errors import ApiError, ErrorResponse, api_error_handler
 
@@ -124,6 +125,7 @@ app.include_router(agent_router.router)
 app.include_router(agent_router.purchase_router)
 app.include_router(agent_router.rec_router)
 app.include_router(auth_router.router)
+app.include_router(me_router.router)
 
 
 @app.middleware("http")
