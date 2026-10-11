@@ -69,6 +69,7 @@ def _indexed_purchases(
                 listing_id=listing_id,
                 title=listing.title,
                 description=listing.description,
+                dataset_url=listing.dataset_url,
                 price_paid=str(int(purchase.price_paid)),
                 payment_token=purchase.payment_token,
                 token_symbol=_symbol(
@@ -96,6 +97,7 @@ def get_purchases(
             listing_id=item.id,
             title=item.title,
             description=item.description,
+            dataset_url=item.dataset_url,
             # The contract path has no per-purchase amount; the current price
             # is the best available figure.
             price_paid=item.price_atomic,

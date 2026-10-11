@@ -122,6 +122,7 @@ def test_purchases_returns_only_callers_rows(client_factory, indexed, auth_heade
     assert [p["listing_id"] for p in body] == [ID3]
     assert body[0]["title"] == "bob-one"
     assert body[0]["price_paid"] == "1010000"
+    assert body[0]["dataset_url"] == "ipfs://x"
     assert body[0]["token_symbol"] == "USDC"
     assert body[0]["token_decimals"] == 6
     assert body[0]["source"] == "indexer"

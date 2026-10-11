@@ -12,6 +12,7 @@ class PurchasedListing(BaseModel):
     listing_id: str
     title: str
     description: str
+    dataset_url: str
     price_paid: str = Field(description="Amount paid in token base units (decimal string).")
     payment_token: str
     token_symbol: str
