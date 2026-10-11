@@ -1,4 +1,5 @@
 import { apiRequest } from "@/src/lib/api";
+import { authHeaders, withSession } from "@/src/lib/auth";
 import type {
   MarketplaceDataItem,
   MarketplaceSettlementCurrency,
@@ -8,7 +9,6 @@ import type {
   PurchasedItemsResponse,
 } from "@/src/types/contract";
 import type {
-  KeyReleaseRequest,
   KeyReleaseResponse,
 } from "@/src/types/dataset";
 import type { JobResponse, JobStatusResponse } from "@/src/types/llm";
@@ -127,11 +127,14 @@ export const backend = {
     return normalizeMarketplaceItem(item);
   },
 
-  requestKeyRelease: (listingId: string, payload: KeyReleaseRequest) =>
-    apiRequest<KeyReleaseResponse>(`/api/v1/datasets/${listingId}/key`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    }),
+  // The wallet identity comes from the signed-in session token, not the body.
+  requestKeyRelease: (listingId: string) =>
+    withSession((token) =>
+      apiRequest<KeyReleaseResponse>(`/api/v1/datasets/${listingId}/key`, {
+        method: "POST",
+        headers: authHeaders(token),
+      }),
+    ),
 
   checkAccess: (listingId: string, payload: WalletAccessRequest) =>
     apiRequest<AccessCheckResponse>(

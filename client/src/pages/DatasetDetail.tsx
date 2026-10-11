@@ -406,10 +406,6 @@ function DatasetDetail() {
               try {
                 const keyResponse = await backend.requestKeyRelease(
                   listingUuid,
-                  {
-                    wallet_type: "evm",
-                    address,
-                  },
                 );
                 setDownloadStep("decrypting");
                 const datasetUrl = resolveIpfsUrl(dataset.dataset_url);

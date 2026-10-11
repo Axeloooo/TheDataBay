@@ -64,6 +64,7 @@ const config: ExpoConfig = {
     chainId: readEnv("CHAIN_ID", "31337"),
     rpcUrl: readEnv("RPC_URL", "http://127.0.0.1:8545"),
     explorerUrl: readEnv("EXPLORER_URL"),
+    authDomain: readEnv("AUTH_DOMAIN", "thedatabay.com"),
   },
 };
 

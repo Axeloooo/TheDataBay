@@ -16,7 +16,6 @@ from .schemas import (
     CreateItemRequest,
     GrantAccessRequest,
     SetFeeConfigRequest,
-    TransferOwnershipRequest,
     TxHashResponse,
     UpdateDatasetUrlRequest,
     PurchasedItemsRequest,
@@ -27,6 +26,7 @@ from .schemas import (
 )
 from .marketplace_schemas import MarketplaceDataItem
 from . import service as contract_service
+from ..auth.dependencies import AuthedWallet, require_owner
 
 router = APIRouter(prefix="/api/v1/contract", tags=["contract"])
 logger = logging.getLogger(__name__)
@@ -247,6 +247,7 @@ def buy_item(
 def update_dataset_url(
     listing_id: str,
     request: UpdateDatasetUrlRequest,
+    _owner: AuthedWallet = Depends(require_owner),
     settings: Settings = Depends(get_settings),
 ) -> TxHashResponse:
     """Update the dataset URL for an existing item.
@@ -267,6 +268,7 @@ def update_dataset_url(
 def update_signature(
     listing_id: str,
     request: UpdateSignatureRequest,
+    _owner: AuthedWallet = Depends(require_owner),
     settings: Settings = Depends(get_settings),
 ) -> TxHashResponse:
     """Update signature URL and hash for an existing item.
@@ -289,6 +291,7 @@ def update_signature(
 def update_price(
     listing_id: str,
     request: UpdatePriceRequest,
+    _owner: AuthedWallet = Depends(require_owner),
     settings: Settings = Depends(get_settings),
 ) -> TxHashResponse:
     """Update item price on-chain.
@@ -338,6 +341,7 @@ def check_access(
 def grant_access(
     listing_id: str,
     request: GrantAccessRequest,
+    _owner: AuthedWallet = Depends(require_owner),
     settings: Settings = Depends(get_settings),
 ) -> TxHashResponse:
     """Grant listing access for a wallet on-chain.
@@ -359,7 +363,9 @@ def grant_access(
 
 @router.patch("/fee-config", response_model=TxHashResponse)
 def set_fee_config(
-    request: SetFeeConfigRequest, settings: Settings = Depends(get_settings)
+    request: SetFeeConfigRequest,
+    _owner: AuthedWallet = Depends(require_owner),
+    settings: Settings = Depends(get_settings),
 ) -> TxHashResponse:
     """Update fee recipient and fee bps in the contract.
 
@@ -373,36 +379,4 @@ def set_fee_config(
     tx_hash = contract_service.set_fee_config(
         request.fee_recipient, request.fee_bps, settings
     )
-    return TxHashResponse(tx_hash=tx_hash)
-
-
-@router.post("/ownership/transfer", response_model=TxHashResponse)
-def transfer_ownership(
-    request: TransferOwnershipRequest,
-    settings: Settings = Depends(get_settings),
-) -> TxHashResponse:
-    """Transfer contract ownership.
-
-    Args:
-        request (TransferOwnershipRequest): Transfer ownership request model
-        settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
-
-    Returns:
-        TxHashResponse: Transaction hash response
-    """
-    tx_hash = contract_service.transfer_ownership(request.new_owner, settings)
-    return TxHashResponse(tx_hash=tx_hash)
-
-
-@router.post("/ownership/renounce", response_model=TxHashResponse)
-def renounce_ownership(settings: Settings = Depends(get_settings)) -> TxHashResponse:
-    """Renounce contract ownership.
-
-    Args:
-        settings (Settings, optional): Settings instance. Defaults to Depends(get_settings).
-
-    Returns:
-        TxHashResponse: Transaction hash response
-    """
-    tx_hash = contract_service.renounce_ownership(settings)
     return TxHashResponse(tx_hash=tx_hash)

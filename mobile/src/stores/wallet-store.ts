@@ -3,6 +3,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
 import { walletRuntime } from "@/src/lib/wallet/runtime";
+import { useSessionStore } from "@/src/stores/session-store";
 import type { WalletSessionSnapshot } from "@/src/lib/wallet/types";
 import type {
   WalletConnectionSnapshot,
@@ -99,6 +100,7 @@ export const useWalletStore = create<WalletStore>()(
       },
 
       async disconnectWallet() {
+        useSessionStore.getState().clearSession();
         try {
           await walletRuntime.disconnect();
         } catch (error) {

@@ -9,11 +9,6 @@ class WalletType(str, Enum):
     SOLANA = "solana"
 
 
-class KeyReleaseRequest(BaseModel):
-    wallet_type: WalletType = Field(..., description="Wallet type (evm, solana)")
-    address: str = Field(..., description="Wallet address or public key")
-
-
 class KeyReleaseResponse(BaseModel):
     id: str = Field(..., description="Listing UUID")
     key_b64: str = Field(..., description="AES key (base64)")

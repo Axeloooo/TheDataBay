@@ -12,13 +12,13 @@ from ..config.settings import Settings, get_settings
 from .schemas import (
     DatasetEmbedResponse,
     DatasetPreviewResponse,
-    KeyReleaseRequest,
     KeyReleaseResponse,
 )
 from .service import DatasetEmbedService, get_dataset_embed_service
 from ..contracts import service as contract_service
 from . import repository as dataset_key_repo
 from ..shared.errors import ApiError
+from ..auth.dependencies import AuthedWallet, current_wallet
 
 router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
 logger = logging.getLogger(__name__)
@@ -83,21 +83,25 @@ async def get_dataset_preview(
 @router.post("/{id}/key", response_model=KeyReleaseResponse)
 def release_key(
     id: str,
-    request: KeyReleaseRequest,
+    wallet: AuthedWallet = Depends(current_wallet),
     settings: Settings = Depends(get_settings),
     session: Session = Depends(get_session),
 ) -> KeyReleaseResponse:
-    """Release dataset encryption key if authorized.
+    """Release the dataset encryption key to the signed-in wallet.
+
+    The wallet identity comes only from the bearer token; any address in the
+    request body is ignored.
 
     Args:
         id (str): Item ID
-        request (KeyReleaseRequest): Key release request data
+        wallet (AuthedWallet): Wallet proven by the bearer token.
         settings (Settings, optional): Application settings. Defaults to Depends(get_settings).
         session (Session, optional): Database session. Defaults to Depends(get_session).
 
     Raises:
-        HTTPException: Authentication error
-        HTTPException: Key not found error
+        ApiError: 401 when the token is missing or invalid
+        HTTPException: 403 when the wallet has no on-chain access
+        HTTPException: 404 when no key is stored for the listing
 
     Returns:
         KeyReleaseResponse: Dataset key release response
@@ -106,13 +110,9 @@ def release_key(
     logger.info(
         "datasets.release_key called listing_id=%s wallet_type=%s",
         id,
-        request.wallet_type,
+        wallet.wallet_type.value,
     )
-    wallet_id_bytes = contract_service.wallet_id(
-        request.wallet_type, request.address, settings
-    )
-
-    authorized = contract_service.has_access(id, wallet_id_bytes, settings)
+    authorized = contract_service.has_access(id, wallet.wallet_id, settings)
 
     if not authorized:
         logger.warning("datasets.release_key unauthorized listing_id=%s", id)

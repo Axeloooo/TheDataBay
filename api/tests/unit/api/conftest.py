@@ -61,6 +61,9 @@ _REGISTERED_MODELS = (
 )
 
 
+TEST_JWT_SECRET = "test-secret-" + "x" * 40
+
+
 def make_settings(**overrides: Any) -> Settings:
     data = {
         "APP_NAME": "TheDataBay API",
@@ -85,6 +88,7 @@ def make_settings(**overrides: Any) -> Settings:
         "RPC_URL": "http://127.0.0.1:8545",
         "SERVER_PRIVATE_KEY": "0x" + "11" * 32,
         "POSTGRES_URL": "sqlite:///./test.db",
+        "AUTH_JWT_SECRET": TEST_JWT_SECRET,
     }
     data.update(overrides)
     return Settings(_env_file=None, **data)
@@ -98,6 +102,23 @@ def settings_factory() -> Callable[..., Settings]:
 @pytest.fixture
 def settings(settings_factory: Callable[..., Settings]) -> Settings:
     return settings_factory()
+
+
+@pytest.fixture
+def auth_headers() -> Callable[..., dict[str, str]]:
+    """Build an Authorization header holding a real signed token for ``address``."""
+    from app.auth import service as auth_service
+
+    def _headers(
+        address: str, settings: Settings | None = None, scope: str = "user"
+    ) -> dict[str, str]:
+        resolved = settings if settings is not None else make_settings()
+        token = auth_service.issue_token(
+            "evm", address, resolved, scope=scope
+        ).access_token
+        return {"Authorization": f"Bearer {token}"}
+
+    return _headers
 
 
 @pytest.fixture(autouse=True)

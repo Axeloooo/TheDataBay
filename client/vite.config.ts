@@ -41,6 +41,10 @@ export default defineConfig(({ mode }) => {
       "import.meta.env.VITE_WALLETCONNECT_PROJECT_ID": JSON.stringify(
         env.WALLETCONNECT_PROJECT_ID || env.VITE_WALLETCONNECT_PROJECT_ID || ""
       ),
+      // Host the API puts in sign-in messages; empty → the app's own host.
+      "import.meta.env.VITE_AUTH_DOMAIN": JSON.stringify(
+        env.AUTH_DOMAIN || env.VITE_AUTH_DOMAIN || ""
+      ),
       "import.meta.env.VITE_CHAIN_ID": JSON.stringify(
         env.CHAIN_ID || env.VITE_CHAIN_ID || "31337"
       ),

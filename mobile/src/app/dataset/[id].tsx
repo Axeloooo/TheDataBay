@@ -209,10 +209,7 @@ export default function DatasetDetailScreen() {
 
     try {
       setDownloadStep("authorizing");
-      const keyResp = await backend.requestKeyRelease(uuid, {
-        wallet_type: "evm",
-        address,
-      });
+      const keyResp = await backend.requestKeyRelease(uuid);
 
       setDownloadStep("fetching");
       const ciphertextUrl = resolveIpfsUrl(dataset.dataset_url);

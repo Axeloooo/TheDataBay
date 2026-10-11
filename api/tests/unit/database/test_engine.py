@@ -22,5 +22,6 @@ def test_create_db_and_tables_imports_feature_models_before_create_all(monkeypat
         ("import", "app.agents.models"),
         ("import", "app.datasets.models"),
         ("import", "app.indexer.models"),
+        ("import", "app.auth.models"),
         ("create_all", fake_engine),
     ]
