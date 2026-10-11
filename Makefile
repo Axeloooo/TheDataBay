@@ -23,7 +23,7 @@ ANVIL_PORT         ?= 8545
         dev-up dev-down \
         anvil stop-anvil \
         deploy-anvil seed-anvil mint-tokens-anvil \
-        deploy-base-sepolia mint-tokens-base-sepolia \
+        deploy-base-sepolia mint-tokens-base-sepolia transfer-ownership-base-sepolia \
         evm-build evm-test evm-fmt \
         api-test \
         client-build client-lint \
@@ -51,6 +51,7 @@ help:
 	@echo "EVM / Base Sepolia (testnet):"
 	@echo "  deploy-base-sepolia      Deploy Marketplace to Base Sepolia"
 	@echo "  mint-tokens-base-sepolia Mint MockUSDC + MockCADC on Base Sepolia"
+	@echo "  transfer-ownership-base-sepolia  Transfer Marketplace ownership (NEW_OWNER=0x...)"
 	@echo ""
 	@echo "EVM build & test:"
 	@echo "  evm-build                Compile contracts, export ABI to api/app/contracts/"
@@ -159,6 +160,14 @@ mint-tokens-base-sepolia:
 	forge script $(MINT_SCRIPT) \
 		--rpc-url $(BASE_SEPOLIA_RPC_URL) \
 		--broadcast
+
+# Ownership changes are not exposed over HTTP; run them from an operator machine.
+transfer-ownership-base-sepolia:
+	@if [ -z "$(NEW_OWNER)" ]; then echo "ERROR: set NEW_OWNER=0x..."; exit 1; fi
+	@echo "Transferring Marketplace $(CONTRACT_ADDRESS) ownership to $(NEW_OWNER) on Base Sepolia..."
+	@cast send $(CONTRACT_ADDRESS) "transferOwnership(address)" $(NEW_OWNER) \
+		--rpc-url $(BASE_SEPOLIA_RPC_URL) \
+		--private-key $(BASE_SEPOLIA_PRIVATE_KEY)
 
 # ── EVM build & test ──────────────────────────────────────────────────────────
 evm-build:

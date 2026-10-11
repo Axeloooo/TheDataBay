@@ -104,6 +104,19 @@ def settings(settings_factory: Callable[..., Settings]) -> Settings:
     return settings_factory()
 
 
+@pytest.fixture
+def auth_headers() -> Callable[..., dict[str, str]]:
+    """Build an Authorization header holding a real signed token for ``address``."""
+    from app.auth import service as auth_service
+
+    def _headers(address: str, settings: Settings | None = None) -> dict[str, str]:
+        resolved = settings if settings is not None else make_settings()
+        token = auth_service.issue_token("evm", address, resolved).access_token
+        return {"Authorization": f"Bearer {token}"}
+
+    return _headers
+
+
 @pytest.fixture(autouse=True)
 def dependency_overrides() -> Generator[None, None, None]:
     original_overrides = dict(app.dependency_overrides)
