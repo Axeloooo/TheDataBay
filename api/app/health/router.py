@@ -12,7 +12,7 @@ from .schemas import HealthResponse, ReadinessResponse
 from ..config.settings import Settings, get_settings
 from ..database import engine as db_engine
 from ..indexer.models import IndexerState
-from ..indexer.service import STATE_NAME
+from ..indexer.service import STATE_NAME, is_stale
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,10 @@ async def health_check():
 
 
 def _indexer_status(settings: Settings) -> tuple[str, int | None]:
-    """Indexer status and lag in blocks, read from the indexer cursor only."""
+    """Indexer status and lag in blocks, read from the indexer cursor only.
+
+    Status is one of disabled, unavailable, starting, stale, catching_up, synced.
+    """
     if not settings.indexer_enabled:
         return "disabled", None
     try:
@@ -48,6 +51,9 @@ def _indexer_status(settings: Settings) -> tuple[str, int | None]:
     if state is None or state.chain_head_block is None:
         return "starting", None
     lag = max(state.chain_head_block - state.last_indexed_block, 0)
+    if is_stale(state, settings):
+        # Lag is as of the last tick, which is too old to trust.
+        return "stale", lag
     return ("synced" if lag <= settings.indexer_confirmations else "catching_up"), lag
 
 

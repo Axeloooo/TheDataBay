@@ -83,6 +83,7 @@ def test_listing_id_is_unique(engine):
             signature_url="",
             signature_hash="0x" + "00" * 32,
             created_block=10,
+            created_log_index=0,
             last_event_block=10,
             last_event_log_index=0,
         )
@@ -130,3 +131,27 @@ def test_indexer_settings_have_safe_defaults():
     assert fields["indexer_block_chunk"].default == 2000
     assert fields["indexer_confirmations"].default == 2
     assert fields["indexer_poll_seconds"].default == 5
+
+
+@pytest.mark.parametrize(
+    "override",
+    [
+        {"INDEXER_POLL_SECONDS": 0},
+        {"INDEXER_BLOCK_CHUNK": 0},
+        {"INDEXER_CONFIRMATIONS": -1},
+        {"INDEXER_START_BLOCK": -1},
+    ],
+)
+def test_indexer_settings_reject_out_of_range_values(override):
+    from pydantic import ValidationError
+
+    from .conftest import make_settings
+
+    with pytest.raises(ValidationError):
+        make_settings(**override)
+
+
+def test_zero_confirmations_is_allowed():
+    from .conftest import make_settings
+
+    assert make_settings(INDEXER_CONFIRMATIONS=0).indexer_confirmations == 0

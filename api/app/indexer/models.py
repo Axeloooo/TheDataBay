@@ -70,6 +70,8 @@ class IndexedListing(SQLModel, table=True):
     signature_url: str = Field(sa_column=Column(Text, nullable=False))
     signature_hash: str = Field(sa_column=Column(Text, nullable=False))
     created_block: int = Field(sa_column=Column(BigInteger, nullable=False))
+    # (created_block, created_log_index) reproduces the contract's getAllItems order.
+    created_log_index: int = Field(sa_column=Column(Integer, nullable=False))
     frozen: bool = Field(default=False, nullable=False)
     # Position of the last event applied to this row. Updates from events at
     # or before this position are ignored, so replays never roll state back.

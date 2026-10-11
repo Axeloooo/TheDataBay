@@ -63,6 +63,10 @@ class FakeChain(BaseProvider):
         self.get_logs_calls: list[dict[str, Any]] = []
         self.fail_block_times: set[int] = set()
         self.ignore_address_filter = False
+        # Providers cap eth_getLogs ranges; None means no cap.
+        self.max_log_range: int | None = None
+        # Called with the filter on every eth_getLogs (e.g. to block or signal).
+        self.on_get_logs: Any = None
         self._tx_counter = 0
 
     # ---- fixture builders -------------------------------------------------
@@ -164,7 +168,21 @@ class FakeChain(BaseProvider):
         if method == "eth_blockNumber":
             return self._ok(hex(self.head))
         if method == "eth_getLogs":
-            return self._ok(self._get_logs(params[0]))
+            flt = params[0]
+            if self.on_get_logs is not None:
+                self.on_get_logs(flt)
+            span = int(flt["toBlock"], 16) - int(flt["fromBlock"], 16) + 1
+            if self.max_log_range is not None and span > self.max_log_range:
+                self.get_logs_calls.append(flt)
+                return {
+                    "jsonrpc": "2.0",
+                    "id": 1,
+                    "error": {
+                        "code": -32005,
+                        "message": f"query exceeds max block range {self.max_log_range}",
+                    },
+                }
+            return self._ok(self._get_logs(flt))
         if method == "eth_getBlockByNumber":
             number = int(params[0], 16)
             if number in self.fail_block_times:

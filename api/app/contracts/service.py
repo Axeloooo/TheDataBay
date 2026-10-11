@@ -1104,7 +1104,7 @@ def get_indexed_items(
             return None
         rows = session.exec(
             select(IndexedListing).order_by(
-                IndexedListing.created_block, IndexedListing.listing_id  # type: ignore[arg-type]
+                IndexedListing.created_block, IndexedListing.created_log_index  # type: ignore[arg-type]
             )
         ).all()
         counts = _purchase_counts(session)
@@ -1144,6 +1144,11 @@ def get_indexed_purchased_items_by_wallet(
         buyer = Web3.to_checksum_address(address)
     except ValueError:
         return None
+    if start_block is not None and end_block is not None and start_block > end_block:
+        # Same contract as the on-chain path.
+        raise HTTPException(
+            status_code=400, detail="start_block cannot be greater than end_block"
+        )
 
     try:
         if synced_state(session, settings) is None:

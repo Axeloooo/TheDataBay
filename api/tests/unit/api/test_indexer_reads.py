@@ -1,7 +1,7 @@
 """Read path served from indexer tables, readiness lag, and lifespan wiring."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -30,7 +30,9 @@ def _indexer_settings(override_settings, **extra):
     )
 
 
-def _listing(listing_id: str, block: int, price: int, title: str) -> IndexedListing:
+def _listing(
+    listing_id: str, block: int, price: int, title: str, log_index: int = 0
+) -> IndexedListing:
     return IndexedListing(
         listing_id=listing_id,
         title=title,
@@ -44,6 +46,7 @@ def _listing(listing_id: str, block: int, price: int, title: str) -> IndexedList
         signature_url="",
         signature_hash="0x" + "00" * 32,
         created_block=block,
+        created_log_index=log_index,
         frozen=False,
         last_event_block=block,
         last_event_log_index=0,
@@ -92,8 +95,15 @@ def seeded(db_session):
     return db_session
 
 
-def _set_state(session, last: int, head: int) -> None:
-    session.merge(IndexerState(name=STATE_NAME, last_indexed_block=last, chain_head_block=head))
+def _set_state(session, last: int, head: int, age_seconds: float = 0) -> None:
+    session.merge(
+        IndexerState(
+            name=STATE_NAME,
+            last_indexed_block=last,
+            chain_head_block=head,
+            updated_at=datetime.now(timezone.utc) - timedelta(seconds=age_seconds),
+        )
+    )
     session.commit()
 
 
@@ -182,7 +192,57 @@ def test_browse_ignores_tables_when_indexer_is_disabled(
     assert calls == ["get_all_items"]
 
 
+def test_browse_falls_back_to_contract_when_indexer_state_is_stale(
+    client_factory, override_settings, seeded, monkeypatch
+):
+    settings = _indexer_settings(override_settings, INDEXER_POLL_SECONDS=5)
+    _set_state(seeded, last=198, head=200, age_seconds=120)
+    calls = _contract_items(monkeypatch)
+
+    with client_factory(settings=settings) as client:
+        client.get("/api/v1/contract/items/all")
+
+    assert calls == ["get_all_items"]
+
+
+def test_browse_orders_same_block_listings_by_log_index(
+    client_factory, override_settings, db_session, monkeypatch
+):
+    settings = _indexer_settings(override_settings)
+    db_session.add_all(
+        [
+            _listing(ID1, 101, 1, "later-in-block", log_index=9),
+            _listing(ID2, 101, 1, "earlier-in-block", log_index=2),
+        ]
+    )
+    db_session.commit()
+    _set_state(db_session, last=198, head=200)
+    _forbid_contract(monkeypatch, "get_all_items")
+
+    with client_factory(settings=settings) as client:
+        body = client.get("/api/v1/contract/items/all").json()
+
+    assert [item["id"] for item in body] == [ID2, ID1]
+
+
 # ---- purchases by wallet ------------------------------------------------------
+
+
+def test_purchases_by_wallet_rejects_inverted_block_range(
+    client_factory, override_settings, seeded, monkeypatch
+):
+    settings = _indexer_settings(override_settings)
+    _set_state(seeded, last=198, head=200)
+    _forbid_contract(monkeypatch, "get_purchased_items_by_wallet")
+
+    with client_factory(settings=settings) as client:
+        response = client.post(
+            "/api/v1/contract/purchases/by-wallet",
+            json={"wallet_type": "evm", "address": BUYER, "start_block": 20, "end_block": 10},
+        )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "start_block cannot be greater than end_block"
 
 
 def test_purchases_by_wallet_reads_purchases_table_newest_first(
@@ -289,6 +349,17 @@ def test_readiness_reports_synced_indexer(client_factory, override_settings, db_
 
     assert body["indexer_lag_blocks"] == 2
     assert body["dependencies"]["indexer"] == "synced"
+
+
+def test_readiness_reports_stale_indexer(client_factory, override_settings, db_session):
+    settings = _indexer_settings(override_settings, INDEXER_POLL_SECONDS=5)
+    _set_state(db_session, last=248, head=250, age_seconds=300)
+
+    with client_factory(settings=settings) as client:
+        body = client.get("/health/ready").json()
+
+    assert body["indexer_lag_blocks"] == 2
+    assert body["dependencies"]["indexer"] == "stale"
 
 
 def test_readiness_before_first_indexer_run(client_factory, override_settings):

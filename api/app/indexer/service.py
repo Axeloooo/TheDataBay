@@ -12,13 +12,19 @@ Safety properties:
   when the incoming event is newer, so replays cannot roll state back.
 * The cursor advances in the same transaction as the rows of each chunk:
   a crash mid-chunk rolls both back and the chunk is simply replayed.
+* Every tick refreshes ``indexer_state.updated_at``; reads only trust the
+  tables while that heartbeat is recent (see ``synced_state``).
+
+Indexed reads therefore lag the chain by INDEXER_CONFIRMATIONS blocks plus
+up to one poll interval.
 """
 
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Callable
 
@@ -40,6 +46,23 @@ HANDLED_EVENTS = (
     "DatasetUrlUpdated",
     "SignatureUpdated",
 )
+# Smallest eth_getLogs range tried when a provider rejects a range.
+MIN_LOG_RANGE = 1
+# Reads stop trusting the tables when the heartbeat is older than this many
+# poll intervals (and never sooner than MIN_STALE_SECONDS).
+STALE_POLL_INTERVALS = 3
+MIN_STALE_SECONDS = 60
+
+
+class LogsRequestError(Exception):
+    """eth_getLogs failed for a block range (often a provider range cap)."""
+
+    def __init__(self, from_block: int, to_block: int, cause: Exception) -> None:
+        super().__init__(
+            f"eth_getLogs failed for blocks {from_block}-{to_block}: {type(cause).__name__}"
+        )
+        self.from_block = from_block
+        self.to_block = to_block
 
 
 @dataclass
@@ -91,6 +114,15 @@ def _is_newer(block: int, log_index: int):
     )
 
 
+def _listing_missing(session: Session, listing_id: str) -> bool:
+    return (
+        session.exec(
+            select(IndexedListing.listing_id).where(IndexedListing.listing_id == listing_id)
+        ).first()
+        is None
+    )
+
+
 def _apply_listing_update(
     session: Session, event: Any, values: dict[str, Any]
 ) -> int:
@@ -107,7 +139,7 @@ def _apply_listing_update(
             updated_at=datetime.now(timezone.utc),
         )
     )
-    if result.rowcount == 0 and session.get(IndexedListing, listing_id) is None:
+    if result.rowcount == 0 and _listing_missing(session, listing_id):
         logger.warning(
             "indexer: %s for unknown listing %s at block %s (created before "
             "INDEXER_START_BLOCK?)",
@@ -144,6 +176,7 @@ def _on_item_created(session: Session, ctx: _Context, event: Any) -> int:
             signature_url=args["signatureUrl"],
             signature_hash=_hex(args["signatureHash"]),
             created_block=int(event["blockNumber"]),
+            created_log_index=int(event["logIndex"]),
             frozen=False,
             last_event_block=int(event["blockNumber"]),
             last_event_log_index=int(event["logIndex"]),
@@ -180,6 +213,13 @@ def _on_item_purchased(session: Session, ctx: _Context, event: Any) -> int:
         .where(IndexedListing.frozen.is_(False))  # type: ignore[union-attr]
         .values(frozen=True, updated_at=datetime.now(timezone.utc))
     )
+    if written and _listing_missing(session, listing_id):
+        logger.warning(
+            "indexer: purchase at block %s for unknown listing %s (created before "
+            "INDEXER_START_BLOCK?); it will not appear in indexed reads",
+            block,
+            listing_id,
+        )
     return written
 
 
@@ -225,14 +265,17 @@ def index_range(session: Session, contract: Contract, from_block: int, to_block:
     """
     topics = {_hex(contract.events[name].topic): name for name in HANDLED_EVENTS}
     address = contract.address.lower()
-    raw_logs = contract.w3.eth.get_logs(
-        {
-            "address": contract.address,
-            "fromBlock": from_block,
-            "toBlock": to_block,
-            "topics": [list(topics)],
-        }
-    )
+    try:
+        raw_logs = contract.w3.eth.get_logs(
+            {
+                "address": contract.address,
+                "fromBlock": from_block,
+                "toBlock": to_block,
+                "topics": [list(topics)],
+            }
+        )
+    except Exception as exc:
+        raise LogsRequestError(from_block, to_block, exc) from exc
     logs = sorted(
         (
             log
@@ -262,11 +305,29 @@ def index_range(session: Session, contract: Contract, from_block: int, to_block:
     return written
 
 
+def stale_after(settings: Settings) -> timedelta:
+    """How old the indexer heartbeat may be before its tables are distrusted."""
+    return timedelta(
+        seconds=max(STALE_POLL_INTERVALS * settings.indexer_poll_seconds, MIN_STALE_SECONDS)
+    )
+
+
+def is_stale(state: IndexerState, settings: Settings, now: datetime | None = None) -> bool:
+    """True when no indexer tick has refreshed the state recently."""
+    if state.updated_at is None:
+        return True
+    updated = state.updated_at
+    if updated.tzinfo is None:  # SQLite returns naive UTC timestamps
+        updated = updated.replace(tzinfo=timezone.utc)
+    return (now or datetime.now(timezone.utc)) - updated > stale_after(settings)
+
+
 def synced_state(session: Session, settings: Settings) -> IndexerState | None:
     """Return the indexer state when its tables can serve reads, else None.
 
     Tables serve reads only when the indexer is enabled, has completed a run,
-    and that run reached the confirmed head (it is not still backfilling).
+    that run reached the confirmed head (it is not still backfilling), and a
+    tick has refreshed the state recently (the indexer is not stuck).
     """
     if not settings.indexer_enabled:
         return None
@@ -274,6 +335,8 @@ def synced_state(session: Session, settings: Settings) -> IndexerState | None:
     if state is None or state.chain_head_block is None:
         return None
     if state.last_indexed_block < state.chain_head_block - settings.indexer_confirmations:
+        return None
+    if is_stale(state, settings):
         return None
     return state
 
@@ -288,8 +351,17 @@ def _advance_cursor(session: Session, last_block: int, chain_head: int) -> None:
     session.add(state)
 
 
-def run_once(session: Session, settings: Settings, contract: Contract | None = None) -> int:
+def run_once(
+    session: Session,
+    settings: Settings,
+    contract: Contract | None = None,
+    stop_event: threading.Event | None = None,
+) -> int:
     """Index every confirmed block after the cursor, one committed chunk at a time.
+
+    If the provider rejects a log range, the chunk size is halved for the
+    rest of this run (down to MIN_LOG_RANGE). ``stop_event`` is checked
+    between chunks so shutdown does not wait for a long backfill.
 
     Returns:
         int: Number of rows written across all chunks.
@@ -304,17 +376,36 @@ def run_once(session: Session, settings: Settings, contract: Contract | None = N
     state = session.get(IndexerState, STATE_NAME)
     cursor = state.last_indexed_block if state else settings.indexer_start_block - 1
     if safe_head <= cursor:
+        if state is not None:
+            # Nothing new is confirmed; still record the head and heartbeat.
+            _advance_cursor(session, state.last_indexed_block, latest)
+            session.commit()
         return 0
 
-    chunk = max(settings.indexer_block_chunk, 1)
+    chunk = max(settings.indexer_block_chunk, MIN_LOG_RANGE)
     written = 0
     start = cursor + 1
     while start <= safe_head:
+        if stop_event is not None and stop_event.is_set():
+            logger.info("indexer: stop requested; cursor at %s", start - 1)
+            break
         end = min(start + chunk - 1, safe_head)
         try:
             written += index_range(session, contract, start, end)
             _advance_cursor(session, end, latest)
             session.commit()
+        except LogsRequestError:
+            session.rollback()
+            if chunk <= MIN_LOG_RANGE:
+                raise
+            chunk = max(chunk // 2, MIN_LOG_RANGE)
+            logger.warning(
+                "indexer: eth_getLogs rejected blocks %s-%s; retrying with %s-block ranges",
+                start,
+                end,
+                chunk,
+            )
+            continue
         except Exception:
             session.rollback()
             raise

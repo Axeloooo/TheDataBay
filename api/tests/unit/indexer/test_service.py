@@ -1,13 +1,21 @@
 """Log handling and cursor tests for the marketplace indexer."""
 
-from datetime import datetime, timezone
+import logging
+import threading
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
 from sqlmodel import Session, select
 
 from app.indexer.models import IndexedListing, IndexedPurchase, IndexerState
-from app.indexer.service import STATE_NAME, index_range, run_once
+from app.indexer.service import (
+    STATE_NAME,
+    LogsRequestError,
+    index_range,
+    run_once,
+    synced_state,
+)
 
 from .conftest import make_settings
 from .fakes import (
@@ -200,10 +208,13 @@ def test_next_run_resumes_after_the_cursor(session, chain):
     assert int(chain.get_logs_calls[0]["fromBlock"], 16) == 111
 
 
-def test_nothing_happens_when_confirmed_head_is_behind_cursor(session, chain):
-    session.add(IndexerState(name=STATE_NAME, last_indexed_block=123, chain_head_block=125))
+def test_idle_tick_reads_no_logs_but_refreshes_head_and_heartbeat(session, chain):
+    old = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    session.add(
+        IndexerState(name=STATE_NAME, last_indexed_block=123, chain_head_block=124, updated_at=old)
+    )
     session.commit()
-    chain.head = 124
+    chain.head = 125
 
     written = run_once(session, make_settings(), contract=contract_for(chain))
 
@@ -211,6 +222,116 @@ def test_nothing_happens_when_confirmed_head_is_behind_cursor(session, chain):
     assert chain.get_logs_calls == []
     state = _state(session)
     assert (state.last_indexed_block, state.chain_head_block) == (123, 125)
+    assert _as_utc(state.updated_at) > old
+
+
+def _as_utc(value: datetime) -> datetime:
+    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+
+
+# ---- freshness ---------------------------------------------------------------
+
+
+def _fresh_state(**overrides) -> IndexerState:
+    data = {
+        "name": STATE_NAME,
+        "last_indexed_block": 198,
+        "chain_head_block": 200,
+        "updated_at": datetime.now(timezone.utc),
+    }
+    data.update(overrides)
+    return IndexerState(**data)
+
+
+def test_synced_state_accepts_recent_caught_up_state(session):
+    session.add(_fresh_state())
+    session.commit()
+
+    assert synced_state(session, make_settings()) is not None
+
+
+def test_synced_state_rejects_state_not_refreshed_recently(session):
+    stale_at = datetime.now(timezone.utc) - timedelta(seconds=61)
+    session.add(_fresh_state(updated_at=stale_at))
+    session.commit()
+
+    assert synced_state(session, make_settings(INDEXER_POLL_SECONDS=5)) is None
+
+
+def test_stale_threshold_scales_with_poll_interval(session):
+    updated = datetime.now(timezone.utc) - timedelta(seconds=90)
+    session.add(_fresh_state(updated_at=updated))
+    session.commit()
+
+    assert synced_state(session, make_settings(INDEXER_POLL_SECONDS=40)) is not None
+
+
+# ---- provider range caps -----------------------------------------------------
+
+
+def test_rejected_log_range_is_halved_until_the_provider_accepts_it(session, chain):
+    chain.head = 125
+    chain.max_log_range = 3
+    settings = make_settings(INDEXER_START_BLOCK=100, INDEXER_BLOCK_CHUNK=10)
+
+    written = run_once(session, settings, contract=contract_for(chain))
+
+    assert written == 6
+    assert _state(session).last_indexed_block == 123
+    spans = [int(c["toBlock"], 16) - int(c["fromBlock"], 16) + 1 for c in chain.get_logs_calls]
+    assert spans[:3] == [10, 5, 2]
+    assert set(spans[3:]) <= {2}
+
+
+def test_log_range_rejected_down_to_one_block_raises(session, chain):
+    chain.max_log_range = 0
+
+    with pytest.raises(LogsRequestError):
+        run_once(session, make_settings(INDEXER_BLOCK_CHUNK=8), contract=contract_for(chain))
+
+    assert _state(session) is None
+
+
+# ---- shutdown ----------------------------------------------------------------
+
+
+def test_stop_flag_ends_the_run_between_chunks(session, chain):
+    stop = threading.Event()
+    chain.on_get_logs = lambda flt: stop.set()
+    settings = make_settings(INDEXER_START_BLOCK=100, INDEXER_BLOCK_CHUNK=10)
+
+    run_once(session, settings, contract=contract_for(chain), stop_event=stop)
+
+    assert len(chain.get_logs_calls) == 1
+    assert _state(session).last_indexed_block == 109
+
+
+# ---- ordering and warnings ---------------------------------------------------
+
+
+def test_listing_creation_position_is_stored(session):
+    c = FakeChain(head=200)
+    c.add_listing(2, block=101, log_index=4)
+    c.add_listing(1, block=101, log_index=7)
+
+    index_range(session, contract_for(c), 100, 110)
+    session.commit()
+
+    assert _listing(session, ID2).created_log_index == 4
+    assert _listing(session, ID1).created_log_index == 7
+
+
+def test_purchase_for_unknown_listing_is_recorded_with_a_warning(session, caplog):
+    c = FakeChain(head=200)
+    c.add_purchase(item_id(9), block=105)
+
+    with caplog.at_level(logging.WARNING, logger="app.indexer.service"):
+        index_range(session, contract_for(c), 100, 110)
+    session.commit()
+
+    assert len(_purchases(session)) == 1
+    unknown = "0x" + item_id(9).hex()
+    assert any(unknown in r.getMessage() for r in caplog.records)
 
 
 def test_cursor_does_not_advance_when_a_write_raises(session, chain):
