@@ -8,7 +8,9 @@ out/
 /broadcast/**/dry-run/
 
 # Docs
-docs/
+docs/*
+!docs/superpowers/
+!docs/agentic-layer.md
 
 # Dotenv file
 .env
