@@ -11,6 +11,16 @@ export interface ApiError {
   message?: string;
 }
 
+export class ApiRequestError extends Error {
+  readonly status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiRequestError";
+    this.status = status;
+  }
+}
+
 export async function apiRequest<T>(
   endpoint: string,
   options?: RequestInit,
@@ -30,7 +40,10 @@ export async function apiRequest<T>(
     const error: ApiError = await response.json().catch(() => ({
       detail: `HTTP ${response.status}: ${response.statusText}`,
     }));
-    throw new Error(error.detail || error.message || "API request failed");
+    throw new ApiRequestError(
+      error.detail || error.message || "API request failed",
+      response.status,
+    );
   }
 
   return response.json();

@@ -46,12 +46,6 @@ class SetFeeConfigRequest(BaseModel):
     fee_bps: int = Field(..., ge=0, le=10_000, description="Fee basis points")
 
 
-class TransferOwnershipRequest(BaseModel):
-    """Transfer ownership request schema."""
-
-    new_owner: str = Field(..., description="New owner EVM address")
-
-
 class WalletAccessRequest(BaseModel):
     """Wallet access request schema."""
 

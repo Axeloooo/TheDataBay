@@ -94,9 +94,22 @@ def _raise_internal_config(detail: str, exc: Exception) -> None:
     raise HTTPException(status_code=500, detail=detail) from exc
 
 
+_URL_PATTERN = re.compile(r"[a-zA-Z][a-zA-Z0-9+.-]*://[^\s'\"]+")
+_LONG_HEX_PATTERN = re.compile(r"0x[0-9a-fA-F]{40,}")
+
+
+def _redact_error(exc: Exception) -> str:
+    """Describe an exception for logs without URLs (API keys) or long hex (keys)."""
+    text = _URL_PATTERN.sub(lambda m: _redact_rpc_url(m.group(0)), str(exc))
+    text = _LONG_HEX_PATTERN.sub("0x<redacted>", text)
+    return f"{type(exc).__name__}: {text}"
+
+
 def _raise_upstream(detail: str, exc: Exception) -> None:
-    logger.exception("%s", detail)
-    raise HTTPException(status_code=502, detail=f"{detail}: {str(exc)}") from exc
+    # Upstream errors can embed the RPC URL (often carrying an API key); keep the
+    # client-facing detail generic and log a redacted description only.
+    logger.error("%s error=%s", detail, _redact_error(exc))
+    raise HTTPException(status_code=502, detail=detail) from exc
 
 
 def _redact_rpc_url(rpc_url: str) -> str:
@@ -485,17 +498,18 @@ def _send_tx(function, settings: Settings, value: int = 0) -> str:
         receipt = w3.eth.wait_for_transaction_receipt(tx_hash)
     except Exception as exc:
         _maybe_raise_custom_error(exc, "send_raw_transaction")
-        logger.exception(
-            "Failed to submit tx. from=%s to=%s nonce=%s chainId=%s value=%s",
+        logger.error(
+            "Failed to submit tx. from=%s to=%s nonce=%s chainId=%s value=%s error=%s",
             account.address,
             tx.get("to"),
             tx.get("nonce"),
             tx.get("chainId"),
             value,
+            _redact_error(exc),
         )
         raise HTTPException(
             status_code=502,
-            detail=f"Failed to submit transaction to RPC: {str(exc)}",
+            detail="Failed to submit transaction to RPC",
         ) from exc
     if receipt.status != 1:
         logger.error("Contract transaction reverted. tx_hash=%s", tx_hash.hex())

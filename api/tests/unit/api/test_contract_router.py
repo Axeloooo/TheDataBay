@@ -1,4 +1,5 @@
 import pytest
+from web3 import Web3
 
 from app.contracts import router as contract_router
 from app.contracts.marketplace_schemas import MarketplaceDataItem
@@ -202,57 +203,72 @@ def test_contract_check_access_uses_wallet_id_then_has_access(
     assert captured["access_args"] == (LISTING_ID, b"wallet-id", settings)
 
 
+OWNER = Web3.to_checksum_address("0x" + "aa" * 20)
+NOT_OWNER = Web3.to_checksum_address("0x" + "bb" * 20)
+
+ADMIN_ROUTES = [
+    (
+        "patch",
+        f"/api/v1/contract/items/{LISTING_ID}/dataset-url",
+        {"new_url": "ipfs://new-dataset"},
+        "update_dataset_url",
+        "0x" + "01" * 32,
+        (LISTING_ID, "ipfs://new-dataset"),
+    ),
+    (
+        "patch",
+        f"/api/v1/contract/items/{LISTING_ID}/signature",
+        {"new_url": "ipfs://new-signature", "new_hash": "0x" + "ef" * 32},
+        "update_signature",
+        "0x" + "02" * 32,
+        (LISTING_ID, "ipfs://new-signature", "0x" + "ef" * 32),
+    ),
+    (
+        "patch",
+        f"/api/v1/contract/items/{LISTING_ID}/price",
+        {"new_price": 555},
+        "update_price",
+        "0x" + "03" * 32,
+        (LISTING_ID, 555),
+    ),
+    (
+        "patch",
+        "/api/v1/contract/fee-config",
+        {
+            "fee_recipient": "0x0000000000000000000000000000000000000002",
+            "fee_bps": 125,
+        },
+        "set_fee_config",
+        "0x" + "04" * 32,
+        ("0x0000000000000000000000000000000000000002", 125),
+    ),
+]
+
+GRANT_ACCESS_ROUTE = (
+    "post",
+    f"/api/v1/contract/items/{LISTING_ID}/grant-access",
+    {"wallet_type": "evm", "address": "0x0000000000000000000000000000000000000004"},
+)
+
+
+def _fail_if_called(*args, **kwargs):
+    raise AssertionError("contract write must not run for unauthorized callers")
+
+
+@pytest.fixture
+def owner_is(monkeypatch):
+    monkeypatch.setattr(contract_router.contract_service, "owner", lambda s: OWNER)
+
+
 @pytest.mark.parametrize(
     ("method", "path", "body", "service_attr", "service_result", "expected_args"),
-    [
-        (
-            "patch",
-            f"/api/v1/contract/items/{LISTING_ID}/dataset-url",
-            {"new_url": "ipfs://new-dataset"},
-            "update_dataset_url",
-            "0x" + "01" * 32,
-            (LISTING_ID, "ipfs://new-dataset"),
-        ),
-        (
-            "patch",
-            f"/api/v1/contract/items/{LISTING_ID}/signature",
-            {"new_url": "ipfs://new-signature", "new_hash": "0x" + "ef" * 32},
-            "update_signature",
-            "0x" + "02" * 32,
-            (LISTING_ID, "ipfs://new-signature", "0x" + "ef" * 32),
-        ),
-        (
-            "patch",
-            f"/api/v1/contract/items/{LISTING_ID}/price",
-            {"new_price": 555},
-            "update_price",
-            "0x" + "03" * 32,
-            (LISTING_ID, 555),
-        ),
-        (
-            "patch",
-            "/api/v1/contract/fee-config",
-            {
-                "fee_recipient": "0x0000000000000000000000000000000000000002",
-                "fee_bps": 125,
-            },
-            "set_fee_config",
-            "0x" + "04" * 32,
-            ("0x0000000000000000000000000000000000000002", 125),
-        ),
-        (
-            "post",
-            "/api/v1/contract/ownership/transfer",
-            {"new_owner": "0x0000000000000000000000000000000000000003"},
-            "transfer_ownership",
-            "0x" + "05" * 32,
-            ("0x0000000000000000000000000000000000000003",),
-        ),
-    ],
+    ADMIN_ROUTES,
 )
-def test_contract_write_endpoints_forward_to_service(
+def test_contract_admin_endpoints_forward_to_service_for_owner(
     client_factory,
     override_settings,
+    auth_headers,
+    owner_is,
     monkeypatch,
     method,
     path,
@@ -271,22 +287,68 @@ def test_contract_write_endpoints_forward_to_service(
     monkeypatch.setattr(contract_router.contract_service, service_attr, fake_service)
 
     with client_factory(settings=settings) as client:
-        response = getattr(client, method)(path, json=body)
+        response = getattr(client, method)(
+            path, json=body, headers=auth_headers(OWNER, settings, scope="admin")
+        )
 
     assert response.status_code == 200
     assert response.json() == {"tx_hash": service_result}
     assert captured["args"] == (*expected_args, settings)
 
 
+ALL_ADMIN = [(m, p, b, a) for m, p, b, a, _, _ in ADMIN_ROUTES] + [
+    (*GRANT_ACCESS_ROUTE, "grant_access")
+]
+
+
+@pytest.mark.parametrize(("method", "path", "body", "service_attr"), ALL_ADMIN)
+def test_contract_admin_endpoints_require_token(
+    client, owner_is, monkeypatch, method, path, body, service_attr
+):
+    monkeypatch.setattr(contract_router.contract_service, service_attr, _fail_if_called)
+
+    response = getattr(client, method)(path, json=body)
+
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize(("method", "path", "body", "service_attr"), ALL_ADMIN)
+def test_contract_admin_endpoints_reject_non_owner(
+    client, auth_headers, owner_is, monkeypatch, method, path, body, service_attr
+):
+    monkeypatch.setattr(contract_router.contract_service, service_attr, _fail_if_called)
+
+    response = getattr(client, method)(
+        path, json=body, headers=auth_headers(NOT_OWNER, scope="admin")
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "forbidden"
+
+
+@pytest.mark.parametrize(("method", "path", "body", "service_attr"), ALL_ADMIN)
+def test_contract_admin_endpoints_reject_user_scope_token_even_for_owner(
+    client, auth_headers, owner_is, monkeypatch, method, path, body, service_attr
+):
+    monkeypatch.setattr(contract_router.contract_service, service_attr, _fail_if_called)
+
+    response = getattr(client, method)(path, json=body, headers=auth_headers(OWNER))
+
+    assert response.status_code == 401
+
+
 def test_contract_grant_access_derives_wallet_id_before_service_call(
-    client_factory, override_settings, monkeypatch
+    client_factory, override_settings, auth_headers, owner_is, monkeypatch
 ):
     settings = override_settings()
     captured = {}
+    real_wallet_id = contract_router.contract_service.wallet_id
 
     def fake_wallet_id(wallet_type, address, resolved_settings):
-        captured["wallet_args"] = (wallet_type, address, resolved_settings)
-        return b"derived-wallet"
+        if address == "0x0000000000000000000000000000000000000004":
+            captured["wallet_args"] = (wallet_type, address, resolved_settings)
+            return b"derived-wallet"
+        return real_wallet_id(wallet_type, address, resolved_settings)
 
     def fake_grant_access(listing_id, wallet_id_bytes, resolved_settings):
         captured["grant_args"] = (listing_id, wallet_id_bytes, resolved_settings)
@@ -297,14 +359,9 @@ def test_contract_grant_access_derives_wallet_id_before_service_call(
         contract_router.contract_service, "grant_access", fake_grant_access
     )
 
+    method, path, body = GRANT_ACCESS_ROUTE
     with client_factory(settings=settings) as client:
-        response = client.post(
-            f"/api/v1/contract/items/{LISTING_ID}/grant-access",
-            json={
-                "wallet_type": "evm",
-                "address": "0x0000000000000000000000000000000000000004",
-            },
-        )
+        response = client.post(path, json=body, headers=auth_headers(OWNER, settings, scope="admin"))
 
     assert response.status_code == 200
     assert response.json() == {"tx_hash": "0x" + "06" * 32}
@@ -316,28 +373,17 @@ def test_contract_grant_access_derives_wallet_id_before_service_call(
     assert captured["grant_args"] == (LISTING_ID, b"derived-wallet", settings)
 
 
-def test_contract_renounce_ownership_forwards_to_service(
-    client_factory, override_settings, monkeypatch
-):
-    settings = override_settings()
-    captured = {}
-
-    def fake_renounce_ownership(resolved_settings):
-        captured["settings"] = resolved_settings
-        return "0x" + "07" * 32
-
-    monkeypatch.setattr(
-        contract_router.contract_service,
-        "renounce_ownership",
-        fake_renounce_ownership,
+@pytest.mark.parametrize(
+    "path", ["/api/v1/contract/ownership/transfer", "/api/v1/contract/ownership/renounce"]
+)
+def test_ownership_routes_are_removed(client, auth_headers, owner_is, path):
+    response = client.post(
+        path,
+        json={"new_owner": NOT_OWNER},
+        headers=auth_headers(OWNER, scope="admin"),
     )
 
-    with client_factory(settings=settings) as client:
-        response = client.post("/api/v1/contract/ownership/renounce")
-
-    assert response.status_code == 200
-    assert response.json() == {"tx_hash": "0x" + "07" * 32}
-    assert captured["settings"] is settings
+    assert response.status_code == 404
 
 
 def test_contract_create_item_requires_direct_wallet_transaction(
