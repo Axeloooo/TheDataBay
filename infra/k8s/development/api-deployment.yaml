@@ -1,0 +1,224 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: thedatabay/api
+          env:
+            # Database settings
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: POSTGRES_URL
+
+            # App settings
+            - name: APP_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: APP_NAME
+            - name: APP_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: APP_VERSION
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: ENVIRONMENT
+
+            # Server settings
+            - name: HOST
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: HOST
+            - name: PORT
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: PORT
+
+            # CORS settings
+            - name: CORS_ORIGINS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CORS_ORIGINS
+
+            # LLM settings
+            - name: LLM_PROVIDER
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_PROVIDER
+            - name: LLM_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_BASE_URL
+                  optional: true
+            - name: LLM_EMBEDDING_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_EMBEDDING_BASE_URL
+                  optional: true
+            - name: LLM_CHAT_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_CHAT_MODEL
+            - name: LLM_EMBEDDING_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_EMBEDDING_MODEL
+            - name: LLM_EMBEDDING_DIMENSION
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_EMBEDDING_DIMENSION
+            - name: LLM_THINK
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_THINK
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: OPENAI_API_KEY
+                  optional: true
+            - name: OLLAMA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: OLLAMA_API_KEY
+                  optional: true
+
+            # Dataset summary settings
+            - name: DATASET_SUMMARY_COUNT
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: DATASET_SUMMARY_COUNT
+            - name: DATASET_SUMMARY_SAMPLE_ROWS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: DATASET_SUMMARY_SAMPLE_ROWS
+
+            # Embedding job settings
+            - name: MAX_FILE_SIZE_MB
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: MAX_FILE_SIZE_MB
+            - name: MAX_DATASET_ROWS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: MAX_DATASET_ROWS
+
+            # Similarity search settings
+            - name: TOP_K
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: TOP_K
+            - name: SIMILARITY_THRESHOLD
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: SIMILARITY_THRESHOLD
+            - name: CACHE_MAXSIZE
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CACHE_MAXSIZE
+
+            # Pinata IPFS settings
+            - name: PINATA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: PINATA_API_KEY
+            - name: PINATA_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: PINATA_SECRET_KEY
+            - name: PINATA_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: PINATA_GATEWAY_URL
+
+            # Smart contract settings
+            - name: CONTRACT_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CONTRACT_ADDRESS
+            - name: CONTRACT_ABI_PATH
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CONTRACT_ABI_PATH
+            - name: CHAIN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CHAIN_ID
+            - name: RPC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: RPC_URL
+            - name: SERVER_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: SERVER_PRIVATE_KEY
+
+            # Agent settings
+            - name: SEED_AGENTS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: SEED_AGENTS
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-svc
+spec:
+  selector:
+    app: api
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

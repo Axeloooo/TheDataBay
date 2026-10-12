@@ -1,0 +1,23 @@
+Marketplace._purchase via buyItem
+├── when the item does not exist
+│   └── it should revert with ItemDoesNotExist
+└── when the item exists
+    ├── given the buyer is the seller
+    │   └── it should revert with SellerCannotBuyOwnItem
+    ├── given the item's payment token is disabled
+    │   └── it should revert with TokenNotAccepted
+    └── given the buyer is not the seller and the payment token is enabled
+        ├── given the buyer allowance is less than price plus fee
+        │   └── it should revert with InsufficientAllowance
+        ├── given the buyer balance is less than price plus fee
+        │   └── it should revert with InsufficientBalance
+        ├── given the buyer already has access
+        │   └── it should revert with AlreadyHasAccess
+        └── given the buyer does not have access
+            ├── given feeBps is greater than zero
+            │   ├── when this is the first purchase
+            │   │   └── it should grant access, increment purchaseCount, emit ItemFrozenAfterSale and ItemPurchased, and transfer fee plus seller proceeds
+            │   └── when this is a later purchase by a distinct buyer
+            │       └── it should grant access, increment purchaseCount, and keep the item frozen without another state transition
+            └── given feeBps is zero
+                └── it should grant access, emit ItemPurchased with zero fee, pay only the seller, and leave the fee recipient balance unchanged

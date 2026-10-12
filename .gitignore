@@ -8,10 +8,15 @@ out/
 /broadcast/**/dry-run/
 
 # Docs
-docs/
+docs/*
+!docs/superpowers/
+!docs/agentic-layer.md
 
 # Dotenv file
 .env
+
+# Terraform local working directories
+.terraform/
 
 # Logs
 logs
@@ -21,6 +26,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+.coverage
 
 node_modules
 dist
@@ -39,3 +45,12 @@ dist-ssr
 *.sw?
 
 .DS_Store
+
+secrets.yaml
+
+.vscode 
+
+notes.txt
+test-results/
+playwright-report/
+infra/k8s/development/secrets.yaml.bak

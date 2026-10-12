@@ -1,0 +1,282 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: thedatabay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: api
+          # Replace <ACR_LOGIN_SERVER> and <TAG> after terraform apply and docker push
+          image: <ACR_LOGIN_SERVER>/thedatabay/api:<TAG>
+          ports:
+            - containerPort: 8080
+          env:
+            # ingress-nginx (defaults) overwrites X-Forwarded-For with the real client IP:
+            # 1 trusted hop. Revisit if use-forwarded-headers / compute-full-forwarded-for
+            # is enabled or Front Door / App Gateway is added in front.
+            - name: AUTH_TRUSTED_PROXY_HOPS
+              value: "1"
+            - name: APP_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: APP_NAME
+            - name: APP_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: APP_VERSION
+            - name: ENVIRONMENT
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: ENVIRONMENT
+            - name: HOST
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: HOST
+            - name: PORT
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: PORT
+            - name: CORS_ORIGINS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CORS_ORIGINS
+            - name: LLM_PROVIDER
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_PROVIDER
+            - name: LLM_BASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_BASE_URL
+            - name: LLM_CHAT_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_CHAT_MODEL
+            - name: LLM_EMBEDDING_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_EMBEDDING_MODEL
+            - name: LLM_EMBEDDING_DIMENSION
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_EMBEDDING_DIMENSION
+            - name: LLM_THINK
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: LLM_THINK
+            - name: OLLAMA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-optional-secrets
+                  key: OLLAMA_API_KEY
+                  optional: true
+            - name: DATASET_SUMMARY_COUNT
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: DATASET_SUMMARY_COUNT
+            - name: DATASET_SUMMARY_SAMPLE_ROWS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: DATASET_SUMMARY_SAMPLE_ROWS
+            - name: MAX_FILE_SIZE_MB
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: MAX_FILE_SIZE_MB
+            - name: MAX_DATASET_ROWS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: MAX_DATASET_ROWS
+            - name: TOP_K
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: TOP_K
+            - name: SIMILARITY_THRESHOLD
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: SIMILARITY_THRESHOLD
+            - name: CACHE_MAXSIZE
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CACHE_MAXSIZE
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: POSTGRES_URL
+            - name: PINATA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: PINATA_API_KEY
+            - name: PINATA_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: PINATA_SECRET_KEY
+            - name: PINATA_GATEWAY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: PINATA_GATEWAY_URL
+            - name: SERVER_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: SERVER_PRIVATE_KEY
+            - name: AUTH_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: AUTH_JWT_SECRET
+            - name: AUTH_DOMAIN
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: AUTH_DOMAIN
+            - name: AUTH_TOKEN_TTL_SECONDS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: AUTH_TOKEN_TTL_SECONDS
+            - name: AUTH_ADMIN_TOKEN_TTL_SECONDS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: AUTH_ADMIN_TOKEN_TTL_SECONDS
+            - name: AUTH_NONCE_TTL_SECONDS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: AUTH_NONCE_TTL_SECONDS
+            - name: INDEXER_ENABLED
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: INDEXER_ENABLED
+            - name: INDEXER_START_BLOCK
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: INDEXER_START_BLOCK
+            - name: INDEXER_BLOCK_CHUNK
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: INDEXER_BLOCK_CHUNK
+            - name: INDEXER_CONFIRMATIONS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: INDEXER_CONFIRMATIONS
+            - name: INDEXER_POLL_SECONDS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: INDEXER_POLL_SECONDS
+            - name: CONTRACT_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CONTRACT_ADDRESS
+            - name: USDC_TOKEN_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: USDC_TOKEN_ADDRESS
+            - name: CADC_TOKEN_ADDRESS
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CADC_TOKEN_ADDRESS
+            - name: CONTRACT_ABI_PATH
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CONTRACT_ABI_PATH
+            - name: CHAIN_ID
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: CHAIN_ID
+            - name: RPC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: thedatabay-secrets
+                  key: RPC_URL
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: secrets-store
+              mountPath: /mnt/secrets-store
+              readOnly: true
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: thedatabay-secrets-provider
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-svc
+  namespace: thedatabay
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP

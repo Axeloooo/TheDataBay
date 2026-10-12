@@ -1,0 +1,34 @@
+{
+  "items": [
+    {
+      "listing_id": "0d5f3ea4-f154-4f04-99d3-524c00112233",
+      "title": "Retail Transactions 2025",
+      "description": "Synthetic retail basket-level transactions for demand forecasting.",
+      "price_atomic": "200000",
+      "dataset_url": "ipfs://bafybeiaretaildatasetenc",
+      "dataset_hash": "0xb5580f9238f293f18c439bda536cb9662191438ef1f3ec1c7255a1f0079fbe29",
+      "signature_url": "ipfs://bafybeiaretailsignature",
+      "signature_hash": "0x5d4f37a47c4bdbf95d3fb9e44f53e12e2fefd8a298ef70624087d8d8f4dd58df"
+    },
+    {
+      "listing_id": "8be1b771-e9ab-4cb7-9e00-a42f10445566",
+      "title": "Cardio Clinical Cohort",
+      "description": "De-identified cardiovascular cohort for binary risk classification.",
+      "price_atomic": "350000",
+      "dataset_url": "ipfs://bafybeibcardiodatasetenc",
+      "dataset_hash": "0x2b90193213c15465e48a1ff1758f4787dbca508c731f17df97787adfbf112ba0",
+      "signature_url": "ipfs://bafybeibcardiosignature",
+      "signature_hash": "0x5d4477516dfdd4951df7f43231ff34395d6d7d84897a65f1b38407c42cbcd573"
+    },
+    {
+      "listing_id": "f3d9a221-7aa1-4fdc-b4cb-00ef987799aa",
+      "title": "SME Invoice Delays",
+      "description": "Invoice payment delay records for credit scoring and anomaly modeling.",
+      "price_atomic": "150000",
+      "dataset_url": "ipfs://bafybeicsmedatasetenc",
+      "dataset_hash": "0x6689d5d7e097cb8632996f6b95feccb55d4fc6a859d78bd0c4fdb5d7c5f4d11d",
+      "signature_url": "ipfs://bafybeicsmesignature",
+      "signature_hash": "0x4f7aa005343fd84715a3af04bf6134921ec904fe6540f14729938d83a5d9bc20"
+    }
+  ]
+}

@@ -27,7 +27,7 @@ jobs:
         run: npm init -y
 
       - name: Install dependencies
-        run: npm install -D semantic-release
+        run: npm install -D semantic-release @semantic-release/changelog @semantic-release/git
 
       - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
         run: npm audit signatures

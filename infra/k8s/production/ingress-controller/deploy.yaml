@@ -1,0 +1,11 @@
+# ingress-nginx installation manifest
+# Source: https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.6/deploy/static/provider/cloud/deploy.yaml
+#
+# To install ingress-nginx, run:
+#   kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.6/deploy/static/provider/cloud/deploy.yaml
+#
+# Or download and commit the full manifest:
+#   curl -L https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.6/deploy/static/provider/cloud/deploy.yaml -o deploy.yaml
+#
+# After installation, get the external IP:
+#   kubectl get svc -n ingress-nginx ingress-nginx-controller

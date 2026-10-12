@@ -1,0 +1,295 @@
+import { apiRequest } from "@/lib/api";
+import type {
+  MarketplaceDataItem,
+  AccessCheckResponse,
+  WalletAccessRequest,
+  PurchasedItemsRequest,
+  PurchasedItemsResponse,
+} from "@/types/contract";
+import type {
+  DatasetEmbedResponse,
+  KeyReleaseResponse,
+} from "@/types/dataset";
+import { authHeaders, withSession } from "@/lib/auth";
+import type { PurchasedListing, SellerListing } from "@/types/me";
+import type {
+  SimilaritySearchRequest,
+  SimilaritySearchResponse,
+  CardViewModel,
+} from "@/types/ai";
+import type {
+  Agent,
+  AgentListResponse,
+  RecommendationListResponse,
+  PurchaseRequest,
+  PurchaseRequestListResponse,
+} from "@/types/agent";
+import { normalizeAtomicString } from "@/lib/atomic";
+import { mockBackend } from "@/lib/mock-backend";
+import { uuidToBytes32 } from "@/lib/ids";
+import { SETTLEMENT_TOKENS } from "@/types/contract";
+import type { SettlementCurrency } from "@/types/contract";
+
+type MarketplaceApiItem = Omit<
+  MarketplaceDataItem,
+  "payment_token" | "price_atomic" | "settlement_currency" | "settlement_decimals"
+> & {
+  payment_token?: unknown;
+  paymentToken?: unknown;
+  price?: unknown;
+  price_atomic?: unknown;
+  settlement_currency?: unknown;
+  settlement_decimals?: unknown;
+};
+
+function normalizeMarketplaceItem(
+  item: MarketplaceApiItem,
+): MarketplaceDataItem {
+  const priceAtomic = item.price_atomic ?? item.price;
+  if (priceAtomic === undefined || priceAtomic === null) {
+    throw new Error("Missing marketplace price from API.");
+  }
+  const rawPaymentToken = item.payment_token ?? item.paymentToken;
+  if (typeof rawPaymentToken !== "string" || !rawPaymentToken.trim()) {
+    throw new Error("Missing marketplace payment token from API.");
+  }
+
+  const rawSettlementCurrency = item.settlement_currency;
+  const normalizedCurrencyStr =
+    rawSettlementCurrency == null
+      ? "USDC"
+      : String(rawSettlementCurrency).trim().toUpperCase();
+
+  const isValidCurrency = (s: string): s is SettlementCurrency =>
+    s in SETTLEMENT_TOKENS;
+
+  if (!isValidCurrency(normalizedCurrencyStr)) {
+    throw new Error(
+      `Unsupported marketplace settlement currency from API: ${normalizedCurrencyStr}`,
+    );
+  }
+  const settlementCurrency: SettlementCurrency = normalizedCurrencyStr;
+
+  if (
+    rawSettlementCurrency != null &&
+    String(rawSettlementCurrency) !== settlementCurrency
+  ) {
+    // Soft warning: backend returned currency in a non-canonical format (e.g., wrong case/whitespace).
+    console.warn(
+      "Non-canonical marketplace settlement currency from API; normalized to",
+      settlementCurrency,
+      "from:",
+      rawSettlementCurrency,
+    );
+  }
+
+  const expectedDecimals = SETTLEMENT_TOKENS[settlementCurrency].decimals;
+  const settlementDecimals = Number(item.settlement_decimals ?? expectedDecimals);
+  if (settlementDecimals !== expectedDecimals) {
+    console.warn(
+      `Unexpected settlement decimals from API for ${settlementCurrency}: expected ${expectedDecimals}, got ${settlementDecimals}`,
+    );
+  }
+
+  const rest = { ...item };
+  delete rest.price;
+  delete rest.paymentToken;
+  delete rest.payment_token;
+  delete rest.price_atomic;
+  delete rest.settlement_currency;
+  delete rest.settlement_decimals;
+
+  return {
+    ...rest,
+    payment_token: rawPaymentToken.trim(),
+    price_atomic: normalizeAtomicString(priceAtomic),
+    settlement_currency: settlementCurrency,
+    settlement_decimals: settlementDecimals,
+  };
+}
+
+const realBackend = {
+  submitDataset: (formData: FormData) =>
+    apiRequest<DatasetEmbedResponse>("/api/v1/datasets/embed", {
+      method: "POST",
+      body: formData,
+    }),
+
+  getMarketplaceItems: async () => {
+    const items = await apiRequest<MarketplaceApiItem[]>(
+      "/api/v1/contract/items/all",
+    );
+    return items.map(normalizeMarketplaceItem);
+  },
+
+  getMarketplaceItem: async (listingId: string) => {
+    const item = await apiRequest<MarketplaceApiItem>(
+      `/api/v1/contract/items/${listingId}`,
+    );
+    return normalizeMarketplaceItem(item);
+  },
+
+  // The wallet identity comes from the signed-in session token, not the body.
+  requestKeyRelease: (listingId: string) =>
+    withSession((token) =>
+      apiRequest<KeyReleaseResponse>(`/api/v1/datasets/${listingId}/key`, {
+        method: "POST",
+        headers: authHeaders(token),
+      }),
+    ),
+
+  getMyPurchases: () =>
+    withSession((token) =>
+      apiRequest<PurchasedListing[]>("/api/v1/me/purchases", {
+        headers: authHeaders(token),
+      }),
+    ),
+
+  getMyListings: () =>
+    withSession((token) =>
+      apiRequest<SellerListing[]>("/api/v1/me/listings", {
+        headers: authHeaders(token),
+      }),
+    ),
+
+  checkAccess: (listingId: string, payload: WalletAccessRequest) =>
+    apiRequest<AccessCheckResponse>(
+      `/api/v1/contract/access/${listingId}/check`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    ),
+
+  getDatasetPreview: (listingId: string) =>
+    apiRequest<{ column_names: string[]; rows: string[][] }>(
+      `/api/v1/datasets/${listingId}/preview`,
+    ),
+
+  similaritySearch: async (
+    payload: SimilaritySearchRequest,
+  ): Promise<{ query: string; results: CardViewModel[]; count: number }> => {
+    const response = await apiRequest<SimilaritySearchResponse>(
+      "/api/v1/ai/similarity-search",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+    return {
+      query: response.query,
+      count: response.count,
+      results: response.results.map((r) => ({
+        dataset: {
+          id: uuidToBytes32(r.listing_id),
+          title: r.title,
+          description: r.description,
+          payment_token: r.payment_token,
+          price_atomic: String(r.price_atomic),
+          settlement_currency: r.settlement_currency,
+          settlement_decimals: r.settlement_decimals,
+          purchase_count: r.purchase_count,
+        },
+        score: r.score,
+        scoreLabel: r.score_label,
+      })),
+    };
+  },
+
+  getPurchasedItemsByWallet: async (payload: PurchasedItemsRequest) => {
+    const response = await apiRequest<PurchasedItemsResponse>(
+      "/api/v1/contract/purchases/by-wallet",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      },
+    );
+    return {
+      ...response,
+      items: response.items.map((item) =>
+        normalizeMarketplaceItem(item as MarketplaceApiItem),
+      ),
+    };
+  },
+
+  // Agent endpoints
+  getAgents: (params?: {
+    search?: string;
+    tag?: string;
+    status?: string;
+    offset?: number;
+    limit?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.search) searchParams.set("search", params.search);
+    if (params?.tag) searchParams.set("tag", params.tag);
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.offset !== undefined)
+      searchParams.set("offset", String(params.offset));
+    if (params?.limit !== undefined)
+      searchParams.set("limit", String(params.limit));
+    const qs = searchParams.toString();
+    return apiRequest<AgentListResponse>(`/api/v1/agents${qs ? "?" + qs : ""}`);
+  },
+
+  getAgent: (handle: string) => apiRequest<Agent>(`/api/v1/agents/${handle}`),
+
+  getAgentRecommendations: (
+    handle: string,
+    params?: { offset?: number; limit?: number },
+  ) => {
+    const searchParams = new URLSearchParams();
+    if (params?.offset !== undefined)
+      searchParams.set("offset", String(params.offset));
+    if (params?.limit !== undefined)
+      searchParams.set("limit", String(params.limit));
+    const qs = searchParams.toString();
+    return apiRequest<RecommendationListResponse>(
+      `/api/v1/agents/${handle}/recommendations${qs ? "?" + qs : ""}`,
+    );
+  },
+
+  getRecommendationsForListing: (listingId: string) =>
+    apiRequest<RecommendationListResponse>(
+      `/api/v1/recommendations/by-listing/${listingId}`,
+    ),
+
+  getPurchaseRequests: (params?: {
+    status?: string;
+    offset?: number;
+    limit?: number;
+  }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.status) searchParams.set("status", params.status);
+    if (params?.offset !== undefined)
+      searchParams.set("offset", String(params.offset));
+    if (params?.limit !== undefined)
+      searchParams.set("limit", String(params.limit));
+    const qs = searchParams.toString();
+    return apiRequest<PurchaseRequestListResponse>(
+      `/api/v1/purchase-requests${qs ? "?" + qs : ""}`,
+    );
+  },
+
+  // Only the request's requester wallet may review; the API records the
+  // reviewer from the session token, so the body carries just the decision.
+  reviewPurchaseRequest: (
+    requestId: string,
+    payload: { status: "approved" | "rejected" },
+  ) =>
+    withSession((token) =>
+      apiRequest<PurchaseRequest>(
+        `/api/v1/purchase-requests/${requestId}/review`,
+        {
+          method: "POST",
+          headers: authHeaders(token),
+          body: JSON.stringify({ status: payload.status }),
+        },
+      ),
+    ),
+};
+
+type Backend = typeof realBackend;
+
+export const backend: Backend =
+  import.meta.env.VITE_MOCK === "true" ? mockBackend : realBackend;
