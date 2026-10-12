@@ -2,6 +2,7 @@ import uuid
 from datetime import datetime, timezone
 
 import pytest
+from eth_account import Account
 
 from app.agents.models import Agent, AgentPurchaseRequest, AgentRecommendation
 from app.agents import router as agent_router
@@ -389,9 +390,38 @@ def test_submit_purchase_request_returns_created_request(client, monkeypatch):
     assert captured["args"] == {
         "agent_id": agent.id,
         "listing_id": "listing-9",
-        "requester_address": "0x00000000000000000000000000000000000000ab",
+        # Stored in EIP-55 checksum form.
+        "requester_address": "0x00000000000000000000000000000000000000AB",
         "reason": "Need benchmark data",
     }
+
+
+def test_submit_purchase_request_rejects_invalid_requester_address(
+    client, monkeypatch
+):
+    monkeypatch.setattr(
+        agent_router,
+        "get_agent_by_handle",
+        lambda session, handle: make_agent(handle),
+    )
+    monkeypatch.setattr(
+        agent_router,
+        "create_purchase_request",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("create_purchase_request should not be called")
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/agents/buyer-bot/purchase-requests",
+        json={
+            "listing_id": "listing-9",
+            "requester_address": "not-an-address",
+            "reason": "Need benchmark data",
+        },
+    )
+
+    assert response.status_code == 422
 
 
 def test_list_agent_purchase_requests_returns_filtered_requests(client, monkeypatch):
@@ -465,51 +495,151 @@ def test_list_all_purchase_requests_defaults_to_pending(client, monkeypatch):
     }
 
 
-def test_review_purchase_request_returns_reviewed_request(client, monkeypatch):
-    pending = make_purchase_request(uuid.uuid4(), listing_id="listing-7")
-    reviewed = make_purchase_request(
-        pending.agent_id,
-        listing_id="listing-7",
-        id=pending.id,
-        status="approved",
-        reviewed_by="0x00000000000000000000000000000000000000ff",
-        reviewed_at=datetime(2024, 3, 2, tzinfo=timezone.utc),
-        updated_at=datetime(2024, 3, 2, tzinfo=timezone.utc),
+REQUESTER = Account.create().address
+STRANGER = Account.create().address
+
+
+@pytest.fixture
+def pending_request(db_session):
+    """A pending purchase request persisted in the test database.
+
+    requester_address is stored lowercase to prove the ownership check is
+    case-insensitive against the checksummed address in the token.
+    """
+    agent = make_agent("buyer-bot")
+    db_session.add(agent)
+    db_session.commit()
+    req = make_purchase_request(
+        agent.id, listing_id="listing-7", requester_address=REQUESTER.lower()
     )
-    captured = {}
+    db_session.add(req)
+    db_session.commit()
+    db_session.refresh(req)
+    return req
 
-    monkeypatch.setattr(
-        agent_router,
-        "get_purchase_request_by_id",
-        lambda session, request_id: pending,
+
+def _review(client, request_id, status="approved", headers=None, **extra):
+    return client.post(
+        f"/api/v1/purchase-requests/{request_id}/review",
+        json={"status": status, **extra},
+        headers=headers or {},
     )
 
-    def fake_review(session, req, status, reviewed_by):
-        captured["args"] = {
-            "req": req,
-            "status": status,
-            "reviewed_by": reviewed_by,
-        }
-        return reviewed
 
-    monkeypatch.setattr(agent_router, "review_purchase_request_repo", fake_review)
+def test_review_without_token_returns_401(client, db_session, pending_request):
+    response = _review(client, pending_request.id)
 
-    response = client.post(
-        f"/api/v1/purchase-requests/{pending.id}/review",
-        json={
-            "status": "approved",
-            "reviewed_by": "0x00000000000000000000000000000000000000ff",
-        },
+    assert response.status_code == 401
+    assert response.json()["error"] == "unauthorized"
+    db_session.refresh(pending_request)
+    assert pending_request.status == "pending"
+    assert pending_request.reviewed_by is None
+
+
+def test_review_with_admin_scope_token_returns_401(
+    client, db_session, pending_request, auth_headers
+):
+    response = _review(
+        client, pending_request.id, headers=auth_headers(REQUESTER, scope="admin")
+    )
+
+    assert response.status_code == 401
+    db_session.refresh(pending_request)
+    assert pending_request.status == "pending"
+
+
+def test_review_by_other_wallet_returns_403(
+    client, db_session, pending_request, auth_headers
+):
+    response = _review(
+        client,
+        pending_request.id,
+        headers=auth_headers(STRANGER),
+        # A forged reviewed_by naming the requester must not help.
+        reviewed_by=REQUESTER,
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "forbidden"
+    db_session.refresh(pending_request)
+    assert pending_request.status == "pending"
+    assert pending_request.reviewed_by is None
+
+
+@pytest.mark.parametrize("decision", ["approved", "rejected"])
+def test_review_by_requester_records_token_wallet(
+    client, db_session, pending_request, auth_headers, decision
+):
+    response = _review(
+        client,
+        pending_request.id,
+        status=decision,
+        headers=auth_headers(REQUESTER),
+        # Older clients still send reviewed_by; it is ignored.
+        reviewed_by=STRANGER,
     )
 
     assert response.status_code == 200
-    assert response.json()["id"] == str(pending.id)
-    assert response.json()["status"] == "approved"
-    assert (
-        response.json()["reviewed_by"] == "0x00000000000000000000000000000000000000ff"
+    body = response.json()
+    assert body["id"] == str(pending_request.id)
+    assert body["status"] == decision
+    assert body["reviewed_by"] == REQUESTER
+    assert body["reviewed_at"] is not None
+    db_session.refresh(pending_request)
+    assert pending_request.status == decision
+    assert pending_request.reviewed_by == REQUESTER
+
+
+def test_second_review_returns_409_and_keeps_first_decision(
+    client, db_session, pending_request, auth_headers
+):
+    headers = auth_headers(REQUESTER)
+    first = _review(client, pending_request.id, status="approved", headers=headers)
+    second = _review(client, pending_request.id, status="rejected", headers=headers)
+
+    assert first.status_code == 200
+    assert second.status_code == 409
+    assert second.json()["error"] == "already_reviewed"
+    assert second.json()["details"] == {"status": "approved"}
+    db_session.refresh(pending_request)
+    assert pending_request.status == "approved"
+
+
+def test_review_missing_request_returns_404(client, auth_headers):
+    response = _review(client, uuid.uuid4(), headers=auth_headers(REQUESTER))
+
+    assert response.status_code == 404
+
+
+def test_review_rejects_unknown_status(client, pending_request, auth_headers):
+    response = _review(
+        client, pending_request.id, status="completed", headers=auth_headers(REQUESTER)
     )
-    assert captured["args"]["req"].id == pending.id
-    assert captured["args"]["status"] == "approved"
-    assert (
-        captured["args"]["reviewed_by"] == "0x00000000000000000000000000000000000000ff"
+
+    assert response.status_code == 422
+
+
+def test_review_returns_409_when_concurrent_review_wins(
+    client, pending_request, auth_headers, monkeypatch
+):
+    # The route saw "pending", but the conditional UPDATE matched no row.
+    monkeypatch.setattr(
+        agent_router,
+        "review_purchase_request_repo",
+        lambda session, req, status, reviewed_by: None,
     )
+
+    response = _review(client, pending_request.id, headers=auth_headers(REQUESTER))
+
+    assert response.status_code == 409
+    assert response.json()["error"] == "already_reviewed"
+
+
+def test_review_route_documents_auth_errors(client):
+    schema = client.get("/openapi.json").json()
+    review = schema["paths"]["/api/v1/purchase-requests/{request_id}/review"]["post"]
+    body_ref = review["requestBody"]["content"]["application/json"]["schema"]["$ref"]
+    body_schema = schema["components"]["schemas"][body_ref.rsplit("/", 1)[-1]]
+
+    assert {"401", "403", "404", "409"} <= set(review["responses"])
+    assert "reviewed_by" not in body_schema["properties"]

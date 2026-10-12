@@ -38,7 +38,8 @@ export type SessionDeps = {
   now?(): number;
 };
 
-function sameAddress(a: string, b: string): boolean {
+/** EVM addresses compare case-insensitively (mixed case is only a checksum). */
+export function sameAddress(a: string, b: string): boolean {
   return a.toLowerCase() === b.toLowerCase();
 }
 

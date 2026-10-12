@@ -369,3 +369,28 @@ def test_expires_at_is_indexed():
         for index in AuthNonce.__table__.indexes
     }
     assert ("expires_at",) in indexed
+
+
+def test_same_evm_address_ignores_case():
+    address = Account.create().address
+
+    assert auth_service.same_evm_address(address, address.lower())
+    assert auth_service.same_evm_address(address.lower(), address)
+    assert auth_service.same_evm_address("0x" + address[2:].upper(), address)
+
+
+@pytest.mark.parametrize(
+    "a, b",
+    [
+        (
+            "0x0000000000000000000000000000000000000001",
+            "0x0000000000000000000000000000000000000002",
+        ),
+        ("not-an-address", "not-an-address"),
+        ("", ""),
+        (None, None),
+        ("0x0000000000000000000000000000000000000001", None),
+    ],
+)
+def test_same_evm_address_rejects_mismatch_and_invalid(a, b):
+    assert not auth_service.same_evm_address(a, b)
