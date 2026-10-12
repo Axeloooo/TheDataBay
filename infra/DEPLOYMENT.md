@@ -90,6 +90,16 @@ export CADC_TOKEN_ADDRESS="<CADC_TOKEN_ADDRESS>"
 export CONTRACT_ABI_PATH="/code/app/contracts/Marketplace.json"
 export CHAIN_ID="84532"
 export RPC_URL="https://sepolia.base.org"
+export AUTH_JWT_SECRET="<GENERATED_SECRET>"   # see "Generate AUTH_JWT_SECRET" below
+export AUTH_DOMAIN="thedatabay.com"           # web host users visit, no scheme
+export AUTH_TOKEN_TTL_SECONDS="3600"
+export AUTH_ADMIN_TOKEN_TTL_SECONDS="300"
+export AUTH_NONCE_TTL_SECONDS="300"
+export INDEXER_ENABLED="true"
+export INDEXER_START_BLOCK="<MARKETPLACE_DEPLOY_BLOCK>"
+export INDEXER_BLOCK_CHUNK="2000"
+export INDEXER_CONFIRMATIONS="2"
+export INDEXER_POLL_SECONDS="5"
 ```
 
 Provision AKS, ACR, Key Vault, VNet, and DNS:
@@ -152,32 +162,47 @@ set_secret CADC-TOKEN-ADDRESS "$CADC_TOKEN_ADDRESS"
 set_secret CONTRACT-ABI-PATH "$CONTRACT_ABI_PATH"
 set_secret CHAIN-ID "$CHAIN_ID"
 set_secret RPC-URL "$RPC_URL"
+set_secret AUTH-JWT-SECRET "$AUTH_JWT_SECRET"
+set_secret AUTH-DOMAIN "$AUTH_DOMAIN"
+set_secret AUTH-TOKEN-TTL-SECONDS "$AUTH_TOKEN_TTL_SECONDS"
+set_secret AUTH-ADMIN-TOKEN-TTL-SECONDS "$AUTH_ADMIN_TOKEN_TTL_SECONDS"
+set_secret AUTH-NONCE-TTL-SECONDS "$AUTH_NONCE_TTL_SECONDS"
+set_secret INDEXER-ENABLED "$INDEXER_ENABLED"
+set_secret INDEXER-START-BLOCK "$INDEXER_START_BLOCK"
+set_secret INDEXER-BLOCK-CHUNK "$INDEXER_BLOCK_CHUNK"
+set_secret INDEXER-CONFIRMATIONS "$INDEXER_CONFIRMATIONS"
+set_secret INDEXER-POLL-SECONDS "$INDEXER_POLL_SECONDS"
 ```
 
-### Wallet sign-in secret (`AUTH_JWT_SECRET`)
+### Generate AUTH_JWT_SECRET
 
 The API signs short-lived bearer tokens (HS256) for dataset key release and
 owner-only admin routes. Without `AUTH_JWT_SECRET` (or with one shorter than 32
-characters) sign-in and every protected route return `503`, so add it before
-deploying a backend image that includes wallet sign-in:
+characters) sign-in and every protected route return `503`.
 
 ```bash
-set_secret AUTH-JWT-SECRET "$(python3 -c 'import secrets; print(secrets.token_urlsafe(48))')"
+openssl rand -base64 48
 ```
 
-Then expose it to the backend: add an `AUTH-JWT-SECRET` object to
-`infra/k8s/production/secret-provider-class.yaml` (both the `objects` list and
-the synced secret's `data` keys) and an `AUTH_JWT_SECRET` env entry in
-`backend-deployment.yaml`, following the existing `SERVER-PRIVATE-KEY` /
-`SERVER_PRIVATE_KEY` entries.
-Add the object only after the Key Vault secret exists, or the CSI mount fails
-and pods will not start. Rotating the secret signs every user out; they sign in
-again on their next download. Optional overrides: `AUTH_TOKEN_TTL_SECONDS`
-(default 3600, 60 to 86400), `AUTH_ADMIN_TOKEN_TTL_SECONDS` (default 300, 30 to
-300), `AUTH_NONCE_TTL_SECONDS` (default 300, 30 to 900) and `AUTH_DOMAIN`
-(default `thedatabay.com`). `AUTH_DOMAIN` must equal the web app host: it is
-shown in the message users sign, checked by the clients before signing, and
-bound into the token audience, so give each environment its own value.
+- It must be 32+ characters.
+- Never reuse it across environments, and never commit it.
+- Rotating it signs every user out; they sign in again on their next download.
+
+`AUTH_DOMAIN` must exactly equal the web host users visit (for example
+`thedatabay.com`, no scheme). It is shown in the message users sign, checked by
+the clients before signing, and bound into the token audience, so give each
+environment its own value.
+
+`INDEXER_START_BLOCK` should be the block where the Marketplace contract was
+deployed on Base Sepolia; listings created before it never appear in indexed
+reads.
+
+All of these secrets are wired into `secret-provider-class.yaml` and
+`backend-deployment.yaml`. Create them in Key Vault before applying the
+manifests, or the CSI mount fails and pods will not start. Defaults and ranges:
+`AUTH_TOKEN_TTL_SECONDS` 3600 (60 to 86400), `AUTH_ADMIN_TOKEN_TTL_SECONDS` 300
+(30 to 300), `AUTH_NONCE_TTL_SECONDS` 300 (30 to 900), `INDEXER_BLOCK_CHUNK`
+2000, `INDEXER_CONFIRMATIONS` 2, `INDEXER_POLL_SECONDS` 5.
 
 Owner-only contract routes need an admin-scope token (`scope: "admin"` on
 `/api/v1/auth/nonce` and `/api/v1/auth/verify`), valid for at most 5 minutes.
