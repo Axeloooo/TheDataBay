@@ -35,7 +35,9 @@ spec:
 # Rate-limits wallet sign-in at the edge. limit-rps annotations apply to a whole
 # Ingress, so this is a separate resource that only owns /api/v1/auth; nginx
 # picks the longest matching path, so every other /api/v1 route keeps using
-# thedatabay-ingress above. TLS reuses the same secret (cert-manager issues it
+# thedatabay-ingress above. nginx rejects over-limit requests with 503 unless the
+# controller ConfigMap sets limit-req-status-code and limit-conn-status-code to
+# "429" (see infra/DEPLOYMENT.md). TLS reuses the same secret (cert-manager issues it
 # from thedatabay-ingress, so no issuer annotation here).
 apiVersion: networking.k8s.io/v1
 kind: Ingress

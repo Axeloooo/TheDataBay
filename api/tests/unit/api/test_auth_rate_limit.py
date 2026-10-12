@@ -60,6 +60,22 @@ def test_nonce_limit_resets_after_window(client_factory, clock):
     assert blocked.headers["Retry-After"] == "10"
 
 
+def test_one_ip_cannot_exhaust_another_ips_bucket_for_same_address(
+    client_factory, clock
+):
+    address = Account.create().address
+    with client_factory(
+        AUTH_NONCE_RATE_LIMIT_PER_MINUTE=100,
+        AUTH_NONCE_ADDRESS_RATE_LIMIT_PER_MINUTE=1,
+        AUTH_TRUSTED_PROXY_HOPS=1,
+    ) as client:
+        attacker = {"X-Forwarded-For": "6.6.6.6"}
+        victim = {"X-Forwarded-For": "7.7.7.7"}
+        assert _nonce(client, address, headers=attacker).status_code == 200
+        assert _nonce(client, address, headers=attacker).status_code == 429
+        assert _nonce(client, address, headers=victim).status_code == 200
+
+
 def test_nonce_per_address_limit_is_independent_of_other_addresses(
     client_factory, clock
 ):
