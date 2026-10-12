@@ -7,6 +7,8 @@ from typing import List, Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic_core import PydanticCustomError
+from web3 import Web3
 
 
 class AgentCreateRequest(BaseModel):
@@ -157,21 +159,41 @@ class PurchaseRequestCreate(BaseModel):
     """Request model for creating a purchase request."""
 
     listing_id: str = Field(..., description="ID of the listing to request")
-    requester_address: str = Field(..., description="Ethereum address of the requester")
+    requester_address: str = Field(
+        ...,
+        description=(
+            "EVM address of the human buyer who will pay. Only this wallet can "
+            "approve or reject the request."
+        ),
+    )
     reason: str = Field(
         ..., max_length=500, description="Reason for the purchase request"
     )
 
+    @field_validator("requester_address")
+    @classmethod
+    def checksum_requester_address(cls, v: str) -> str:
+        if not Web3.is_address(v):
+            # PydanticCustomError keeps the 422 body JSON-serializable (a
+            # ValueError would land in the error ctx as an exception object).
+            raise PydanticCustomError(
+                "evm_address", "requester_address must be a valid EVM address"
+            )
+        return Web3.to_checksum_address(v)
+
 
 class PurchaseRequestReview(BaseModel):
-    """Request model for reviewing a purchase request."""
+    """Request model for reviewing a purchase request.
+
+    The reviewer is the wallet proven by the bearer token. A ``reviewed_by``
+    field sent by older clients is ignored.
+    """
 
     status: str = Field(
         ...,
         description="Review status (must be 'approved' or 'rejected')",
         pattern="^(approved|rejected)$",
     )
-    reviewed_by: str = Field(..., description="Ethereum address of the reviewer")
 
 
 class PurchaseRequestResponse(BaseModel):

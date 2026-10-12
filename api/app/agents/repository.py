@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from sqlalchemy import update
 from sqlmodel import Session, select, func, or_, col
 
 from .models import Agent, AgentRecommendation, AgentPurchaseRequest
@@ -388,8 +389,11 @@ def review_purchase_request(
     req: AgentPurchaseRequest,
     status: str,
     reviewed_by: str,
-) -> AgentPurchaseRequest:
-    """Update a purchase request with a review decision.
+) -> Optional[AgentPurchaseRequest]:
+    """Record a review decision on a pending purchase request.
+
+    The update is a single conditional ``UPDATE ... WHERE status = 'pending'``
+    so two concurrent reviews cannot both succeed.
 
     Args:
         session: Database session
@@ -398,14 +402,25 @@ def review_purchase_request(
         reviewed_by: Wallet address of the reviewer
 
     Returns:
-        AgentPurchaseRequest: The reviewed record
+        Optional[AgentPurchaseRequest]: The reviewed record, or None when the
+        request was no longer pending (already reviewed).
     """
     now = datetime.now(timezone.utc)
-    req.status = status
-    req.reviewed_by = reviewed_by
-    req.reviewed_at = now
-    req.updated_at = now
-    session.add(req)
+    result = session.execute(
+        update(AgentPurchaseRequest)
+        .where(
+            AgentPurchaseRequest.id == req.id,
+            AgentPurchaseRequest.status == "pending",
+        )
+        .values(
+            status=status,
+            reviewed_by=reviewed_by,
+            reviewed_at=now,
+            updated_at=now,
+        )
+    )
     session.commit()
     session.refresh(req)
+    if result.rowcount != 1:
+        return None
     return req

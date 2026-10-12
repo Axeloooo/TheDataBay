@@ -314,3 +314,37 @@ def test_purchase_request_create_list_get_and_review_persist(db_engine, monkeypa
         assert persisted.reviewed_by == "0x00000000000000000000000000000000000000aa"
         assert persisted.reviewed_at == datetime(2024, 3, 2)
         assert agent_repo.get_purchase_request_by_id(session, uuid.uuid4()) is None
+
+
+def test_review_purchase_request_only_updates_pending_requests(db_engine):
+    with Session(db_engine) as session:
+        agent = agent_repo.create_agent(session, make_create_request("review-agent"))
+        request = agent_repo.create_purchase_request(
+            session,
+            agent_id=agent.id,
+            listing_id="listing-11",
+            requester_address="0x0000000000000000000000000000000000000011",
+            reason="Need data",
+        )
+
+        first = agent_repo.review_purchase_request(
+            session,
+            request,
+            status="rejected",
+            reviewed_by="0x0000000000000000000000000000000000000011",
+        )
+        second = agent_repo.review_purchase_request(
+            session,
+            request,
+            status="approved",
+            reviewed_by="0x00000000000000000000000000000000000000ff",
+        )
+
+    assert first is not None
+    assert first.status == "rejected"
+    assert second is None
+
+    with Session(db_engine) as session:
+        persisted = agent_repo.get_purchase_request_by_id(session, request.id)
+        assert persisted.status == "rejected"
+        assert persisted.reviewed_by == "0x0000000000000000000000000000000000000011"

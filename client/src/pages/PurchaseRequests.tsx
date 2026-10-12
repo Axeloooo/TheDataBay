@@ -38,10 +38,7 @@ function PurchaseRequests() {
 
   const handleApprove = async (id: string) => {
     try {
-      await backend.reviewPurchaseRequest(id, {
-        status: "approved",
-        reviewed_by: address ?? "unknown",
-      });
+      await backend.reviewPurchaseRequest(id, { status: "approved" });
       loadPurchaseRequests(statusFilter === "all" ? undefined : statusFilter);
     } catch (err) {
       const message =
@@ -52,10 +49,7 @@ function PurchaseRequests() {
 
   const handleReject = async (id: string) => {
     try {
-      await backend.reviewPurchaseRequest(id, {
-        status: "rejected",
-        reviewed_by: address ?? "unknown",
-      });
+      await backend.reviewPurchaseRequest(id, { status: "rejected" });
       loadPurchaseRequests(statusFilter === "all" ? undefined : statusFilter);
     } catch (err) {
       const message =
@@ -72,7 +66,8 @@ function PurchaseRequests() {
           <div>
             <h1 className="text-2xl font-bold">Purchase Requests</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              Review and approve AI agent purchase requests
+              Review AI agent purchase requests. Only the wallet a request
+              names as its buyer can approve or reject it.
             </p>
           </div>
 

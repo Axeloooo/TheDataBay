@@ -9,6 +9,8 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session
 
+from ..auth.dependencies import AuthedWallet, current_wallet
+from ..auth.service import same_evm_address
 from ..database.engine import get_session
 from .repository import (
     create_agent,
@@ -28,6 +30,7 @@ from .service import (
     generate_recommendation as generate_recommendation_service,
 )
 from ..ai.service import AIService, get_ai_service
+from ..shared.errors import ApiError, ErrorResponse
 from ..shared.rate_limiter import agent_write_rate_limiter
 from .schemas import (
     AgentCreateRequest,
@@ -335,18 +338,45 @@ def list_all_purchase_requests(
     return PurchaseRequestListResponse(requests=reqs, count=len(reqs), total=total)
 
 
-@purchase_router.post("/{request_id}/review", response_model=PurchaseRequestResponse)
+_REVIEW_ERROR_RESPONSES = {
+    401: {"model": ErrorResponse, "description": "Missing or invalid bearer token"},
+    403: {
+        "model": ErrorResponse,
+        "description": "Signed-in wallet is not the request's requester_address",
+    },
+    404: {"description": "Purchase request not found"},
+    409: {"model": ErrorResponse, "description": "Request was already reviewed"},
+}
+
+
+@purchase_router.post(
+    "/{request_id}/review",
+    response_model=PurchaseRequestResponse,
+    responses=_REVIEW_ERROR_RESPONSES,
+)
 def review_purchase_request_route(
     request_id: uuid.UUID,
     data: PurchaseRequestReview,
+    wallet: AuthedWallet = Depends(current_wallet),
     session: Session = Depends(get_session),
 ):
     """Review (approve or reject) a purchase request.
 
+    Requires a user-scope bearer token. Only the wallet named in the request's
+    ``requester_address`` (the buyer who would pay) may review it, and only
+    while it is pending. ``reviewed_by`` is recorded from the token; any value
+    in the body is ignored.
+
     Args:
         request_id (uuid.UUID): Purchase request UUID.
         data (PurchaseRequestReview): Review decision payload.
+        wallet (AuthedWallet): Wallet proven by the bearer token.
         session (Session): Database session.
+
+    Raises:
+        ApiError: 401 without a valid token, 403 when the wallet is not the
+            requester, 409 when the request is no longer pending.
+        HTTPException: 404 when the request does not exist.
 
     Returns:
         PurchaseRequestResponse: Updated purchase request.
@@ -354,7 +384,37 @@ def review_purchase_request_route(
     req = get_purchase_request_by_id(session, request_id)
     if not req:
         raise HTTPException(status_code=404, detail="Purchase request not found")
-    return review_purchase_request_repo(session, req, data.status, data.reviewed_by)
+    if not same_evm_address(req.requester_address, wallet.address):
+        logger.warning(
+            "purchase_requests.review forbidden request_id=%s", request_id
+        )
+        raise ApiError(
+            status_code=403,
+            error="forbidden",
+            message="Only the requesting wallet can review this purchase request.",
+        )
+    if req.status != "pending":
+        raise ApiError(
+            status_code=409,
+            error="already_reviewed",
+            message="This purchase request has already been reviewed.",
+            details={"status": req.status},
+        )
+    reviewed = review_purchase_request_repo(
+        session, req, data.status, wallet.address
+    )
+    if reviewed is None:
+        # Lost a race with a concurrent review of the same request.
+        raise ApiError(
+            status_code=409,
+            error="already_reviewed",
+            message="This purchase request has already been reviewed.",
+            details={"status": req.status},
+        )
+    logger.info(
+        "purchase_requests.review request_id=%s status=%s", request_id, data.status
+    )
+    return reviewed
 
 
 # ---------------------------------------------------------------------------

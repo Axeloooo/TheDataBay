@@ -485,7 +485,7 @@ POST /api/v1/agents/{handle}/purchase-requests
 
 **What is `requester_address`?**
 
-This is the EVM wallet address of the human user on whose behalf the agent is acting — typically the buyer's MetaMask address. This value is obtained out-of-band (from a session context, configuration file, or explicit user input) and is not managed by the agent itself. When an operator approves the request, this is the wallet that should execute the on-chain `buy()` transaction.
+This is the EVM wallet address of the human user on whose behalf the agent is acting — typically the buyer's MetaMask address. This value is obtained out-of-band (from a session context, configuration file, or explicit user input) and is not managed by the agent itself. It must be a valid EVM address (otherwise `422`) and is stored in EIP-55 checksum form. **Only this wallet can approve or reject the request**, and it is the wallet that executes the on-chain `buy()` transaction after approval.
 
 **Example**
 
@@ -563,27 +563,40 @@ curl "http://localhost:8080/api/v1/purchase-requests?offset=0&limit=50"
 
 ```
 POST /api/v1/purchase-requests/{request_id}/review
+Authorization: Bearer <user-scope token from POST /api/v1/auth/verify>
 ```
+
+**Who can review:** only the wallet named in the request's `requester_address` — the buyer whose funds the agent proposes to spend. The reviewer is taken from the bearer token (wallet sign-in), compared case-insensitively against `requester_address`, and recorded as `reviewed_by`. The agent's `owner_address` does **not** grant review rights: it is self-declared on agent registration and cannot consent to spending another wallet's funds.
 
 **Request fields**
 
-| Field         | Type   | Required | Constraints                           |
-|---------------|--------|----------|---------------------------------------|
-| `status`      | string | Yes      | Must be `"approved"` or `"rejected"`  |
-| `reviewed_by` | string | Yes      | EVM address of the reviewing operator |
+| Field    | Type   | Required | Constraints                          |
+|----------|--------|----------|--------------------------------------|
+| `status` | string | Yes      | Must be `"approved"` or `"rejected"` |
+
+`reviewed_by` is no longer part of the request body. Older clients that still send it are not rejected; the value is ignored.
 
 The `status` field is validated against the pattern `^(approved|rejected)$`. Any other value returns `422 Unprocessable Entity`.
+
+**Errors**
+
+| Status | `error`            | When                                                          |
+|--------|--------------------|---------------------------------------------------------------|
+| 401    | `unauthorized`     | Missing, malformed, expired or admin-scope token              |
+| 403    | `forbidden`        | The signed-in wallet is not the request's `requester_address` |
+| 404    | —                  | No purchase request with that id                              |
+| 409    | `already_reviewed` | The request is no longer `pending` (decisions are final)      |
+
+The status change is a single conditional update on `status = 'pending'`, so two concurrent reviews cannot both succeed; the loser gets `409`.
 
 **Example — approve**
 
 ```bash
 curl -X POST \
   http://localhost:8080/api/v1/purchase-requests/c3d4e5f6-a7b8-9012-cdef-123456789012/review \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "status": "approved",
-    "reviewed_by": "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-  }'
+  -d '{ "status": "approved" }'
 ```
 
 **Example — reject**
@@ -591,11 +604,9 @@ curl -X POST \
 ```bash
 curl -X POST \
   http://localhost:8080/api/v1/purchase-requests/c3d4e5f6-a7b8-9012-cdef-123456789012/review \
+  -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "status": "rejected",
-    "reviewed_by": "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-  }'
+  -d '{ "status": "rejected" }'
 ```
 
 **Response — 200 OK**
@@ -609,7 +620,7 @@ curl -X POST \
   "status": "approved",
   "reason": "Need this dataset for our Q2 churn prediction pipeline. High confidence match (0.87).",
   "reviewed_at": "2026-03-24T11:30:00Z",
-  "reviewed_by": "0xAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+  "reviewed_by": "0x9999999999999999999999999999999999999999",
   "created_at": "2026-03-24T11:05:00Z",
   "updated_at": "2026-03-24T11:30:00Z"
 }
@@ -731,17 +742,19 @@ The page displays avatar (or a bot icon fallback), display name, `AgentBadge` sh
 
 The `PurchaseRequests` page lists all purchase requests across all agents. It provides a status dropdown (`all`, `pending`, `approved`, `rejected`) and calls `loadPurchaseRequests(status)` from the Zustand store when the filter changes.
 
-Each request is rendered as a `PurchaseRequestCard`. Approve and Reject action buttons are only shown when the viewing user has a connected wallet. This is controlled by reading `address` from `walletStore` and passing it as `connectedAddress` to the card:
+Each request is rendered as a `PurchaseRequestCard`. Approve and Reject action buttons are only shown to the wallet the request names as its buyer. The page reads `address` from `walletStore` and passes it as `connectedAddress` to the card:
 
 ```typescript
 // In PurchaseRequests.tsx
 const address = useWalletStore((state) => state.address);
 
 // In PurchaseRequestCard
-const canReview = request.status === "pending" && !!connectedAddress;
+const isRequester =
+  !!connectedAddress && sameAddress(request.requester_address, connectedAddress);
+const canReview = request.status === "pending" && isRequester;
 ```
 
-The Approve/Reject buttons call the `onApprove` and `onReject` callbacks only when `canReview` is `true` — the request must be `pending` and the viewer must have a connected wallet address.
+Other connected wallets see "Only the requesting wallet can review this request." instead of the buttons. Hiding the buttons is a convenience only; the API enforces the rule. `backend.reviewPurchaseRequest(id, { status })` runs inside `withSession`, so the first review prompts a wallet sign-in and the request carries the session's bearer token.
 
 ### Dataset Detail Page — DatasetRecommendations Component
 

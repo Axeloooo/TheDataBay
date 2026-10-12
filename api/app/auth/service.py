@@ -150,6 +150,20 @@ def normalize_evm_address(address: str) -> str:
     return Web3.to_checksum_address(address)
 
 
+def same_evm_address(a: str | None, b: str | None) -> bool:
+    """Return True when both values are the same EVM address, ignoring case.
+
+    EVM addresses are case-insensitive (mixed case is only an EIP-55
+    checksum), so a stored lowercase address matches the checksummed address
+    carried by a token. Anything that is not a 20-byte hex address never
+    matches.
+    """
+    if not isinstance(a, str) or not isinstance(b, str):
+        return False
+    a_lower, b_lower = a.lower(), b.lower()
+    return Web3.is_address(a_lower) and a_lower == b_lower
+
+
 def build_sign_in_message(
     *,
     scope: AuthScope = AuthScope.USER,

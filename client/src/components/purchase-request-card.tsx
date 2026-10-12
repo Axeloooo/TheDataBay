@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Clock } from "lucide-react";
 import type { PurchaseRequest } from "@/types/agent";
 import { cn } from "@/lib/utils";
+import { sameAddress } from "@/lib/auth";
 
 interface PurchaseRequestCardProps {
   request: PurchaseRequest;
@@ -39,7 +40,11 @@ export function PurchaseRequestCard({
 }: PurchaseRequestCardProps) {
   const config = STATUS_CONFIG[request.status];
   const StatusIcon = config.icon;
-  const canReview = request.status === "pending" && !!connectedAddress;
+  // The API only lets the requester wallet (the buyer who would pay) review.
+  const isRequester =
+    !!connectedAddress &&
+    sameAddress(request.requester_address, connectedAddress);
+  const canReview = request.status === "pending" && isRequester;
 
   return (
     <div
@@ -75,6 +80,12 @@ export function PurchaseRequestCard({
           <span className="font-mono">
             {request.reviewed_by.slice(0, 10)}...{request.reviewed_by.slice(-6)}
           </span>
+        </p>
+      )}
+
+      {request.status === "pending" && !!connectedAddress && !isRequester && (
+        <p className="text-xs text-muted-foreground mt-2">
+          Only the requesting wallet can review this request.
         </p>
       )}
 

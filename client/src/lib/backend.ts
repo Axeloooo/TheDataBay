@@ -271,16 +271,21 @@ const realBackend = {
     );
   },
 
+  // Only the request's requester wallet may review; the API records the
+  // reviewer from the session token, so the body carries just the decision.
   reviewPurchaseRequest: (
     requestId: string,
-    payload: { status: "approved" | "rejected"; reviewed_by: string },
+    payload: { status: "approved" | "rejected" },
   ) =>
-    apiRequest<PurchaseRequest>(
-      `/api/v1/purchase-requests/${requestId}/review`,
-      {
-        method: "POST",
-        body: JSON.stringify(payload),
-      },
+    withSession((token) =>
+      apiRequest<PurchaseRequest>(
+        `/api/v1/purchase-requests/${requestId}/review`,
+        {
+          method: "POST",
+          headers: authHeaders(token),
+          body: JSON.stringify({ status: payload.status }),
+        },
+      ),
     ),
 };
 
