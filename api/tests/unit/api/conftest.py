@@ -122,6 +122,15 @@ def auth_headers() -> Callable[..., dict[str, str]]:
 
 
 @pytest.fixture(autouse=True)
+def reset_auth_rate_limits() -> Generator[None, None, None]:
+    from app.auth import rate_limit
+
+    rate_limit.reset_all()
+    yield
+    rate_limit.reset_all()
+
+
+@pytest.fixture(autouse=True)
 def dependency_overrides() -> Generator[None, None, None]:
     original_overrides = dict(app.dependency_overrides)
     app.dependency_overrides.clear()

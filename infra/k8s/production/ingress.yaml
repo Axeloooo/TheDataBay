@@ -31,3 +31,36 @@ spec:
                 name: backend-svc
                 port:
                   number: 8080
+---
+# Rate-limits wallet sign-in at the edge. limit-rps annotations apply to a whole
+# Ingress, so this is a separate resource that only owns /api/v1/auth; nginx
+# picks the longest matching path, so every other /api/v1 route keeps using
+# thedatabay-ingress above. TLS reuses the same secret (cert-manager issues it
+# from thedatabay-ingress, so no issuer annotation here).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: thedatabay-auth-ingress
+  namespace: thedatabay
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rps: "5"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "4"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - thedatabay.com
+      secretName: thedatabay-tls
+  rules:
+    - host: thedatabay.com
+      http:
+        paths:
+          - path: /api/v1/auth
+            pathType: Prefix
+            backend:
+              service:
+                name: backend-svc
+                port:
+                  number: 8080

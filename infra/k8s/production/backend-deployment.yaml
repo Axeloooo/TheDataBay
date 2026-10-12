@@ -26,6 +26,9 @@ spec:
           ports:
             - containerPort: 8080
           env:
+            # One proxy (ingress-nginx) appends to X-Forwarded-For; used by sign-in rate limits.
+            - name: AUTH_TRUSTED_PROXY_HOPS
+              value: "1"
             - name: APP_NAME
               valueFrom:
                 secretKeyRef:
