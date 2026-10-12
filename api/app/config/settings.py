@@ -98,6 +98,24 @@ class Settings(BaseSettings):
         default=300, ge=30, le=900, alias="AUTH_NONCE_TTL_SECONDS"
     )
     auth_domain: str = Field(default="thedatabay.com", alias="AUTH_DOMAIN")
+    # Per-minute limits on /auth/nonce and /auth/verify (in-process, per replica).
+    auth_nonce_rate_limit_per_minute: int = Field(
+        default=20, ge=1, le=10000, alias="AUTH_NONCE_RATE_LIMIT_PER_MINUTE"
+    )
+    auth_nonce_address_rate_limit_per_minute: int = Field(
+        default=5, ge=1, le=10000, alias="AUTH_NONCE_ADDRESS_RATE_LIMIT_PER_MINUTE"
+    )
+    auth_verify_rate_limit_per_minute: int = Field(
+        default=30, ge=1, le=10000, alias="AUTH_VERIFY_RATE_LIMIT_PER_MINUTE"
+    )
+    auth_verify_address_rate_limit_per_minute: int = Field(
+        default=10, ge=1, le=10000, alias="AUTH_VERIFY_ADDRESS_RATE_LIMIT_PER_MINUTE"
+    )
+    # Number of reverse proxies in front of the API that append to
+    # X-Forwarded-For (ingress-nginx = 1). 0 ignores the header entirely.
+    auth_trusted_proxy_hops: int = Field(
+        default=0, ge=0, le=5, alias="AUTH_TRUSTED_PROXY_HOPS"
+    )
 
     @property
     def chat_model(self) -> str:

@@ -26,6 +26,11 @@ spec:
           ports:
             - containerPort: 8080
           env:
+            # ingress-nginx (defaults) overwrites X-Forwarded-For with the real client IP:
+            # 1 trusted hop. Revisit if use-forwarded-headers / compute-full-forwarded-for
+            # is enabled or Front Door / App Gateway is added in front.
+            - name: AUTH_TRUSTED_PROXY_HOPS
+              value: "1"
             - name: APP_NAME
               valueFrom:
                 secretKeyRef:

@@ -268,6 +268,23 @@ kubectl wait --namespace ingress-nginx \
   --timeout=90s
 ```
 
+Sign-in rate limiting at the edge (`thedatabay-auth-ingress`) rejects over-limit
+requests with HTTP 503 by default. To return 429 instead, set these keys in the
+`ingress-nginx-controller` ConfigMap in the `ingress-nginx` namespace (this repo
+does not patch the controller):
+
+```yaml
+data:
+  limit-req-status-code: "429"
+  limit-conn-status-code: "429"
+```
+
+The API reads the client IP from `X-Forwarded-For` using `AUTH_TRUSTED_PROXY_HOPS`
+(set to 1 in `backend-deployment.yaml`). With ingress-nginx defaults the header is
+overwritten with the real client IP. Change the value if `use-forwarded-headers`
+or `compute-full-forwarded-for` is enabled, or Front Door / Application Gateway
+is placed in front.
+
 ## Phase 7: Install cert-manager
 
 ```bash
