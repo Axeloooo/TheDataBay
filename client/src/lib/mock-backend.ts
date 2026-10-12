@@ -151,13 +151,17 @@ export const mockBackend = {
     return delay({ requests: filtered, count: filtered.length, total });
   },
 
-  reviewPurchaseRequest: (requestId: string, payload: { status: "approved" | "rejected"; reviewed_by: string }): Promise<PurchaseRequest> => {
+  reviewPurchaseRequest: (requestId: string, payload: { status: "approved" | "rejected" }): Promise<PurchaseRequest> => {
     const idx = MOCK_PURCHASE_REQUESTS.findIndex((r) => r.id === requestId);
     if (idx === -1) return Promise.reject(new Error(`Purchase request ${requestId} not found.`));
+    if (MOCK_PURCHASE_REQUESTS[idx].status !== "pending") {
+      return Promise.reject(new Error("This purchase request has already been reviewed."));
+    }
     MOCK_PURCHASE_REQUESTS[idx] = {
       ...MOCK_PURCHASE_REQUESTS[idx],
       status: payload.status,
-      reviewed_by: payload.reviewed_by,
+      // The real API records the signed-in wallet, which must be the requester.
+      reviewed_by: MOCK_PURCHASE_REQUESTS[idx].requester_address,
       reviewed_at: new Date().toISOString(),
     };
     return delay({ ...MOCK_PURCHASE_REQUESTS[idx] });

@@ -54,7 +54,7 @@ Click **Agents** in the navbar to browse AI agent profiles and see what datasets
 
 ### Reviewing Purchase Requests
 
-When your wallet is connected, click **Purchase Requests** in the navbar to see any pending requests submitted by AI agents on behalf of buyers. Review each request and click **Approve** or **Reject** to action it.
+When your wallet is connected, click **Purchase Requests** in the navbar to see any pending requests submitted by AI agents on behalf of buyers. Only the wallet a request names as its buyer (`requester_address`) can click **Approve** or **Reject**, and you will be asked to sign in with that wallet first. A decision is final.
 
 ---
 
@@ -217,7 +217,7 @@ POST /api/v1/agents/{handle}/purchase-requests
 }
 ```
 
-> **Note — `requester_address`:** This must be the EVM wallet address of the human user on whose behalf the agent is acting (e.g., the buyer's MetaMask address). This value is obtained out-of-band — from the user's session, configuration, or explicit input — and is not managed by the agent itself.
+> **Note — `requester_address`:** This must be the EVM wallet address of the human user on whose behalf the agent is acting (e.g., the buyer's MetaMask address). This value is obtained out-of-band — from the user's session, configuration, or explicit input — and is not managed by the agent itself. It must be a valid EVM address (otherwise `422`). Only that wallet can approve or reject the request, so a request naming the wrong address can never be approved.
 
 ### Response
 
@@ -308,7 +308,7 @@ The `platform_verified` flag is **only granted by TheDataBay administrators**. A
 | POST   | `/api/v1/agents/{handle}/purchase-requests`                | Submit a purchase request (pending human review)                |
 | GET    | `/api/v1/agents/{handle}/purchase-requests`                | List this agent's purchase requests                             |
 | GET    | `/api/v1/purchase-requests`                                | List all pending purchase requests (for humans to review)       |
-| POST   | `/api/v1/purchase-requests/{request_id}/review`            | Approve or reject a purchase request (admin/user only)          |
+| POST   | `/api/v1/purchase-requests/{request_id}/review`            | Approve or reject (bearer token of `requester_address` wallet)  |
 | GET    | `/api/v1/contract/items/all`                               | List all marketplace datasets                                   |
 | POST   | `/api/v1/ai/similarity-search`                             | Semantic search across datasets                                 |
 
