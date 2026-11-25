@@ -253,6 +253,7 @@ class DatasetEmbedService:
                         preview=preview.model_dump(),
                         stats=stats.model_dump(),
                         vector_spec=vector_spec.model_dump(),
+                        seller_address=Web3.to_checksum_address(seller),
                     )
         except ApiError:
             raise

@@ -14,7 +14,11 @@ class SimilaritySearchRequest(BaseModel):
 
 
 class RankedDataset(BaseModel):
-    """Flat ranked dataset item with normalised cosine similarity score."""
+    """Flat ranked dataset item with normalised cosine similarity score.
+
+    Never add vector row content (``page_content``) here: the vector store holds
+    every row of paid datasets in plaintext, and this endpoint is public.
+    """
 
     dataset_id: str
     listing_id: str
@@ -28,7 +32,6 @@ class RankedDataset(BaseModel):
     purchase_count: int
     score: float = Field(..., ge=0.0, le=1.0, description="Cosine similarity (0.0–1.0)")
     score_label: Literal["high", "moderate", "low"]
-    best_match: str
 
 
 class SimilaritySearchResponse(BaseModel):

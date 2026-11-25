@@ -22,6 +22,7 @@ def upsert_dataset_key(
     preview: dict[str, Any] | None = None,
     stats: dict[str, Any] | None = None,
     vector_spec: dict[str, Any] | None = None,
+    seller_address: str | None = None,
 ) -> DatasetKey:
     """Insert or update dataset key record.
 
@@ -46,6 +47,8 @@ def upsert_dataset_key(
         existing.nonce_b64 = nonce_b64
         existing.dataset_url = dataset_url
         existing.dataset_hash = dataset_hash
+        if seller_address is not None:
+            existing.seller_address = seller_address
         existing.updated_at = now
         session.add(existing)
         if preview is not None:
@@ -67,6 +70,7 @@ def upsert_dataset_key(
         nonce_b64=nonce_b64,
         dataset_url=dataset_url,
         dataset_hash=dataset_hash,
+        seller_address=seller_address,
         created_at=now,
         updated_at=now,
     )
@@ -136,6 +140,7 @@ async def async_upsert_dataset_key(
     preview: dict[str, Any] | None = None,
     stats: dict[str, Any] | None = None,
     vector_spec: dict[str, Any] | None = None,
+    seller_address: str | None = None,
 ) -> DatasetKey:
     """Insert or update a DatasetKey row using an async session.
 
@@ -148,6 +153,7 @@ async def async_upsert_dataset_key(
         nonce_b64 (str): Base64-encoded nonce.
         dataset_url (str): URL of the encrypted dataset on IPFS.
         dataset_hash (str): Content hash of the encrypted dataset.
+        seller_address (str | None): Checksummed wallet that uploaded it.
 
     Returns:
         DatasetKey: The upserted record.
@@ -161,6 +167,7 @@ async def async_upsert_dataset_key(
             nonce_b64=nonce_b64,
             dataset_url=dataset_url,
             dataset_hash=dataset_hash,
+            seller_address=seller_address,
             created_at=now,
             updated_at=now,
         )
@@ -171,6 +178,7 @@ async def async_upsert_dataset_key(
                 "nonce_b64": nonce_b64,
                 "dataset_url": dataset_url,
                 "dataset_hash": dataset_hash,
+                "seller_address": seller_address,
                 "updated_at": now,
             },
         )
@@ -239,6 +247,7 @@ class DatasetKeyRepository:
         preview: dict[str, Any] | None = None,
         stats: dict[str, Any] | None = None,
         vector_spec: dict[str, Any] | None = None,
+        seller_address: str | None = None,
     ) -> DatasetKey:
         """Insert or update key material for a listing."""
         return await async_upsert_dataset_key(
@@ -251,6 +260,7 @@ class DatasetKeyRepository:
             preview=preview,
             stats=stats,
             vector_spec=vector_spec,
+            seller_address=seller_address,
         )
 
 

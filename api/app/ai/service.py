@@ -66,7 +66,6 @@ class _DatasetHit:
     listing_id: str
     score: float
     score_label: Literal["high", "moderate", "low"]
-    best_match: str
 
 
 class _LLMEmbeddingsAdapter:
@@ -195,7 +194,6 @@ class AIService:
                     purchase_count=int(item.purchase_count),
                     score=hit.score,
                     score_label=hit.score_label,
-                    best_match=hit.best_match,
                 )
             )
             if len(results) >= final_limit:
@@ -228,7 +226,6 @@ def _aggregate_dataset_hits(
             listing_id=normalized_listing_id,
             score=score,
             score_label=label,
-            best_match=str(getattr(doc, "page_content", "") or ""),
         )
         current = best_by_listing.get(normalized_listing_id)
         if current is None or hit.score > current.score:

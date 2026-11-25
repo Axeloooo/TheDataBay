@@ -33,7 +33,6 @@ def make_create_request(handle: str, **overrides) -> AgentCreateRequest:
         "avatar_url": f"https://example.com/{handle}.png",
         "homepage_url": f"https://example.com/{handle}",
         "capability_tags": ["search", "analysis"],
-        "owner_address": "0x0000000000000000000000000000000000000001",
     }
     payload.update(overrides)
     return AgentCreateRequest(**payload)
@@ -48,6 +47,7 @@ def test_create_agent_and_get_by_handle_persists_across_sessions(db_engine):
                 display_name="Climate Bot",
                 capability_tags=["climate", "forecasting"],
             ),
+            owner_address="0x0000000000000000000000000000000000000001",
         )
 
         assert created.handle == "climate-bot"

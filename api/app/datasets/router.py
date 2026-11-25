@@ -19,6 +19,7 @@ from ..contracts import service as contract_service
 from . import repository as dataset_key_repo
 from ..shared.errors import ApiError
 from ..auth.dependencies import AuthedWallet, current_wallet
+from ..auth.service import same_evm_address
 
 router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
 logger = logging.getLogger(__name__)
@@ -90,7 +91,9 @@ def release_key(
     """Release the dataset encryption key to the signed-in wallet.
 
     The wallet identity comes only from the bearer token; any address in the
-    request body is ignored.
+    request body is ignored. The on-chain listing's seller must also be the
+    wallet that uploaded the dataset, so a squatter who claims the listing ID
+    on-chain first cannot sell (or buy back) the real seller's key.
 
     Args:
         id (str): Item ID
@@ -100,7 +103,8 @@ def release_key(
 
     Raises:
         ApiError: 401 when the token is missing or invalid
-        HTTPException: 403 when the wallet has no on-chain access
+        HTTPException: 403 when the wallet has no on-chain access, or the
+            on-chain seller is not the wallet that uploaded the dataset
         HTTPException: 404 when no key is stored for the listing
 
     Returns:
@@ -123,6 +127,16 @@ def release_key(
     if not record:
         logger.warning("datasets.release_key missing_key listing_id=%s", id)
         raise HTTPException(status_code=404, detail="Key not found for listing")
+
+    # Rows stored before seller binding existed have no seller_address.
+    if record.seller_address:
+        item = contract_service.get_item_view(id, settings)
+        if not same_evm_address(item.seller, record.seller_address):
+            logger.warning("datasets.release_key seller_mismatch listing_id=%s", id)
+            raise HTTPException(
+                status_code=403,
+                detail="Listing seller does not match the dataset uploader",
+            )
 
     logger.info("datasets.release_key success listing_id=%s", id)
 

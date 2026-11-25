@@ -3,9 +3,14 @@ from datetime import datetime, timezone
 
 import pytest
 from eth_account import Account
+from sqlmodel import select
 
 from app.agents.models import Agent, AgentPurchaseRequest, AgentRecommendation
 from app.agents import router as agent_router
+
+OWNER = Account.create().address
+REQUESTER = Account.create().address
+STRANGER = Account.create().address
 
 
 def make_agent(handle: str, **overrides) -> Agent:
@@ -18,7 +23,7 @@ def make_agent(handle: str, **overrides) -> Agent:
         "homepage_url": f"https://example.com/{handle}",
         "capability_tags": '["search","analysis"]',
         "verification_status": "unverified",
-        "owner_address": "0x0000000000000000000000000000000000000001",
+        "owner_address": OWNER,
         "is_active": True,
         "created_at": datetime(2024, 1, 1, tzinfo=timezone.utc),
         "updated_at": datetime(2024, 1, 1, tzinfo=timezone.utc),
@@ -81,7 +86,7 @@ def override_agent_dependencies(client, db_session):
         client.app.dependency_overrides.pop(agent_router.get_ai_service, None)
 
 
-def test_register_agent_returns_created_agent(client, monkeypatch):
+def test_register_agent_returns_created_agent(client, monkeypatch, auth_headers):
     created = make_agent("climate-bot", display_name="Climate Bot")
     captured = {}
 
@@ -89,15 +94,17 @@ def test_register_agent_returns_created_agent(client, monkeypatch):
         agent_router, "get_agent_by_handle", lambda session, handle: None
     )
 
-    def fake_create_agent(session, data):
+    def fake_create_agent(session, data, owner_address=None):
         captured["session"] = session
         captured["data"] = data
+        captured["owner_address"] = owner_address
         return created
 
     monkeypatch.setattr(agent_router, "create_agent", fake_create_agent)
 
     response = client.post(
         "/api/v1/agents/",
+        headers=auth_headers(OWNER),
         json={
             "handle": "climate-bot",
             "display_name": "Climate Bot",
@@ -113,9 +120,10 @@ def test_register_agent_returns_created_agent(client, monkeypatch):
     assert captured["data"].handle == "climate-bot"
     assert captured["data"].display_name == "Climate Bot"
     assert captured["data"].capability_tags == ["climate", "analysis"]
+    assert captured["owner_address"] == OWNER
 
 
-def test_register_agent_returns_409_for_duplicate_handle(client, monkeypatch):
+def test_register_agent_returns_409_for_duplicate_handle(client, monkeypatch, auth_headers):
     monkeypatch.setattr(
         agent_router,
         "get_agent_by_handle",
@@ -124,13 +132,14 @@ def test_register_agent_returns_409_for_duplicate_handle(client, monkeypatch):
     monkeypatch.setattr(
         agent_router,
         "create_agent",
-        lambda session, data: (_ for _ in ()).throw(
+        lambda session, data, owner_address=None: (_ for _ in ()).throw(
             AssertionError("create_agent should not be called for duplicate handles")
         ),
     )
 
     response = client.post(
         "/api/v1/agents/",
+        headers=auth_headers(OWNER),
         json={"handle": "climate-bot", "display_name": "Climate Bot"},
     )
 
@@ -210,7 +219,7 @@ def test_get_agent_returns_404_when_missing(client, monkeypatch):
     assert response.json() == {"detail": "Agent not found"}
 
 
-def test_update_agent_returns_updated_agent(client, monkeypatch):
+def test_update_agent_returns_updated_agent(client, monkeypatch, auth_headers):
     existing = make_agent("climate-bot", display_name="Old Name")
     updated = make_agent(
         "climate-bot",
@@ -234,6 +243,7 @@ def test_update_agent_returns_updated_agent(client, monkeypatch):
 
     response = client.patch(
         "/api/v1/agents/climate-bot",
+        headers=auth_headers(OWNER),
         json={
             "display_name": "New Name",
             "bio": "Updated bio",
@@ -250,18 +260,22 @@ def test_update_agent_returns_updated_agent(client, monkeypatch):
     assert captured["data"].capability_tags == ["climate", "ranker"]
 
 
-def test_update_agent_returns_404_when_missing(client, monkeypatch):
+def test_update_agent_returns_404_when_missing(client, monkeypatch, auth_headers):
     monkeypatch.setattr(
         agent_router, "get_agent_by_handle", lambda session, handle: None
     )
 
-    response = client.patch("/api/v1/agents/missing-bot", json={"bio": "Updated bio"})
+    response = client.patch(
+        "/api/v1/agents/missing-bot",
+        headers=auth_headers(OWNER),
+        json={"bio": "Updated bio"},
+    )
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Agent not found"}
 
 
-def test_generate_recommendation_returns_recommendation(client, monkeypatch):
+def test_generate_recommendation_returns_recommendation(client, monkeypatch, auth_headers):
     agent = make_agent("climate-bot")
     recommendation = make_recommendation(agent.id)
     captured = {}
@@ -285,6 +299,7 @@ def test_generate_recommendation_returns_recommendation(client, monkeypatch):
 
     response = client.post(
         "/api/v1/agents/climate-bot/recommend",
+        headers=auth_headers(OWNER),
         json={"query": "  find climate datasets  "},
     )
 
@@ -298,7 +313,7 @@ def test_generate_recommendation_returns_recommendation(client, monkeypatch):
     assert captured["args"]["ai_service"] is ai_service
 
 
-def test_generate_recommendation_returns_404_when_no_results(client, monkeypatch):
+def test_generate_recommendation_returns_404_when_no_results(client, monkeypatch, auth_headers):
     agent = make_agent("climate-bot")
     ai_service = object()
 
@@ -314,6 +329,7 @@ def test_generate_recommendation_returns_404_when_no_results(client, monkeypatch
 
     response = client.post(
         "/api/v1/agents/climate-bot/recommend",
+        headers=auth_headers(OWNER),
         json={"query": "no matches"},
     )
 
@@ -321,7 +337,7 @@ def test_generate_recommendation_returns_404_when_no_results(client, monkeypatch
     assert response.json() == {"detail": "No matching datasets found for query"}
 
 
-def test_retract_recommendation_returns_updated_record(client, monkeypatch):
+def test_retract_recommendation_returns_updated_record(client, monkeypatch, auth_headers):
     agent = make_agent("climate-bot")
     original = make_recommendation(agent.id)
     retracted = make_recommendation(
@@ -346,7 +362,8 @@ def test_retract_recommendation_returns_updated_record(client, monkeypatch):
     monkeypatch.setattr(agent_router, "retract_recommendation_repo", fake_retract)
 
     response = client.post(
-        f"/api/v1/agents/climate-bot/recommendations/{original.id}/retract"
+        f"/api/v1/agents/climate-bot/recommendations/{original.id}/retract",
+        headers=auth_headers(OWNER),
     )
 
     assert response.status_code == 200
@@ -355,7 +372,7 @@ def test_retract_recommendation_returns_updated_record(client, monkeypatch):
     assert captured["rec"].id == original.id
 
 
-def test_submit_purchase_request_returns_created_request(client, monkeypatch):
+def test_submit_purchase_request_returns_created_request(client, monkeypatch, auth_headers):
     agent = make_agent("buyer-bot")
     created = make_purchase_request(agent.id, listing_id="listing-9")
     captured = {}
@@ -377,6 +394,7 @@ def test_submit_purchase_request_returns_created_request(client, monkeypatch):
 
     response = client.post(
         "/api/v1/agents/buyer-bot/purchase-requests",
+        headers=auth_headers(OWNER),
         json={
             "listing_id": "listing-9",
             "requester_address": "0x00000000000000000000000000000000000000ab",
@@ -397,8 +415,7 @@ def test_submit_purchase_request_returns_created_request(client, monkeypatch):
 
 
 def test_submit_purchase_request_rejects_invalid_requester_address(
-    client, monkeypatch
-):
+    client, monkeypatch, auth_headers):
     monkeypatch.setattr(
         agent_router,
         "get_agent_by_handle",
@@ -414,6 +431,7 @@ def test_submit_purchase_request_rejects_invalid_requester_address(
 
     response = client.post(
         "/api/v1/agents/buyer-bot/purchase-requests",
+        headers=auth_headers(OWNER),
         json={
             "listing_id": "listing-9",
             "requester_address": "not-an-address",
@@ -493,10 +511,6 @@ def test_list_all_purchase_requests_defaults_to_pending(client, monkeypatch):
         "offset": 0,
         "limit": 20,
     }
-
-
-REQUESTER = Account.create().address
-STRANGER = Account.create().address
 
 
 @pytest.fixture
@@ -643,3 +657,151 @@ def test_review_route_documents_auth_errors(client):
 
     assert {"401", "403", "404", "409"} <= set(review["responses"])
     assert "reviewed_by" not in body_schema["properties"]
+
+
+# ---------------------------------------------------------------------------
+# Agent writes are limited to the agent's owner wallet
+# ---------------------------------------------------------------------------
+
+_OWNED_AGENT_WRITES = [
+    ("patch", "/api/v1/agents/owned-bot", {"homepage_url": "https://phish.example"}),
+    ("post", "/api/v1/agents/owned-bot/recommend", {"query": "anything"}),
+    (
+        "post",
+        f"/api/v1/agents/owned-bot/recommendations/{uuid.uuid4()}/retract",
+        None,
+    ),
+    (
+        "post",
+        "/api/v1/agents/owned-bot/purchase-requests",
+        {
+            "listing_id": "listing-9",
+            "requester_address": "0x00000000000000000000000000000000000000ab",
+            "reason": "Looks great",
+        },
+    ),
+]
+
+
+@pytest.fixture
+def owned_agent(client, db_session):
+    """A persisted agent owned by OWNER; write paths must never reach the service."""
+    agent = make_agent("owned-bot", verification_status="platform_verified")
+    db_session.add(agent)
+    db_session.commit()
+    db_session.refresh(agent)
+    client.app.dependency_overrides[agent_router.get_ai_service] = lambda: object()
+    return agent
+
+
+def _call(client, method, path, body, headers=None):
+    kwargs = {"headers": headers or {}}
+    if body is not None:
+        kwargs["json"] = body
+    return getattr(client, method)(path, **kwargs)
+
+
+def _forbid_writes(monkeypatch):
+    def boom(*args, **kwargs):
+        raise AssertionError("write must not happen for a non-owner")
+
+    for name in (
+        "update_agent",
+        "generate_recommendation_service",
+        "retract_recommendation_repo",
+        "create_purchase_request",
+    ):
+        monkeypatch.setattr(agent_router, name, boom)
+
+
+@pytest.mark.parametrize(("method", "path", "body"), _OWNED_AGENT_WRITES)
+def test_agent_write_without_token_returns_401(
+    client, owned_agent, monkeypatch, method, path, body
+):
+    _forbid_writes(monkeypatch)
+
+    response = _call(client, method, path, body)
+
+    assert response.status_code == 401
+    assert response.json()["error"] == "unauthorized"
+
+
+@pytest.mark.parametrize(("method", "path", "body"), _OWNED_AGENT_WRITES)
+def test_agent_write_by_other_wallet_returns_403(
+    client, owned_agent, monkeypatch, auth_headers, method, path, body
+):
+    _forbid_writes(monkeypatch)
+
+    response = _call(client, method, path, body, headers=auth_headers(STRANGER))
+
+    assert response.status_code == 403
+    assert response.json()["error"] == "forbidden"
+
+
+@pytest.mark.parametrize(("method", "path", "body"), _OWNED_AGENT_WRITES)
+def test_agent_without_owner_cannot_be_written(
+    client, db_session, owned_agent, monkeypatch, auth_headers, method, path, body
+):
+    owned_agent.owner_address = None
+    db_session.add(owned_agent)
+    db_session.commit()
+    _forbid_writes(monkeypatch)
+
+    response = _call(client, method, path, body, headers=auth_headers(OWNER))
+
+    assert response.status_code == 403
+
+
+def test_register_agent_takes_owner_from_token_not_body(
+    client, db_session, auth_headers
+):
+    response = client.post(
+        "/api/v1/agents/",
+        headers=auth_headers(OWNER),
+        json={
+            "handle": "new-bot",
+            "display_name": "New Bot",
+            # A forged owner in the body must be ignored.
+            "owner_address": STRANGER,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["owner_address"] == OWNER
+    stored = db_session.exec(
+        select(Agent).where(Agent.handle == "new-bot")
+    ).one()
+    assert stored.owner_address == OWNER
+
+
+def test_register_agent_without_token_returns_401(client, db_session):
+    response = client.post(
+        "/api/v1/agents/",
+        json={"handle": "anon-bot", "display_name": "Anon Bot"},
+    )
+
+    assert response.status_code == 401
+
+
+def test_owner_cannot_transfer_or_verify_agent_via_patch(
+    client, db_session, owned_agent, auth_headers
+):
+    owned_agent.verification_status = "unverified"
+    db_session.add(owned_agent)
+    db_session.commit()
+
+    response = client.patch(
+        "/api/v1/agents/owned-bot",
+        headers=auth_headers(OWNER),
+        json={
+            "bio": "updated",
+            "owner_address": STRANGER,
+            "verification_status": "platform_verified",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["bio"] == "updated"
+    assert body["owner_address"] == OWNER
+    assert body["verification_status"] == "unverified"
