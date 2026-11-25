@@ -20,7 +20,6 @@ def make_ranked(listing_id: str, title: str, score: float) -> RankedDataset:
         purchase_count=0,
         score=score,
         score_label="high" if score > 0.66 else ("moderate" if score > 0.33 else "low"),
-        best_match=f"Summary for {title}",
     )
 
 

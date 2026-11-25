@@ -159,7 +159,6 @@ def test_strong_match_embeds_query_searches_summaries_and_joins_listing():
     assert result.title == "Heart Cohort"
     assert result.score == 0.91
     assert result.score_label == "high"
-    assert result.best_match == "age in years: 63\nserum cholesterol: 200"
 
 
 def test_weak_match_is_returned_with_low_label():
@@ -251,7 +250,7 @@ def test_similarity_threshold_can_raise_minimum_score_above_low_band():
     assert asyncio.run(service.rank_datasets("weak signal", limit=5)) == []
 
 
-def test_dedupes_row_hits_by_listing_id_and_keeps_best_match():
+def test_dedupes_row_hits_by_listing_id_and_keeps_best_score():
     service, _, _, _ = make_service(
         row_hits=[
             (
@@ -285,7 +284,6 @@ def test_dedupes_row_hits_by_listing_id_and_keeps_best_match():
 
     assert [result.dataset_id for result in results] == ["listing-1", "listing-2"]
     assert results[0].score == 0.88
-    assert results[0].best_match == "age in years: 37\nserum cholesterol: 289"
 
 
 def test_response_schema_includes_all_ranked_dataset_fields():
@@ -318,8 +316,23 @@ def test_response_schema_includes_all_ranked_dataset_fields():
         "purchase_count": 0,
         "score": 0.75,
         "score_label": "high",
-        "best_match": "biological sex: 1\nage in years: 45",
     }
+
+
+def test_ranked_results_never_expose_vector_row_content():
+    """Row text from paid datasets must not leak through public search."""
+    row_text = "customer_id: 10432\ncountry: CA\nlifetime_value: 9120"
+    service, _, _, _ = make_service(
+        row_hits=[(make_doc(listing_id="listing-paid", page_content=row_text), 0.9)],
+        contract_items=[make_item("listing-paid")],
+    )
+
+    results = asyncio.run(service.rank_datasets("customer country value", limit=5))
+
+    assert len(results) == 1
+    serialized = results[0].model_dump_json()
+    assert "10432" not in serialized
+    assert "lifetime_value" not in serialized
 
 
 def test_bytes32_contract_listing_id_joins_to_uuid_metadata_listing_id():
