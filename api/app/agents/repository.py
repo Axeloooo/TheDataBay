@@ -18,12 +18,15 @@ from .schemas import AgentCreateRequest, AgentUpdateRequest
 # ---------------------------------------------------------------------------
 
 
-def create_agent(session: Session, data: AgentCreateRequest) -> Agent:
+def create_agent(
+    session: Session, data: AgentCreateRequest, owner_address: Optional[str] = None
+) -> Agent:
     """Create a new agent record.
 
     Args:
         session: Database session
         data: AgentCreateRequest schema with agent fields
+        owner_address: Wallet that owns the agent, taken from the caller's token
 
     Returns:
         Agent: The newly created Agent record
@@ -36,7 +39,7 @@ def create_agent(session: Session, data: AgentCreateRequest) -> Agent:
         avatar_url=data.avatar_url,
         homepage_url=data.homepage_url,
         capability_tags=json.dumps(data.capability_tags),
-        owner_address=data.owner_address,
+        owner_address=owner_address,
         created_at=now,
         updated_at=now,
     )
@@ -130,8 +133,6 @@ def update_agent(session: Session, agent: Agent, data: AgentUpdateRequest) -> Ag
         agent.homepage_url = data.homepage_url
     if data.capability_tags is not None:
         agent.capability_tags = json.dumps(data.capability_tags)
-    if data.owner_address is not None:
-        agent.owner_address = data.owner_address
 
     agent.updated_at = now
     session.add(agent)

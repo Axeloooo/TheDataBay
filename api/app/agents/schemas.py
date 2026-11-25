@@ -12,7 +12,11 @@ from web3 import Web3
 
 
 class AgentCreateRequest(BaseModel):
-    """Request model for creating a new agent."""
+    """Request model for creating a new agent.
+
+    The owner is the wallet proven by the bearer token, so there is no
+    ``owner_address`` field here.
+    """
 
     handle: str = Field(..., max_length=64, description="Unique handle for the agent")
     display_name: str = Field(..., description="Display name of the agent")
@@ -26,13 +30,14 @@ class AgentCreateRequest(BaseModel):
     capability_tags: List[str] = Field(
         default_factory=list, description="List of capability tags describing the agent"
     )
-    owner_address: Optional[str] = Field(
-        None, description="Ethereum address of the agent owner"
-    )
 
 
 class AgentUpdateRequest(BaseModel):
-    """Request model for updating an existing agent."""
+    """Request model for updating an existing agent.
+
+    ``owner_address`` and ``verification_status`` are deliberately absent:
+    neither can be changed through the public API.
+    """
 
     display_name: Optional[str] = Field(None, description="Display name of the agent")
     bio: Optional[str] = Field(
@@ -44,9 +49,6 @@ class AgentUpdateRequest(BaseModel):
     homepage_url: Optional[str] = Field(None, description="URL to the agent's homepage")
     capability_tags: Optional[List[str]] = Field(
         None, description="List of capability tags describing the agent"
-    )
-    owner_address: Optional[str] = Field(
-        None, description="Ethereum address of the agent owner"
     )
 
 

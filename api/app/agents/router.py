@@ -54,22 +54,57 @@ rec_router = APIRouter(prefix="/api/v1/recommendations", tags=["recommendations"
 
 logger = logging.getLogger(__name__)
 
+_OWNER_ONLY_RESPONSES = {
+    401: {"model": ErrorResponse, "description": "Missing, malformed or expired token"},
+    403: {
+        "model": ErrorResponse,
+        "description": "Signed-in wallet is not the agent's owner_address",
+    },
+}
+
+
+def _require_agent_owner(agent, wallet: AuthedWallet, action: str) -> None:
+    """Allow an agent write only for the wallet that registered the agent.
+
+    Agents without an owner (legacy or seeded rows) cannot be changed through
+    the API at all.
+    """
+    if not agent.owner_address or not same_evm_address(
+        agent.owner_address, wallet.address
+    ):
+        logger.warning("agents.%s forbidden handle=%s", action, agent.handle)
+        raise ApiError(
+            status_code=403,
+            error="forbidden",
+            message="Only the agent's owner wallet can perform this action.",
+        )
+
 
 # ---------------------------------------------------------------------------
 # Agent CRUD
 # ---------------------------------------------------------------------------
 
 
-@router.post("/", response_model=AgentResponse, status_code=201)
+@router.post(
+    "/",
+    response_model=AgentResponse,
+    status_code=201,
+    responses={401: _OWNER_ONLY_RESPONSES[401]},
+)
 def register_agent(
     data: AgentCreateRequest,
+    wallet: AuthedWallet = Depends(current_wallet),
     session: Session = Depends(get_session),
     _: None = Depends(agent_write_rate_limiter),
 ):
-    """Register a new agent.
+    """Register a new agent owned by the signed-in wallet.
+
+    Requires a user-scope bearer token. The token's wallet becomes the agent's
+    ``owner_address``; only that wallet can change or act for the agent later.
 
     Args:
         data (AgentCreateRequest): Agent creation payload.
+        wallet (AuthedWallet): Wallet proven by the bearer token.
         session (Session): Database session.
 
     Returns:
@@ -78,7 +113,7 @@ def register_agent(
     existing = get_agent_by_handle(session, data.handle)
     if existing:
         raise HTTPException(status_code=409, detail="Handle already taken")
-    agent = create_agent(session, data)
+    agent = create_agent(session, data, owner_address=wallet.address)
     return agent
 
 
@@ -127,18 +162,22 @@ def get_agent(handle: str, session: Session = Depends(get_session)):
     return agent
 
 
-@router.patch("/{handle}", response_model=AgentResponse)
+@router.patch(
+    "/{handle}", response_model=AgentResponse, responses=_OWNER_ONLY_RESPONSES
+)
 def update_agent_route(
     handle: str,
     data: AgentUpdateRequest,
+    wallet: AuthedWallet = Depends(current_wallet),
     session: Session = Depends(get_session),
     _: None = Depends(agent_write_rate_limiter),
 ):
-    """Update an agent's profile.
+    """Update an agent's profile. Only the agent's owner wallet may do this.
 
     Args:
         handle (str): Unique agent handle.
         data (AgentUpdateRequest): Fields to update.
+        wallet (AuthedWallet): Wallet proven by the bearer token.
         session (Session): Database session.
 
     Returns:
@@ -147,6 +186,7 @@ def update_agent_route(
     agent = get_agent_by_handle(session, handle)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
+    _require_agent_owner(agent, wallet, "update")
     return update_agent(session, agent, data)
 
 
@@ -155,19 +195,27 @@ def update_agent_route(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/{handle}/recommend", response_model=RecommendationResponse)
+@router.post(
+    "/{handle}/recommend",
+    response_model=RecommendationResponse,
+    responses=_OWNER_ONLY_RESPONSES,
+)
 async def generate_recommendation_route(
     handle: str,
     body: RecommendQueryRequest,
+    wallet: AuthedWallet = Depends(current_wallet),
     session: Session = Depends(get_session),
     ai_service: AIService = Depends(get_ai_service),
     _: None = Depends(agent_write_rate_limiter),
 ):
     """Generate a recommendation for a dataset query on behalf of an agent.
 
+    Only the agent's owner wallet may publish recommendations under its name.
+
     Args:
         handle (str): Unique agent handle.
         body (RecommendQueryRequest): Request body containing ``query`` field.
+        wallet (AuthedWallet): Wallet proven by the bearer token.
         session (Session): Database session.
         ai_service (AIService): AI service instance.
 
@@ -177,6 +225,7 @@ async def generate_recommendation_route(
     agent = get_agent_by_handle(session, handle)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
+    _require_agent_owner(agent, wallet, "recommend")
     query = body.query.strip()
     result = await generate_recommendation_service(
         agent.id, query, session, ai_service
@@ -218,19 +267,23 @@ def list_agent_recommendations(
 
 
 @router.post(
-    "/{handle}/recommendations/{rec_id}/retract", response_model=RecommendationResponse
+    "/{handle}/recommendations/{rec_id}/retract",
+    response_model=RecommendationResponse,
+    responses=_OWNER_ONLY_RESPONSES,
 )
 def retract_recommendation_route(
     handle: str,
     rec_id: uuid.UUID,
+    wallet: AuthedWallet = Depends(current_wallet),
     session: Session = Depends(get_session),
     _: None = Depends(agent_write_rate_limiter),
 ):
-    """Retract a recommendation made by an agent.
+    """Retract a recommendation made by an agent. Owner wallet only.
 
     Args:
         handle (str): Unique agent handle.
         rec_id (uuid.UUID): Recommendation UUID to retract.
+        wallet (AuthedWallet): Wallet proven by the bearer token.
         session (Session): Database session.
 
     Returns:
@@ -239,6 +292,7 @@ def retract_recommendation_route(
     agent = get_agent_by_handle(session, handle)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
+    _require_agent_owner(agent, wallet, "retract")
     rec = get_recommendation_by_id(session, rec_id)
     if not rec or rec.agent_id != agent.id:
         raise HTTPException(status_code=404, detail="Recommendation not found")
@@ -254,18 +308,23 @@ def retract_recommendation_route(
     "/{handle}/purchase-requests",
     response_model=PurchaseRequestResponse,
     status_code=201,
+    responses=_OWNER_ONLY_RESPONSES,
 )
 def submit_purchase_request(
     handle: str,
     data: PurchaseRequestCreate,
+    wallet: AuthedWallet = Depends(current_wallet),
     session: Session = Depends(get_session),
     _: None = Depends(agent_write_rate_limiter),
 ):
-    """Submit a purchase request on behalf of an agent.
+    """Submit a purchase request on behalf of an agent. Owner wallet only.
+
+    Without this check anyone could file requests in a trusted agent's name.
 
     Args:
         handle (str): Unique agent handle.
         data (PurchaseRequestCreate): Purchase request payload.
+        wallet (AuthedWallet): Wallet proven by the bearer token.
         session (Session): Database session.
 
     Returns:
@@ -274,6 +333,7 @@ def submit_purchase_request(
     agent = get_agent_by_handle(session, handle)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
+    _require_agent_owner(agent, wallet, "purchase_request")
     req = create_purchase_request(
         session, agent.id, data.listing_id, data.requester_address, data.reason
     )
