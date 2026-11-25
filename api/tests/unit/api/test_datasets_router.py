@@ -26,7 +26,7 @@ def only_b_has_access(settings, monkeypatch):
         datasets_router.dataset_key_repo,
         "get_dataset_key",
         lambda session, listing_id: SimpleNamespace(
-            key_b64="a2V5", nonce_b64="bm9uY2U="
+            key_b64="a2V5", nonce_b64="bm9uY2U=", seller_address=None
         ),
     )
     return SimpleNamespace(calls=calls, b_wallet_id=b_wallet_id)

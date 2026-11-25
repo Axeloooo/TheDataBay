@@ -20,6 +20,10 @@ class DatasetKey(SQLModel, table=True):
     nonce_b64: str
     dataset_url: str
     dataset_hash: str
+    # Wallet that uploaded the dataset. Key release requires the on-chain
+    # listing's seller to match, so a squatter cannot claim the listing ID.
+    # NULL for keys stored before this column existed.
+    seller_address: Optional[str] = Field(default=None)
     created_at: Optional[datetime] = Field(
         default=None,
         sa_column=Column(

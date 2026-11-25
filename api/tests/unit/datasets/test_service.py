@@ -171,6 +171,11 @@ async def test_embed_persists_row_documents(settings):
 
     assert harness.repo.calls[0]["listing_id"] == response.listing_id
     assert harness.repo.calls[0]["dataset_url"] == "ipfs://QmData"
+    # Key release later requires the on-chain seller to be this uploader.
+    assert (
+        harness.repo.calls[0]["seller_address"]
+        == "0x0000000000000000000000000000000000000001"
+    )
     assert harness.repo.calls[0]["preview"] == {
         "column_names": ["age", "cp"],
         "rows": [["63", "3"], ["37", "2"]],
